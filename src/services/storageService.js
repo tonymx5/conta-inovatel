@@ -163,11 +163,11 @@ export const storageService = {
   getTaxConfig: () => getStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: 1.25 }),
   saveTaxConfig: (config) => {
     setStorageItem(STORAGE_KEYS.TAX_CONFIG, config);
-    supabase.from('tax_config').upsert({
+    Promise.resolve(supabase.from('tax_config').upsert({
       id: 'default',
       isr_estimated_rate: config.isrEstimatedRate,
       last_updated: new Date().toISOString()
-    }).catch(err => console.error('Supabase TaxConfig error:', err));
+    })).catch(err => console.error('Supabase TaxConfig error:', err));
   },
 
   // Clients
@@ -185,7 +185,7 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.CLIENTS, clients);
 
     // Sync to Supabase
-    supabase.from('clients').upsert({
+    Promise.resolve(supabase.from('clients').upsert({
       id: clientToSave.id,
       name: clientToSave.name,
       rfc: clientToSave.rfc,
@@ -193,14 +193,14 @@ export const storageService = {
       phone: clientToSave.phone,
       sector: clientToSave.sector,
       notes: clientToSave.notes
-    }).catch(err => console.error('Supabase Client save error:', err));
+    })).catch(err => console.error('Supabase Client save error:', err));
 
     return clients;
   },
   deleteClient: (id) => {
     const clients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients).filter(c => c.id !== id);
     setStorageItem(STORAGE_KEYS.CLIENTS, clients);
-    supabase.from('clients').delete().eq('id', id).catch(err => console.error('Supabase Client delete error:', err));
+    Promise.resolve(supabase.from('clients').delete().eq('id', id)).catch(err => console.error('Supabase Client delete error:', err));
     return clients;
   },
 
@@ -219,7 +219,7 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.INVOICES, invoices);
 
     // Sync to Supabase
-    supabase.from('invoices').upsert({
+    Promise.resolve(supabase.from('invoices').upsert({
       id: updatedInvoice.id,
       folio: updatedInvoice.folio,
       client_name: updatedInvoice.clientName,
@@ -238,7 +238,7 @@ export const storageService = {
       base_neta: updatedInvoice.baseNeta || 0,
       total: updatedInvoice.total || 0,
       status: updatedInvoice.status || 'PAGADA'
-    }).catch(err => console.error('Supabase Invoice save error:', err));
+    })).catch(err => console.error('Supabase Invoice save error:', err));
 
     storageService.logAudit(user, existingIndex >= 0 ? 'EDITAR_FACTURA' : 'CREAR_FACTURA', `Factura ${updatedInvoice.folio} (${updatedInvoice.clientName})`);
     return invoices;
@@ -246,7 +246,7 @@ export const storageService = {
   deleteInvoice: (id, user = 'admin') => {
     const invoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices).filter(i => i.id !== id);
     setStorageItem(STORAGE_KEYS.INVOICES, invoices);
-    supabase.from('invoices').delete().eq('id', id).catch(err => console.error('Supabase Invoice delete error:', err));
+    Promise.resolve(supabase.from('invoices').delete().eq('id', id)).catch(err => console.error('Supabase Invoice delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_FACTURA', `ID ${id}`);
     return invoices;
   },
@@ -262,7 +262,7 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, list);
 
     // Sync to Supabase
-    supabase.from('deductibles').upsert({
+    Promise.resolve(supabase.from('deductibles').upsert({
       id: itemToSave.id,
       provider_name: itemToSave.providerName,
       rfc: itemToSave.rfc,
@@ -275,7 +275,7 @@ export const storageService = {
       category: itemToSave.category || 'Telecomunicaciones',
       file_name: itemToSave.fileName,
       file_url: itemToSave.fileUrl
-    }).catch(err => console.error('Supabase Deductible save error:', err));
+    })).catch(err => console.error('Supabase Deductible save error:', err));
 
     storageService.logAudit(user, 'GUARDAR_DEDUCCION_PROVEEDOR', `${itemToSave.providerName} - IVA $${itemToSave.ivaTotal}`);
     return list;
@@ -283,7 +283,7 @@ export const storageService = {
   deleteDeductible: (id, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles).filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, list);
-    supabase.from('deductibles').delete().eq('id', id).catch(err => console.error('Supabase Deductible delete error:', err));
+    Promise.resolve(supabase.from('deductibles').delete().eq('id', id)).catch(err => console.error('Supabase Deductible delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_DEDUCCION', `ID ${id}`);
     return list;
   },
@@ -299,14 +299,14 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
     // Sync to Supabase
-    supabase.from('account_deposits').upsert({
+    Promise.resolve(supabase.from('account_deposits').upsert({
       id: depToSave.id,
       concept: depToSave.concept,
       amount: depToSave.amount || 0,
       date: depToSave.date,
       bank_name: depToSave.bankName || 'Santander',
       reference: depToSave.reference
-    }).catch(err => console.error('Supabase Deposit save error:', err));
+    })).catch(err => console.error('Supabase Deposit save error:', err));
 
     storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount})`);
     return list;
@@ -314,7 +314,7 @@ export const storageService = {
   deleteAccountDeposit: (id, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits).filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
-    supabase.from('account_deposits').delete().eq('id', id).catch(err => console.error('Supabase Deposit delete error:', err));
+    Promise.resolve(supabase.from('account_deposits').delete().eq('id', id)).catch(err => console.error('Supabase Deposit delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_DEPOSITO_CUENTA', `ID ${id}`);
     return list;
   },
@@ -378,13 +378,13 @@ export const storageService = {
     logs.unshift(logItem);
     setStorageItem(STORAGE_KEYS.AUDIT_LOGS, logs.slice(0, 200));
 
-    supabase.from('audit_logs').insert({
+    Promise.resolve(supabase.from('audit_logs').insert({
       id: logItem.id,
       timestamp: logItem.timestamp,
       action: logItem.action,
       details: logItem.details,
       user_role: username
-    }).catch(err => console.error('Supabase Log save error:', err));
+    })).catch(err => console.error('Supabase Log save error:', err));
   },
 
   // Security Incidents
