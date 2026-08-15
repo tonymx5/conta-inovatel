@@ -37,6 +37,12 @@ export default function ProviderDeductionsModule({ userRole }) {
 
   useEffect(() => {
     loadData();
+
+    const handleSync = () => {
+      loadData();
+    };
+    window.addEventListener('conta_data_synced', handleSync);
+    return () => window.removeEventListener('conta_data_synced', handleSync);
   }, []);
 
   const loadData = () => {

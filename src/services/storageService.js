@@ -17,32 +17,41 @@ const STORAGE_KEYS = {
 
 // Initial Seed Data with 1.25% RESICO ISR default
 const initialClients = [
-  { id: 'cli-1', name: 'JOINT', rfc: 'JOI190822ABC', email: 'contacto@joint.mx', phone: '6641234567', sector: 'Inmobiliario', notes: 'Cliente recurrente' },
-  { id: 'cli-2', name: 'MAJESTIC', rfc: 'MAJ200115DEF', email: 'admin@majestic.com', phone: '6642345678', sector: 'Industrial', notes: 'Pagos vía SPEI' },
-  { id: 'cli-3', name: 'GRACIELA', rfc: 'GRA850410GHI', email: 'graciela@gmail.com', phone: '6643456789', sector: 'Comercial', notes: 'Facturación mensual' },
-  { id: 'cli-4', name: 'ELIZABEHT', rfc: 'ELI911005JKL', email: 'elizabeth@inovatel.mx', phone: '6644567890', sector: 'Servicios', notes: 'Cliente preferencial' },
-  { id: 'cli-5', name: 'ALVARADOS', rfc: 'ALV980612MNO', email: 'ventas@alvarados.com', phone: '6645678901', sector: 'Logística', notes: 'Retención ISR 1.25% aplicada' }
+  { id: 'c1', name: 'JOINT', rfc: 'JOI190822ABC', email: 'contacto@joint.mx', phone: '6641234567', sector: 'Inmobiliario', notes: 'Cliente recurrente' },
+  { id: 'c2', name: 'MAJESTIC', rfc: 'MAJ200115DEF', email: 'admin@majestic.com', phone: '6642345678', sector: 'Industrial', notes: 'Pagos vía SPEI' },
+  { id: 'c3', name: 'GRACIELA', rfc: 'GRA850410GHI', email: 'graciela@gmail.com', phone: '6643456789', sector: 'Comercial', notes: 'Facturación mensual' },
+  { id: 'c4', name: 'ELIZABEHT', rfc: 'ELI911005JKL', email: 'elizabeth@inovatel.mx', phone: '6644567890', sector: 'Servicios', notes: 'Cliente preferencial' },
+  { id: 'c5', name: 'ALCO', rfc: 'ALC180312MNO', email: 'finanzas@alco.mx', phone: '6645678901', sector: 'Manufactura', notes: 'Retención ISR 1.25%' },
+  { id: 'c6', name: 'ALVARADOS', rfc: 'ALV190930PQR', email: 'ventas@alvarados.com', phone: '6646789012', sector: 'Logística', notes: 'Retención ISR 1.25% aplicada' },
+  { id: 'c7', name: 'EDGAR', rfc: 'EDG920415XYZ', email: 'edgar@gmail.com', phone: '6647890123', sector: 'Comercial', notes: 'Sin retención' }
 ];
 
 const initialInvoices = [
-  { id: 'inv-1', folio: 'F-101', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-01', subtotal: 7479.41, discount: 0, baseNeta: 7479.41, ivaTotal: 560.52, appliesIsr: true, isrRetained: 93.49, isrRate: 1.25, total: 7946.44, status: 'PAGADA' },
-  { id: 'inv-2', folio: 'F-102', clientName: 'MAJESTIC', rfc: 'MAJ200115DEF', date: '2026-08-03', subtotal: 693.87, discount: 0, baseNeta: 693.87, ivaTotal: 52.00, appliesIsr: true, isrRetained: 8.67, isrRate: 1.25, total: 737.20, status: 'PAGADA' },
-  { id: 'inv-3', folio: 'F-103', clientName: 'GRACIELA', rfc: 'GRA850410GHI', date: '2026-08-05', subtotal: 842.40, discount: 0, baseNeta: 842.40, ivaTotal: 62.40, appliesIsr: false, isrRetained: 0.00, isrRate: 0, total: 904.80, status: 'PAGADA' },
-  { id: 'inv-4', folio: 'F-104', clientName: 'ELIZABEHT', rfc: 'ELI911005JKL', date: '2026-08-07', subtotal: 1333.80, discount: 0, baseNeta: 1333.80, ivaTotal: 98.80, appliesIsr: false, isrRetained: 0.00, isrRate: 0, total: 1432.60, status: 'PAGADA' },
-  { id: 'inv-5', folio: 'F-105', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-10', subtotal: 1146.41, discount: 0, baseNeta: 1146.41, ivaTotal: 85.92, appliesIsr: true, isrRetained: 14.33, isrRate: 1.25, total: 1218.00, status: 'PAGADA' },
-  { id: 'inv-6', 'folio': 'F-106', clientName: 'ALVARADOS', rfc: 'ALV980612MNO', date: '2026-08-12', subtotal: 8346.54, discount: 0, baseNeta: 8346.54, ivaTotal: 625.54, appliesIsr: true, isrRetained: 104.33, isrRate: 1.25, total: 8867.75, status: 'PAGADA' },
-  { id: 'inv-7', folio: 'fk665', clientName: 'ALVARADOS', rfc: 'ALV980612MNO', date: '2026-08-05', subtotal: 34098.46, discount: 1786.00, baseNeta: 32312.46, ivaTotal: 2451.26, appliesIsr: true, isrRetained: 403.91, isrRate: 1.25, total: 34359.81, status: 'PAGADA' },
-  { id: 'inv-8', folio: 'F-110', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-10', subtotal: 7376.33, discount: 0, baseNeta: 7376.33, ivaTotal: 553.10, appliesIsr: true, isrRetained: 86.37, isrRate: 1.25, total: 7376.33, status: 'PAGADA' }
+  // Julio 2026 (8 Facturas)
+  { id: 'inv1', folio: 'F-101', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-07-01', subtotal: 7006.41, discount: 0, baseNeta: 7006.41, ivaRate: 8, ivaTotal: 560.52, appliesIsr: true, isrRate: 1.25, isrRetained: 87.52, total: 7479.41, status: 'PAGADA' },
+  { id: 'inv2', folio: 'F-102', clientName: 'MAJESTIC', rfc: 'MAJ200115DEF', date: '2026-07-03', subtotal: 649.87, discount: 0, baseNeta: 649.87, ivaRate: 8, ivaTotal: 52.00, appliesIsr: true, isrRate: 1.25, isrRetained: 8.00, total: 693.87, status: 'PAGADA' },
+  { id: 'inv3', folio: 'F-103', clientName: 'GRACIELA', rfc: 'GRA850410GHI', date: '2026-07-05', subtotal: 780.00, discount: 0, baseNeta: 780.00, ivaRate: 8, ivaTotal: 62.40, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 842.40, status: 'PAGADA' },
+  { id: 'inv4', folio: 'F-104', clientName: 'ELIZABEHT', rfc: 'ELI911005JKL', date: '2026-07-07', subtotal: 1235.00, discount: 0, baseNeta: 1235.00, ivaRate: 8, ivaTotal: 98.80, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 1333.80, status: 'PAGADA' },
+  { id: 'inv5', folio: 'F-105', clientName: 'ALCO', rfc: 'ALC180312MNO', date: '2026-07-09', subtotal: 1600.00, discount: 0, baseNeta: 1600.00, ivaRate: 8, ivaTotal: 128.00, appliesIsr: true, isrRate: 1.25, isrRetained: 20.00, total: 1708.00, status: 'PAGADA' },
+  { id: 'inv6', folio: 'F-106', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-07-11', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
+  { id: 'inv7', folio: 'F-107', clientName: 'EDGAR', rfc: 'EDG920415XYZ', date: '2026-07-15', subtotal: 450.00, discount: 0, baseNeta: 450.00, ivaRate: 8, ivaTotal: 36.00, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 486.00, status: 'PAGADA' },
+  { id: 'inv8', folio: 'F-108', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-07-20', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
+
+  // Agosto 2026 (2 Facturas)
+  { id: 'inv9', folio: 'fk665', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-08-04', subtotal: 35720.00, discount: 1786.00, baseNeta: 33934.00, ivaRate: 8, ivaTotal: 2714.72, appliesIsr: true, isrRate: 1.25, isrRetained: 424.18, total: 36224.54, status: 'PAGADA' },
+  { id: 'inv10', folio: 'F-110', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-10', subtotal: 7376.33, discount: 0, baseNeta: 6909.60, ivaRate: 8, ivaTotal: 553.10, appliesIsr: true, isrRate: 1.25, isrRetained: 86.37, total: 7376.33, status: 'PAGADA' }
 ];
 
 const initialDeductibles = [
-  { id: 'ded-syscom-aug', providerName: 'SYSCOM (Computación y Telecomunicaciones)', rfc: 'CTE880527J82', invoiceNo: 'FA26/1441633', date: '2026-08-15', subtotal: 20326.80, discount: 0, ivaTotal: 3252.29, total: 23579.09, category: 'Equipos & Telecomunicaciones' },
-  { id: 'ded-1', providerName: 'Telmex / Infinitum', rfc: 'TEL840315-123', invoiceNo: 'F-88912', date: '2026-07-04', subtotal: 1200.00, discount: 0, ivaTotal: 192.00, total: 1392.00, category: 'Telecomunicaciones' },
-  { id: 'ded-2', providerName: 'CFE Suministrador de Servicios Básicos', rfc: 'CFE370814-456', invoiceNo: 'CFE-00923', date: '2026-07-15', subtotal: 910.00, discount: 0, ivaTotal: 145.60, total: 1055.60, category: 'Servicios Básicos' }
+  { id: 'd1', providerName: 'Office Depot', rfc: 'ODE930805B27', invoiceNo: 'PDF-9921', date: '2026-07-04', subtotal: 1250.00, discount: 0, ivaTotal: 200.00, total: 1450.00, category: 'Papelería / Oficina' },
+  { id: 'd2', providerName: 'Telmex', rfc: 'EME8903099C7', invoiceNo: 'PDF-8812', date: '2026-07-12', subtotal: 860.00, discount: 0, ivaTotal: 137.60, total: 997.60, category: 'Telecomunicaciones' },
+  { id: 'd3', providerName: 'SYSCOM (Computación y Telecomunicaciones)', rfc: 'STE940428KBA', invoiceNo: 'FA26/1441633', date: '2026-08-15', subtotal: 20326.80, discount: 0, ivaTotal: 3252.29, total: 23579.09, category: 'Equipos & Telecomunicaciones' }
 ];
 
 const initialAccountDeposits = [
-  { id: 'dep-1', concept: 'Transferencia Cobro Factura fk665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201' }
+  { id: 'dep1', concept: 'Transferencia Cobro Factura F-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192' },
+  { id: 'dep2', concept: 'Transferencia Cobro Factura F-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910' },
+  { id: 'dep3', concept: 'Transferencia Cobro Factura fk665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201' }
 ];
 
 function getStorageItem(key, defaultValue) {
@@ -139,6 +148,11 @@ export const storageService = {
 
       if (taxRes.data) {
         setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 1.25 });
+      }
+
+      // Notify UI components that cloud data has been synchronized
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('conta_data_synced'));
       }
     } catch (err) {
       console.warn('Supabase sync warning (running offline / local cache):', err);

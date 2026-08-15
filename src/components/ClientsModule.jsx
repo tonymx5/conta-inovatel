@@ -15,6 +15,12 @@ export default function ClientsModule() {
 
   useEffect(() => {
     loadClients();
+
+    const handleSync = () => {
+      loadClients();
+    };
+    window.addEventListener('conta_data_synced', handleSync);
+    return () => window.removeEventListener('conta_data_synced', handleSync);
   }, []);
 
   const loadClients = () => {
