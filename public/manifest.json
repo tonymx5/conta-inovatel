@@ -1,0 +1,16 @@
+{
+  "short_name": "Inovatel",
+  "name": "Conta Inovatel - PWA Fiscal & Finanzas",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#e0f2fe",
+  "theme_color": "#ecfdf5",
+  "display": "standalone",
+  "orientation": "portrait"
+}
