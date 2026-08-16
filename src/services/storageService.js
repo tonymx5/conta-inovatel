@@ -1,5 +1,5 @@
 // LocalStorage & Supabase Dual-Sync Service for Conta Inovatel
-import { supabase } from '../lib/supabaseClient';
+import { supabase } from './supabaseClient';
 import { formatFolio } from '../utils/folioFormatter';
 
 const STORAGE_KEYS = {
