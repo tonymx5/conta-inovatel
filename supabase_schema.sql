@@ -69,6 +69,10 @@ CREATE TABLE IF NOT EXISTS public.account_deposits (
     date DATE NOT NULL,
     bank_name TEXT DEFAULT 'Santander',
     reference TEXT,
+    applies_equipment_expense BOOLEAN DEFAULT FALSE,
+    equipment_expense NUMERIC(15,2) DEFAULT 0,
+    equipment_provider TEXT,
+    real_utility NUMERIC(15,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -145,6 +149,6 @@ INSERT INTO public.deductibles (id, provider_name, rfc, invoice_no, date, subtot
 ON CONFLICT (id) DO NOTHING;
 
 -- Depósitos a Cuenta Iniciales
-INSERT INTO public.account_deposits (id, concept, amount, date, bank_name, reference) VALUES
-('dep-1', 'Transferencia Cobro Factura FK-665 (ALVARADOS)', 36224.54, '2026-08-05', 'Santander', 'SPEI-99201')
+INSERT INTO public.account_deposits (id, concept, amount, date, bank_name, reference, applies_equipment_expense, equipment_expense, equipment_provider, real_utility) VALUES
+('dep-1', 'Transferencia Cobro Factura FK-665 (ALVARADOS)', 36224.54, '2026-08-05', 'Santander', 'SPEI-99201', true, 21952.94, 'SYSCOM (Equipos)', 14271.60)
 ON CONFLICT (id) DO NOTHING;

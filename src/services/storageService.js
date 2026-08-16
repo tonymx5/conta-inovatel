@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
   INVOICES: 'conta_inovatel_invoices',
   TAX_CONFIG: 'conta_inovatel_tax_config',
   DEDUCTIBLE_EXPENSES: 'conta_inovatel_deductibles',
+  ACCOUNT_DEPOSITS: 'conta_inovatel_account_deposits',
   OTHER_INCOME: 'conta_inovatel_other_income',
   CARD_EXPENSES: 'conta_inovatel_card_expenses',
   BANK_ACCOUNTS: 'conta_inovatel_bank_accounts',
@@ -48,9 +49,9 @@ const initialDeductibles = [
 ];
 
 const initialAccountDeposits = [
-  { id: 'dep1', concept: 'Transferencia Cobro Factura FK-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192' },
-  { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910' },
-  { id: 'dep3', concept: 'Transferencia Cobro Factura FK-665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201' }
+  { id: 'dep1', concept: 'Transferencia Cobro Factura FK-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 7479.41 },
+  { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 4270.00 },
+  { id: 'dep3', concept: 'Transferencia Cobro Factura FK-665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201', appliesEquipmentExpense: true, equipmentExpense: 21952.94, equipmentProvider: 'SYSCOM (Equipos)', realUtility: 14271.60 }
 ];
 
 const initialBankAccounts = [
@@ -189,14 +190,29 @@ export const storageService = {
       }
 
       if (depRes.data && depRes.data.length > 0) {
-        const mappedDeps = depRes.data.map(dp => ({
-          id: dp.id,
-          concept: dp.concept,
-          amount: parseFloat(dp.amount) || 0,
-          date: dp.date,
-          bankName: dp.bank_name || dp.bankName,
-          reference: dp.reference
-        }));
+        const mappedDeps = depRes.data.map(dp => {
+          const amount = parseFloat(dp.amount) || 0;
+          const appliesEquipmentExpense = dp.applies_equipment_expense !== undefined && dp.applies_equipment_expense !== null 
+            ? !!dp.applies_equipment_expense 
+            : ((parseFloat(dp.equipment_expense) || 0) > 0);
+          const equipmentExpense = appliesEquipmentExpense ? (parseFloat(dp.equipment_expense) || 0) : 0;
+          const realUtility = dp.real_utility !== undefined && dp.real_utility !== null
+            ? parseFloat(dp.real_utility)
+            : (amount - equipmentExpense);
+
+          return {
+            id: dp.id,
+            concept: dp.concept,
+            amount,
+            date: dp.date,
+            bankName: dp.bank_name || dp.bankName || 'Santander',
+            reference: dp.reference || '',
+            appliesEquipmentExpense,
+            equipmentExpense,
+            equipmentProvider: dp.equipment_provider || dp.equipmentProvider || '',
+            realUtility: parseFloat(realUtility.toFixed(2))
+          };
+        });
         setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
       }
 
@@ -387,9 +403,22 @@ export const storageService = {
   getAccountDeposits: () => getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits),
   saveAccountDeposit: (deposit, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
-    const depToSave = { ...deposit, id: deposit.id || 'dep-' + Date.now() };
-    const idx = list.findIndex(d => d.id === depToSave.id);
+    const amount = parseFloat(deposit.amount) || 0;
+    const appliesEquipmentExpense = !!deposit.appliesEquipmentExpense;
+    const equipmentExpense = appliesEquipmentExpense ? (parseFloat(deposit.equipmentExpense) || 0) : 0;
+    const realUtility = parseFloat((amount - equipmentExpense).toFixed(2));
 
+    const depToSave = {
+      ...deposit,
+      id: deposit.id || 'dep-' + Date.now(),
+      amount,
+      appliesEquipmentExpense,
+      equipmentExpense,
+      equipmentProvider: (deposit.equipmentProvider || '').trim(),
+      realUtility
+    };
+
+    const idx = list.findIndex(d => d.id === depToSave.id);
     if (idx >= 0) list[idx] = depToSave; else list.push(depToSave);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
@@ -397,13 +426,17 @@ export const storageService = {
     Promise.resolve(supabase.from('account_deposits').upsert({
       id: depToSave.id,
       concept: depToSave.concept,
-      amount: depToSave.amount || 0,
+      amount: depToSave.amount,
       date: depToSave.date,
       bank_name: depToSave.bankName || 'Santander',
-      reference: depToSave.reference
+      reference: depToSave.reference,
+      applies_equipment_expense: depToSave.appliesEquipmentExpense,
+      equipment_expense: depToSave.equipmentExpense,
+      equipment_provider: depToSave.equipmentProvider,
+      real_utility: depToSave.realUtility
     })).catch(err => console.error('Supabase Deposit save error:', err));
 
-    storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount})`);
+    storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount}) | Utilidad Real: $${depToSave.realUtility}`);
     notifyDataSynced();
     return list;
   },

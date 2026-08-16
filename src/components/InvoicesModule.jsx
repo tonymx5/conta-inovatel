@@ -13,12 +13,16 @@ export default function InvoicesModule({ userRole }) {
 
   // Modal Deposit State
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [editingDepositId, setEditingDepositId] = useState(null);
   const [depositFormData, setDepositFormData] = useState({
     concept: '',
     amount: '',
     date: new Date().toISOString().split('T')[0],
     bankName: 'Santander',
-    reference: ''
+    reference: '',
+    appliesEquipmentExpense: false,
+    equipmentExpense: '',
+    equipmentProvider: ''
   });
 
   // Real dynamic current system date (Agosto)
@@ -391,31 +395,64 @@ export default function InvoicesModule({ userRole }) {
       });
   }, [deposits, selectedMonth, selectedYear]);
 
-  const totalDepositosCuenta = filteredDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+  const totalDepositosBrutos = filteredDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+  const totalGastosEquipos = filteredDeposits.reduce((sum, d) => sum + (d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0), 0);
+  const totalUtilidadRealDepositos = filteredDeposits.reduce((sum, d) => {
+    const amt = parseFloat(d.amount) || 0;
+    const eq = d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0;
+    return sum + (d.realUtility !== undefined ? d.realUtility : (amt - eq));
+  }, 0);
 
   const handleDepositSubmit = (e) => {
     e.preventDefault();
+    const amount = parseFloat(depositFormData.amount) || 0;
+    const appliesEquipmentExpense = !!depositFormData.appliesEquipmentExpense;
+    const equipmentExpense = appliesEquipmentExpense ? (parseFloat(depositFormData.equipmentExpense) || 0) : 0;
+    const realUtility = parseFloat((amount - equipmentExpense).toFixed(2));
+
     const depositToSave = {
+      id: editingDepositId || undefined,
       concept: depositFormData.concept.trim(),
-      amount: parseFloat(depositFormData.amount) || 0,
+      amount,
       date: depositFormData.date,
       bankName: depositFormData.bankName,
-      reference: depositFormData.reference.trim() || 'SPEI-' + Math.floor(10000 + Math.random() * 90000)
+      reference: depositFormData.reference.trim() || 'SPEI-' + Math.floor(10000 + Math.random() * 90000),
+      appliesEquipmentExpense,
+      equipmentExpense,
+      equipmentProvider: (depositFormData.equipmentProvider || '').trim(),
+      realUtility
     };
-    const updated = storageService.saveAccountDeposit(depositToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+
+    const updated = storageService.saveAccountDeposit(depositToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
     setDeposits(updated);
     setShowDepositModal(false);
     resetDepositForm();
   };
 
+  const handleEditDeposit = (dep) => {
+    setEditingDepositId(dep.id);
+    setDepositFormData({
+      concept: dep.concept || '',
+      amount: dep.amount ? dep.amount.toString() : '',
+      date: dep.date || new Date().toISOString().split('T')[0],
+      bankName: dep.bankName || 'Santander',
+      reference: dep.reference || '',
+      appliesEquipmentExpense: !!dep.appliesEquipmentExpense,
+      equipmentExpense: dep.equipmentExpense ? dep.equipmentExpense.toString() : '',
+      equipmentProvider: dep.equipmentProvider || ''
+    });
+    setShowDepositModal(true);
+  };
+
   const handleDeleteDeposit = (id) => {
     if (window.confirm('¿Eliminar este registro de transferencia / depósito?')) {
-      const updated = storageService.deleteAccountDeposit(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+      const updated = storageService.deleteAccountDeposit(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
       setDeposits(updated);
     }
   };
 
   const resetDepositForm = () => {
+    setEditingDepositId(null);
     const defaultDate = selectedMonth !== 'ALL' && selectedYear !== 'ALL'
       ? `${selectedYear}-${selectedMonth}-01`
       : new Date().toISOString().split('T')[0];
@@ -425,7 +462,10 @@ export default function InvoicesModule({ userRole }) {
       amount: '',
       date: defaultDate,
       bankName: 'Santander',
-      reference: ''
+      reference: '',
+      appliesEquipmentExpense: false,
+      equipmentExpense: '',
+      equipmentProvider: ''
     });
   };
 
@@ -990,7 +1030,7 @@ export default function InvoicesModule({ userRole }) {
               </button>
             </div>
 
-            {/* Listado de Transferencias del Mes */}
+            {/* Listado de Transferencias del Mes con Desglose de Utilidad Real */}
             {filteredDeposits.length === 0 ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', textAlign: 'center' }}>
                 <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
@@ -998,70 +1038,138 @@ export default function InvoicesModule({ userRole }) {
                 </p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '230px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-                {filteredDeposits.map((dep) => (
-                  <div
-                    key={dep.id}
-                    style={{
-                      background: '#ffffff',
-                      padding: '0.55rem 0.75rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.82rem' }}>
-                        {dep.concept}
-                      </strong>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
-                        <span style={{ fontSize: '0.68rem', color: '#047857', background: '#ecfdf5', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
-                          {dep.bankName || 'Santander'}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '230px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+                {filteredDeposits.map((dep) => {
+                  const depAmount = parseFloat(dep.amount) || 0;
+                  const eqExpense = dep.appliesEquipmentExpense ? (parseFloat(dep.equipmentExpense) || 0) : 0;
+                  const realUtil = dep.realUtility !== undefined ? dep.realUtility : (depAmount - eqExpense);
+
+                  return (
+                    <div
+                      key={dep.id}
+                      style={{
+                        background: '#ffffff',
+                        padding: '0.6rem 0.75rem',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.83rem' }}>
+                            {dep.concept}
+                          </strong>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '0.15rem' }}>
+                            <span style={{ fontSize: '0.68rem', color: '#047857', background: '#ecfdf5', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700' }}>
+                              {dep.bankName || 'Santander'}
+                            </span>
+                            <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>
+                              {dep.reference ? `${dep.reference} • ` : ''}{formatDate(dep.date)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                          <button
+                            onClick={() => handleEditDeposit(dep)}
+                            style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: '0.2rem' }}
+                            title="Editar Depósito"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDeposit(dep.id)}
+                            style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '0.2rem' }}
+                            title="Eliminar Depósito"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Desglose Financiero del Depósito */}
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        background: '#f8fafc',
+                        padding: '0.35rem 0.55rem',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        border: '1px solid #f1f5f9',
+                        flexWrap: 'wrap',
+                        gap: '0.3rem'
+                      }}>
+                        <span style={{ color: '#64748b' }}>
+                          Depósito: <strong style={{ color: '#334155' }}>${depAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
                         </span>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>
-                          {dep.reference ? `${dep.reference} • ` : ''}{formatDate(dep.date)}
+
+                        {dep.appliesEquipmentExpense && eqExpense > 0 ? (
+                          <span style={{ color: '#0284c7', fontSize: '0.74rem' }}>
+                            (-) Equipos: <strong>-${eqExpense.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
+                            {dep.equipmentProvider ? ` (${dep.equipmentProvider})` : ''}
+                          </span>
+                        ) : (
+                          <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>
+                            (Sin gasto de equipos)
+                          </span>
+                        )}
+
+                        <span className="badge badge-emerald" style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', fontWeight: '800' }}>
+                          💰 Utilidad: ${realUtil.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <strong style={{ color: '#047857', fontSize: '0.88rem', fontWeight: '800' }}>
-                        ${(parseFloat(dep.amount) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </strong>
-                      <button
-                        onClick={() => handleDeleteDeposit(dep.id)}
-                        style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '0.2rem' }}
-                        title="Eliminar Depósito"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
-          {/* Total Box Card 3 */}
+          {/* Total Box Card 3: Desglose Integral de Utilidad Real en Cuenta */}
           <div style={{
-            background: '#dcfce7',
+            background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
             padding: '0.85rem 1rem',
             borderRadius: '12px',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: '0.35rem',
             marginTop: '0.6rem',
-            border: '1px solid #86efac'
+            border: '1.5px solid #86efac'
           }}>
-            <strong style={{ fontSize: '0.82rem', color: '#166534' }}>
-              TOTAL DEPÓSITOS A CUENTA:
-            </strong>
-            <strong style={{ fontSize: '1.15rem', color: '#166534', fontWeight: '900' }}>
-              ${totalDepositosCuenta.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-            </strong>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#475569' }}>
+              <span>(+) Total Depósitos Recibidos:</span>
+              <strong style={{ color: '#0f172a' }}>
+                ${totalDepositosBrutos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+
+            {totalGastosEquipos > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#0284c7' }}>
+                <span>(-) Total Compra de Equipos:</span>
+                <strong>
+                  -${totalGastosEquipos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                </strong>
+              </div>
+            )}
+
+            <div style={{
+              borderTop: '1.5px dashed #86efac',
+              paddingTop: '0.35rem',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <strong style={{ fontSize: '0.85rem', color: '#166534' }}>
+                💰 TOTAL UTILIDAD REAL EN CUENTA:
+              </strong>
+              <strong style={{ fontSize: '1.2rem', color: '#15803d', fontWeight: '900' }}>
+                ${totalUtilidadRealDepositos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
           </div>
         </div>
 
@@ -1466,13 +1574,13 @@ export default function InvoicesModule({ userRole }) {
         </div>
       )}
 
-      {/* Modal Registrar Depósito a Cuenta */}
+      {/* Modal Registrar / Editar Depósito a Cuenta */}
       {showDepositModal && (
         <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '500px' }}>
+          <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
               <h3 style={{ fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Landmark size={20} color="#10b981" /> Registrar Depósito a Cuenta
+                <Landmark size={20} color="#10b981" /> {editingDepositId ? 'Editar Depósito a Cuenta' : 'Registrar Depósito a Cuenta'}
               </h3>
               <button onClick={() => setShowDepositModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}>✕</button>
             </div>
@@ -1486,7 +1594,7 @@ export default function InvoicesModule({ userRole }) {
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Ej: Transferencia Cobro Factura F-109"
+                    placeholder="Ej: Transferencia Cobro Factura FK-665"
                     value={depositFormData.concept}
                     onChange={(e) => setDepositFormData({ ...depositFormData, concept: e.target.value })}
                     required
@@ -1496,14 +1604,14 @@ export default function InvoicesModule({ userRole }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
                     <label className="form-label" style={{ fontWeight: '700', color: '#047857' }}>
-                      Monto Transferido / Depositado:
+                      Monto Total Depositado ($):
                     </label>
                     <input
                       type="number"
                       step="0.01"
                       className="form-control"
                       placeholder="$0.00"
-                      style={{ fontWeight: '800', color: '#047857' }}
+                      style={{ fontWeight: '800', color: '#047857', fontSize: '1.05rem' }}
                       value={depositFormData.amount}
                       onChange={(e) => setDepositFormData({ ...depositFormData, amount: e.target.value })}
                       required
@@ -1558,12 +1666,77 @@ export default function InvoicesModule({ userRole }) {
                     />
                   </div>
                 </div>
+
+                {/* Sección de Gastos para Compra de Equipos / Materiales */}
+                <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', userSelect: 'none' }}>
+                    <input
+                      type="checkbox"
+                      checked={depositFormData.appliesEquipmentExpense}
+                      onChange={(e) => setDepositFormData({ ...depositFormData, appliesEquipmentExpense: e.target.checked })}
+                      style={{ width: '18px', height: '18px', accentColor: '#0284c7', marginTop: '2px' }}
+                    />
+                    <div>
+                      <strong style={{ color: '#0f172a', fontSize: '0.86rem', display: 'block' }}>
+                        ¿Se utilizó parte de este depósito para compra de equipos / materiales?
+                      </strong>
+                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                        Resta el costo pagado a proveedores para calcular tu Utilidad Real en cuenta
+                      </span>
+                    </div>
+                  </label>
+
+                  {depositFormData.appliesEquipmentExpense && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px dashed #cbd5e1' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontWeight: '700', color: '#0284c7', fontSize: '0.8rem' }}>
+                            Monto para Compra de Equipos ($):
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            className="form-control"
+                            placeholder="$0.00"
+                            style={{ fontWeight: '700', color: '#0284c7', borderColor: '#38bdf8' }}
+                            value={depositFormData.equipmentExpense}
+                            onChange={(e) => setDepositFormData({ ...depositFormData, equipmentExpense: e.target.value })}
+                            required={depositFormData.appliesEquipmentExpense}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.8rem' }}>
+                            Proveedor / Detalle Equipos:
+                          </label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Ej: SYSCOM (Cámaras)"
+                            value={depositFormData.equipmentProvider}
+                            onChange={(e) => setDepositFormData({ ...depositFormData, equipmentProvider: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live preview banner */}
+                      <div style={{ background: '#ecfdf5', border: '1px solid #86efac', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#166534' }}>
+                          Utilidad Real Estimada de este Depósito:
+                        </span>
+                        <strong style={{ fontSize: '1.05rem', color: '#15803d', fontWeight: '800' }}>
+                          ${Math.max(0, (parseFloat(depositFormData.amount) || 0) - (parseFloat(depositFormData.equipmentExpense) || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="modal-footer">
                 <button type="button" className="btn-secondary" onClick={() => setShowDepositModal(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
-                  Guardar Depósito
+                  {editingDepositId ? 'Actualizar Depósito' : 'Guardar Depósito'}
                 </button>
               </div>
             </form>

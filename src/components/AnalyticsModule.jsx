@@ -15,6 +15,7 @@ export default function AnalyticsModule() {
   const [invoices, setInvoices] = useState([]);
   const [cardExpenses, setCardExpenses] = useState([]);
   const [otherIncome, setOtherIncome] = useState([]);
+  const [deposits, setDeposits] = useState([]);
 
   useEffect(() => {
     loadData();
@@ -30,14 +31,24 @@ export default function AnalyticsModule() {
     setInvoices(storageService.getInvoices());
     setCardExpenses(storageService.getCardExpenses());
     setOtherIncome(storageService.getOtherIncome());
+    setDeposits(storageService.getAccountDeposits ? storageService.getAccountDeposits() : []);
   };
 
   const totalIngresoFacturado = invoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
   const totalOtroIngreso = otherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresoGlobal = totalIngresoFacturado + totalOtroIngreso;
 
+  // Depósitos y Utilidad Real en Banco
+  const totalDepositos = deposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+  const totalGastosEquipos = deposits.reduce((sum, d) => sum + (d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0), 0);
+  const totalUtilidadRealEnCuenta = deposits.reduce((sum, d) => {
+    const amt = parseFloat(d.amount) || 0;
+    const eq = d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0;
+    return sum + (d.realUtility !== undefined ? d.realUtility : (amt - eq));
+  }, 0);
+
   const totalGastos = cardExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const flujoLibre = Math.max(0, totalIngresoGlobal - totalGastos);
+  const flujoLibre = Math.max(0, (totalUtilidadRealEnCuenta > 0 ? totalUtilidadRealEnCuenta : totalIngresoGlobal) - totalGastos);
 
   // Sector breakdown math
   const sectorTotals = {
@@ -59,7 +70,8 @@ export default function AnalyticsModule() {
 
   const pieData = Object.keys(sectorTotals).map(sec => {
     const amount = sectorTotals[sec];
-    const pctOfIncome = totalIngresoGlobal > 0 ? ((amount / totalIngresoGlobal) * 100).toFixed(1) : 0;
+    const baseIngreso = totalUtilidadRealEnCuenta > 0 ? totalUtilidadRealEnCuenta : totalIngresoGlobal;
+    const pctOfIncome = baseIngreso > 0 ? ((amount / baseIngreso) * 100).toFixed(1) : 0;
     return {
       name: sec,
       value: amount,
@@ -68,10 +80,10 @@ export default function AnalyticsModule() {
   }).filter(d => d.value > 0);
 
   // Quarterly Projections Math
-  const q1Actual = totalIngresoGlobal;
-  const q2Projected = totalIngresoGlobal * 1.05;
-  const q3Projected = totalIngresoGlobal * 1.1025;
-  const q4Projected = totalIngresoGlobal * 1.1576;
+  const q1Actual = totalUtilidadRealEnCuenta > 0 ? totalUtilidadRealEnCuenta : totalIngresoGlobal;
+  const q2Projected = q1Actual * 1.05;
+  const q3Projected = q1Actual * 1.1025;
+  const q4Projected = q1Actual * 1.1576;
 
   const projectionData = [
     { period: 'Trimestre 1 (Actual)', Ingresos: q1Actual, Gastos: totalGastos },
@@ -88,42 +100,44 @@ export default function AnalyticsModule() {
           <BarChart3 color="#6366f1" size={26} /> Métricas & Analíticas Financieras
         </h2>
         <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
-          Visualización de la distribución de gastos por sector y proyecciones de crecimiento estilo Nutrición/Estadísticas
+          Visualización de la distribución de gastos, margen real en cuenta bancaria y proyecciones de crecimiento
         </p>
       </div>
 
-      {/* 4 Soft Pastel Overview Tiles (inspired by Nutrients Overview) */}
+      {/* 4 Soft Pastel Overview Tiles */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: '1.25rem' }}>
         <div className="tile-card tile-card-mint">
-          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#047857', textTransform: 'uppercase' }}>FACTURAS</span>
+          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#047857', textTransform: 'uppercase' }}>FACTURAS EMITIDAS</span>
           <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#0f172a', margin: '0.3rem 0' }}>
             {invoices.length} <span style={{ fontSize: '0.9rem', color: '#047857', fontWeight: '600' }}>Facturas</span>
           </div>
-          <span className="badge badge-emerald">Ingreso $${totalIngresoFacturado.toLocaleString('es-MX')}</span>
+          <span className="badge badge-emerald">Ingreso ${totalIngresoFacturado.toLocaleString('es-MX')}</span>
         </div>
 
         <div className="tile-card tile-card-cyan">
-          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#0369a1', textTransform: 'uppercase' }}>MEDIA INGRESO GLOBAL</span>
+          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#0369a1', textTransform: 'uppercase' }}>UTILIDAD REAL EN CUENTA</span>
           <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#0f172a', margin: '0.3rem 0' }}>
-            ${totalIngresoGlobal.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            ${totalUtilidadRealEnCuenta.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <span className="badge badge-cyan">Mes en curso</span>
+          <span className="badge badge-cyan">
+            {totalGastosEquipos > 0 ? `-$${totalGastosEquipos.toLocaleString('es-MX')} en equipos (de $${totalDepositos.toLocaleString('es-MX')})` : 'Depósitos libres'}
+          </span>
         </div>
 
         <div className="tile-card tile-card-rose">
           <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#be123c', textTransform: 'uppercase' }}>GASTOS POR TARJETA</span>
           <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#0f172a', margin: '0.3rem 0' }}>
-            ${totalGastos.toLocaleString('es-MX', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            ${totalGastos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <span className="badge badge-rose">Egresos totales</span>
+          <span className="badge badge-rose">Egresos operativos</span>
         </div>
 
         <div className="tile-card tile-card-amber">
-          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#b45309', textTransform: 'uppercase' }}>% GASTO DE INGRESO</span>
+          <span style={{ fontSize: '0.78rem', fontWeight: '700', color: '#b45309', textTransform: 'uppercase' }}>FLUJO NETO DISPONIBLE</span>
           <div style={{ fontSize: '1.75rem', fontWeight: '800', color: '#0f172a', margin: '0.3rem 0' }}>
-            {totalIngresoGlobal > 0 ? ((totalGastos / totalIngresoGlobal) * 100).toFixed(1) : 0}%
+            ${flujoLibre.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <span className="badge badge-amber">Flujo Libre ${flujoLibre.toLocaleString('es-MX')}</span>
+          <span className="badge badge-amber">Capacidad Inversión</span>
         </div>
       </div>
 

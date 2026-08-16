@@ -8,13 +8,14 @@ export default function InvestmentsModule({ userRole }) {
   const [invoices, setInvoices] = useState([]);
   const [otherIncome, setOtherIncome] = useState([]);
   const [cardExpenses, setCardExpenses] = useState([]);
+  const [deposits, setDeposits] = useState([]);
   const [editingId, setEditingId] = useState(null);
 
   // Bot Chat State
   const [chatMessages, setChatMessages] = useState([
     {
       sender: 'bot',
-      text: '¡Hola! Soy Inovatel AI, tu Bot Administrador Financiero. He analizado tus ingresos y gastos del mes. ¿Deseas poner en marcha un Plan de Crecimiento del 5% Mensual o revisar recomendaciones de inversión?'
+      text: '¡Hola! Soy Inovatel AI, tu Bot Administrador Financiero. He analizado tu Utilidad Real en cuenta bancaria y gastos. ¿Deseas poner en marcha un Plan de Crecimiento del 5% Mensual o revisar recomendaciones de inversión?'
     }
   ]);
   const [userInput, setUserInput] = useState('');
@@ -44,14 +45,23 @@ export default function InvestmentsModule({ userRole }) {
     setInvoices(storageService.getInvoices());
     setOtherIncome(storageService.getOtherIncome());
     setCardExpenses(storageService.getCardExpenses());
+    setDeposits(storageService.getAccountDeposits ? storageService.getAccountDeposits() : []);
   };
 
   const totalIngresoFacturado = invoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
   const totalOtroIngreso = otherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresos = totalIngresoFacturado + totalOtroIngreso;
 
+  // Utilidad Real en Cuenta Bancaria (Depósitos menos compra de equipos)
+  const totalUtilidadRealDepositos = deposits.reduce((sum, d) => {
+    const amt = parseFloat(d.amount) || 0;
+    const eq = d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0;
+    return sum + (d.realUtility !== undefined ? d.realUtility : (amt - eq));
+  }, 0);
+
+  const baseCalculoUtilidad = totalUtilidadRealDepositos > 0 ? totalUtilidadRealDepositos : totalIngresos;
   const totalGastos = cardExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const flujoLibre = Math.max(0, totalIngresos - totalGastos);
+  const flujoLibre = Math.max(0, baseCalculoUtilidad - totalGastos);
 
   const recomendacionInversionMin = flujoLibre * 0.10;
   const recomendacionInversionMax = flujoLibre * 0.20;
@@ -166,7 +176,7 @@ Te aconsejo destinar entre $${recomendacionInversionMin.toFixed(2)} y $${recomen
           </h3>
         </div>
         <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.2rem', fontWeight: '500' }}>
-          Con base en tus ingresos globales ($${totalIngresos.toLocaleString('es-MX')}) y tu flujo libre ($${flujoLibre.toLocaleString('es-MX')}), el sistema sugiere separar:
+          Con base en tu Utilidad Real en cuenta ($${baseCalculoUtilidad.toLocaleString('es-MX', { minimumFractionDigits: 2 })}) y tu flujo libre ($${flujoLibre.toLocaleString('es-MX', { minimumFractionDigits: 2 })}), el sistema sugiere separar:
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>

@@ -68,8 +68,17 @@ CREATE TABLE IF NOT EXISTS public.account_deposits (
     date DATE NOT NULL,
     bank_name TEXT DEFAULT 'Santander',
     reference TEXT,
+    applies_equipment_expense BOOLEAN DEFAULT FALSE,
+    equipment_expense NUMERIC(15,2) DEFAULT 0,
+    equipment_provider TEXT,
+    real_utility NUMERIC(15,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS applies_equipment_expense BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS equipment_expense NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS equipment_provider TEXT;
+ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS real_utility NUMERIC(15,2) DEFAULT 0;
 
 -- 5. TABLA: CONFIGURACIÓN FISCAL (tax_config)
 CREATE TABLE IF NOT EXISTS public.tax_config (
