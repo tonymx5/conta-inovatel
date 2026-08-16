@@ -75,28 +75,50 @@ if (-not $SkipBuild) {
 }
 
 # ------------------------------------------------------------------------------
-# PASO 2: VERIFICACION DE BASE DE DATOS Y ESQUEMA (Supabase First)
+# PASO 2: VERIFICACION DE BASE DE DATOS Y ESQUEMA (Supabase DB-First Audit)
 # ------------------------------------------------------------------------------
-Write-Step "2/5" "Verificación de Base de Datos (Supabase DB-First)"
+Write-Step "2/5" "Verificación Activa de Base de Datos y Esquema (Supabase DB-First)"
 
 $supabaseUrl = "https://jyhuvmqibfvmfutcvzhw.supabase.co"
-Write-Host "Verificando conectividad con Supabase ($supabaseUrl)..." -ForegroundColor Gray
+Write-Host "Conectando y auditando esquema en Supabase ($supabaseUrl)..." -ForegroundColor Gray
 
 try {
-    $sbPing = Invoke-RestMethod -Uri "$supabaseUrl/rest/v1/" -Method Get -TimeoutSec 10 -ErrorAction SilentlyContinue
-    Write-Success "Conexión con Supabase REST API verificada y activa."
-} catch {
-    # 401/400 is standard for anon ping without key, which still proves endpoint is alive
-    if ($_.Exception.Response.StatusCode -ne $null) {
-        Write-Success "Supabase respondió correctamente (Endpoint activo)."
-    } else {
-        Write-Warning "No se pudo verificar conectividad directa a Supabase. Continuando bajo fallback local."
+    # Inspeccionar definición OpenAPI de Supabase para validar tablas en vivo
+    $swagger = Invoke-RestMethod -Uri "$supabaseUrl/rest/v1/" -Method Get -TimeoutSec 10 -ErrorAction Stop
+    Write-Success "Conexión a Supabase REST API activa."
+
+    if ($swagger.definitions) {
+        $expectedTables = @('invoices', 'clients', 'deductibles', 'account_deposits', 'tax_config', 'audit_logs')
+        $missingTables = @()
+        foreach ($tbl in $expectedTables) {
+            if (-not $swagger.definitions.$tbl) {
+                $missingTables += $tbl
+            }
+        }
+
+        if ($missingTables.Count -eq 0) {
+            Write-Success "Todas las tablas requeridas ($($expectedTables -join ', ')) existen activas en Supabase."
+        } else {
+            Write-Warning "Faltan las siguientes tablas en Supabase: $($missingTables -join ', ')"
+            Write-Warning "Ejecuta las sentencias contenidas en deploy_migration.sql o supabase_schema.sql en el Editor SQL de Supabase."
+        }
+
+        # Auditar columnas críticas en account_deposits
+        if ($swagger.definitions.account_deposits -and $swagger.definitions.account_deposits.properties) {
+            $depCols = $swagger.definitions.account_deposits.properties
+            if ($depCols.applies_equipment_expense -and $depCols.equipment_expense -and $depCols.equipment_provider -and $depCols.real_utility) {
+                Write-Success "Esquema de 'account_deposits' verificado (Columnas de gasto de equipos y utilidad real activas)."
+            } else {
+                Write-Warning "Esquema de 'account_deposits' requiere actualización de columnas en Supabase (ejecutar deploy_migration.sql)."
+            }
+        }
     }
+} catch {
+    Write-Warning "No se pudo auditar la especificación OpenAPI de Supabase directamente ($($_.Exception.Message)). Continuando verificación básica."
 }
 
 if (Test-Path "deploy_migration.sql") {
     Write-Host "Archivo de migración SQL listo en: ./deploy_migration.sql" -ForegroundColor Cyan
-    Write-Host "Tip: Si agregaste nuevas tablas/columnas, asegúrate de correrlas en el SQL Editor de Supabase." -ForegroundColor Gray
 }
 
 # ------------------------------------------------------------------------------
