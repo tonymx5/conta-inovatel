@@ -203,19 +203,19 @@ export default function ExpensesModule({ userRole }) {
               [...expenses].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((e) => (
                 <tr key={e.id}>
                   <td style={{ fontSize: '0.88rem', color: '#334155', fontWeight: '600', whiteSpace: 'nowrap' }}>{formatDate(e.date)}</td>
-                  <td style={{ fontWeight: '600', color: '#f8fafc' }}>{e.description}</td>
+                  <td style={{ fontWeight: '700', color: '#0f172a' }}>{e.description}</td>
                   <td>
                     <span className="badge badge-amber">{e.bankName}</span>
                   </td>
                   <td>
                     <span className="badge badge-indigo">{e.sector}</span>
                   </td>
-                  <td style={{ fontWeight: '700', color: '#fda4af' }}>
+                  <td style={{ fontWeight: '800', color: '#e11d48' }}>
                     -${e.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
-                      <button onClick={() => handleEditExpense(e)} style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer' }} title="Editar Gasto">
+                      <button onClick={() => handleEditExpense(e)} style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer' }} title="Editar Gasto">
                         <Edit3 size={16} />
                       </button>
                       <button onClick={() => handleDeleteExpense(e.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer' }} title="Eliminar Gasto">

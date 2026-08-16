@@ -76,7 +76,7 @@ export default function Header({
           <div style={{ background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '9999px', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.65rem', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
             <span className={`badge ${userRole === 'admin' ? 'badge-amber' : 'badge-emerald'}`}>
               <Lock size={14} />
-              {userRole === 'admin' ? 'edson (administrador)' : 'usuario'}
+              {userRole === 'admin' ? 'edson' : 'usuario'}
             </span>
 
             {userRole === 'admin' ? (
@@ -92,7 +92,7 @@ export default function Header({
                 onClick={() => onRestrictedClick('Panel de Administración')}
                 style={{ background: 'none', border: 'none', color: '#b45309', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '700' }}
               >
-                <Lock size={13} /> edson (administrador)
+                <Lock size={13} /> edson
               </button>
             )}
           </div>
@@ -118,7 +118,7 @@ export default function Header({
                 cursor: isLockedForUser ? 'not-allowed' : 'pointer',
                 transition: 'all 0.3s ease'
               }}
-              title={isLockedForUser ? 'Requiere clave de edson (administrador)' : t.label}
+              title={isLockedForUser ? 'Requiere clave de edson' : t.label}
             >
               <Icon size={18} />
               <span>{t.label}</span>
