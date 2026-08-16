@@ -4,7 +4,7 @@ import RestrictedModal from './components/RestrictedModal';
 import AuditLogModal from './components/AuditLogModal';
 import SecurityReportModal from './components/SecurityReportModal';
 import LoginGateModal from './components/LoginGateModal';
-import { FileText, Plus, BarChart3, TrendingUp, CreditCard } from 'lucide-react';
+import { FileText, BarChart3, TrendingUp, CreditCard } from 'lucide-react';
 import { storageService } from './services/storageService';
 
 // 7 Application Modules
@@ -128,16 +128,7 @@ export default function App() {
             <span>Gastos</span>
           </button>
 
-          {/* Center Floating Green Action FAB (+) Button */}
-          <button
-            className="mobile-fab-btn"
-            onClick={() => {
-              if (activeTab !== 'invoices') setActiveTab('invoices');
-            }}
-            title="Nueva Factura"
-          >
-            <Plus size={28} strokeWidth={3} />
-          </button>
+
 
           <button
             className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}

@@ -431,15 +431,25 @@ export default function InvoicesModule({ userRole }) {
 
   const handleEditDeposit = (dep) => {
     setEditingDepositId(dep.id);
+    const eqVal = (dep.equipmentExpense !== undefined && dep.equipmentExpense !== null && dep.equipmentExpense !== '')
+      ? dep.equipmentExpense
+      : (dep.equipment_expense || '');
+
+    const applies = dep.appliesEquipmentExpense !== undefined && dep.appliesEquipmentExpense !== null
+      ? !!dep.appliesEquipmentExpense
+      : (dep.applies_equipment_expense !== undefined && dep.applies_equipment_expense !== null
+          ? !!dep.applies_equipment_expense
+          : ((parseFloat(eqVal) || 0) > 0));
+
     setDepositFormData({
       concept: dep.concept || '',
       amount: dep.amount ? dep.amount.toString() : '',
       date: dep.date || new Date().toISOString().split('T')[0],
-      bankName: dep.bankName || 'Santander',
+      bankName: dep.bankName || dep.bank_name || 'Santander',
       reference: dep.reference || '',
-      appliesEquipmentExpense: !!dep.appliesEquipmentExpense,
-      equipmentExpense: dep.equipmentExpense ? dep.equipmentExpense.toString() : '',
-      equipmentProvider: dep.equipmentProvider || ''
+      appliesEquipmentExpense: applies,
+      equipmentExpense: eqVal ? eqVal.toString() : '',
+      equipmentProvider: dep.equipmentProvider || dep.equipment_provider || ''
     });
     setShowDepositModal(true);
   };

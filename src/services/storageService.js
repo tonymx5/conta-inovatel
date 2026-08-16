@@ -51,7 +51,8 @@ const initialDeductibles = [
 const initialAccountDeposits = [
   { id: 'dep1', concept: 'Transferencia Cobro Factura FK-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 7479.41 },
   { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 4270.00 },
-  { id: 'dep3', concept: 'Transferencia Cobro Factura FK-665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201', appliesEquipmentExpense: true, equipmentExpense: 21952.94, equipmentProvider: 'SYSCOM (Equipos)', realUtility: 14271.60 }
+  { id: 'dep3', concept: 'Transferencia Cobro Factura FK-665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201', appliesEquipmentExpense: true, equipmentExpense: 21952.94, equipmentProvider: 'SYSCOM (Equipos)', realUtility: 14271.60 },
+  { id: 'dep4', concept: 'deposito a cuenta (alvarado)', amount: 32180.05, date: '2026-08-04', bankName: 'NU', reference: 'SPEI-88347', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 32180.05 }
 ];
 
 const initialBankAccounts = [
@@ -190,7 +191,10 @@ export const storageService = {
       }
 
       if (depRes.data && depRes.data.length > 0) {
-        const mappedDeps = depRes.data.map(dp => {
+        const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+        const localMap = new Map(localDeps.map(d => [d.id, d]));
+
+        depRes.data.forEach(dp => {
           const amount = parseFloat(dp.amount) || 0;
           const appliesEquipmentExpense = dp.applies_equipment_expense !== undefined && dp.applies_equipment_expense !== null 
             ? !!dp.applies_equipment_expense 
@@ -200,7 +204,7 @@ export const storageService = {
             ? parseFloat(dp.real_utility)
             : (amount - equipmentExpense);
 
-          return {
+          const remoteDep = {
             id: dp.id,
             concept: dp.concept,
             amount,
@@ -212,8 +216,24 @@ export const storageService = {
             equipmentProvider: dp.equipment_provider || dp.equipmentProvider || '',
             realUtility: parseFloat(realUtility.toFixed(2))
           };
+
+          const existingLocal = localMap.get(dp.id);
+          if (existingLocal) {
+            localMap.set(dp.id, {
+              ...remoteDep,
+              ...existingLocal,
+              appliesEquipmentExpense: existingLocal.appliesEquipmentExpense !== undefined ? existingLocal.appliesEquipmentExpense : remoteDep.appliesEquipmentExpense,
+              equipmentExpense: existingLocal.equipmentExpense !== undefined ? existingLocal.equipmentExpense : remoteDep.equipmentExpense,
+              equipmentProvider: existingLocal.equipmentProvider !== undefined ? existingLocal.equipmentProvider : remoteDep.equipmentProvider,
+              realUtility: existingLocal.realUtility !== undefined ? existingLocal.realUtility : remoteDep.realUtility
+            });
+          } else {
+            localMap.set(dp.id, remoteDep);
+          }
         });
-        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
+
+        const mergedDeps = Array.from(localMap.values());
+        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mergedDeps);
       }
 
       if (taxRes.data) {
