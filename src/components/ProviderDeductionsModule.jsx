@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Receipt, UploadCloud, Trash2, Sparkles, Calendar, RotateCcw, ShieldCheck, Tag, Plus } from 'lucide-react';
+import { Receipt, UploadCloud, Trash2, Sparkles, Calendar, RotateCcw, ShieldCheck, Tag, Plus, Edit3 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { ocrService } from '../services/ocrService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
@@ -21,6 +21,7 @@ export default function ProviderDeductionsModule({ userRole }) {
   
   // Modal state (siempre limpio)
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     providerName: '',
     rfc: '',
@@ -139,6 +140,33 @@ export default function ProviderDeductionsModule({ userRole }) {
     }));
   };
 
+  const handleEdit = (d) => {
+    setEditingId(d.id);
+    const sub = d.subtotal || 0;
+    const iva = d.ivaTotal || 0;
+    let rate = 16;
+    if (sub > 0 && iva > 0) {
+      const calculated = Math.round((iva / sub) * 100);
+      if (calculated <= 10) rate = 8;
+      else rate = 16;
+    }
+
+    setFormData({
+      providerName: d.providerName || '',
+      rfc: d.rfc || '',
+      invoiceNo: d.invoiceNo || '',
+      date: d.date || new Date().toISOString().split('T')[0],
+      ivaRate: rate,
+      subtotal: d.subtotal !== undefined ? d.subtotal.toString() : '',
+      ivaTotal: d.ivaTotal !== undefined ? d.ivaTotal.toString() : '',
+      total: d.total !== undefined ? d.total.toString() : '',
+      sector: d.sector || 'Trabajo',
+      fileName: d.fileName || '',
+      fileType: d.fileType || 'pdf'
+    });
+    setShowModal(true);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const subtotal = parseFloat(formData.subtotal) || 0;
@@ -146,6 +174,7 @@ export default function ProviderDeductionsModule({ userRole }) {
     const total = parseFloat(formData.total) || (subtotal + ivaTotal);
 
     const itemToSave = {
+      id: editingId || undefined,
       providerName: formData.providerName,
       rfc: formData.rfc,
       invoiceNo: formData.invoiceNo,
@@ -173,6 +202,7 @@ export default function ProviderDeductionsModule({ userRole }) {
   };
 
   const resetForm = () => {
+    setEditingId(null);
     const defaultDate = selectedMonth !== 'ALL' && selectedYear !== 'ALL'
       ? `${selectedYear}-${selectedMonth}-01`
       : new Date().toISOString().split('T')[0];
@@ -182,6 +212,7 @@ export default function ProviderDeductionsModule({ userRole }) {
       rfc: '',
       invoiceNo: '',
       date: defaultDate,
+      ivaRate: 16,
       subtotal: '',
       ivaTotal: '',
       total: '',
@@ -424,13 +455,22 @@ export default function ProviderDeductionsModule({ userRole }) {
                     </span>
                   </td>
                   <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                    <button
-                      onClick={() => handleDelete(d.id)}
-                      style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
-                      title="Eliminar Deducción"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                      <button
+                        onClick={() => handleEdit(d)}
+                        style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
+                        title="Editar Factura de Proveedor"
+                      >
+                        <Edit3 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(d.id)}
+                        style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
+                        title="Eliminar Deducción"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -444,7 +484,9 @@ export default function ProviderDeductionsModule({ userRole }) {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '540px' }}>
             <div className="modal-header">
-              <h3 style={{ fontWeight: '800', color: '#0f172a' }}>Capturar Factura de Proveedor</h3>
+              <h3 style={{ fontWeight: '800', color: '#0f172a' }}>
+                {editingId ? 'Editar Factura de Proveedor' : 'Capturar Factura de Proveedor'}
+              </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}>✕</button>
             </div>
 
@@ -618,7 +660,7 @@ export default function ProviderDeductionsModule({ userRole }) {
               <div className="modal-footer">
                 <button type="button" className="btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg, #06b6d4, #0284c7)' }}>
-                  Guardar Factura Proveedor
+                  {editingId ? 'Guardar Cambios' : 'Guardar Factura Proveedor'}
                 </button>
               </div>
             </form>
