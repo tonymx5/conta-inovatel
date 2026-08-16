@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Plus, Trash2, Building } from 'lucide-react';
+import { CreditCard, Plus, Trash2, Edit3, Building } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate } from '../utils/dateFormatter';
 
@@ -10,6 +10,7 @@ export default function ExpensesModule({ userRole }) {
   // Modal States
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showBankModal, setShowBankModal] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
 
   const [expenseForm, setExpenseForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -47,6 +48,7 @@ export default function ExpensesModule({ userRole }) {
     const amount = parseFloat(expenseForm.amount) || 0;
 
     const expenseToSave = {
+      id: editingExpenseId || undefined,
       date: expenseForm.date,
       description: expenseForm.description,
       amount,
@@ -59,6 +61,18 @@ export default function ExpensesModule({ userRole }) {
     setExpenses(updated);
     setShowExpenseModal(false);
     resetExpenseForm();
+  };
+
+  const handleEditExpense = (expense) => {
+    setEditingExpenseId(expense.id);
+    setExpenseForm({
+      date: expense.date,
+      description: expense.description,
+      amount: expense.amount.toString(),
+      bankId: expense.bankId || (bankAccounts[0]?.id || ''),
+      sector: expense.sector || 'Comida'
+    });
+    setShowExpenseModal(true);
   };
 
   const handleSaveBank = (e) => {
@@ -76,6 +90,13 @@ export default function ExpensesModule({ userRole }) {
     resetBankForm();
   };
 
+  const handleDeleteBank = (id) => {
+    if (window.confirm('¿Eliminar esta cuenta / tarjeta bancaria del catálogo?')) {
+      const updated = storageService.deleteBankAccount(id);
+      setBankAccounts(updated);
+    }
+  };
+
   const handleDeleteExpense = (id) => {
     if (window.confirm('¿Eliminar este gasto de tarjeta?')) {
       const updated = storageService.deleteCardExpense(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
@@ -84,6 +105,7 @@ export default function ExpensesModule({ userRole }) {
   };
 
   const resetExpenseForm = () => {
+    setEditingExpenseId(null);
     setExpenseForm({
       date: new Date().toISOString().split('T')[0],
       description: '',
@@ -136,10 +158,15 @@ export default function ExpensesModule({ userRole }) {
             return (
               <div key={b.id} className="glass-card" style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.9))', border: '1px solid var(--border-glass)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                  <span className={`badge ${b.type === 'Crédito' ? 'badge-rose' : 'badge-emerald'}`}>
-                    {b.type}
-                  </span>
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontFamily: 'monospace' }}>{b.accountNumber}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className={`badge ${b.type === 'Crédito' ? 'badge-rose' : 'badge-emerald'}`}>
+                      {b.type}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontFamily: 'monospace' }}>{b.accountNumber}</span>
+                  </div>
+                  <button onClick={() => handleDeleteBank(b.id)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }} title="Eliminar Tarjeta">
+                    <Trash2 size={14} />
+                  </button>
                 </div>
                 <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#f8fafc' }}>{b.bankName}</h4>
                 <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
@@ -187,9 +214,14 @@ export default function ExpensesModule({ userRole }) {
                     -${e.amount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                   </td>
                   <td>
-                    <button onClick={() => handleDeleteExpense(e.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer' }} title="Eliminar">
-                      <Trash2 size={16} />
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <button onClick={() => handleEditExpense(e)} style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer' }} title="Editar Gasto">
+                        <Edit3 size={16} />
+                      </button>
+                      <button onClick={() => handleDeleteExpense(e.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer' }} title="Eliminar Gasto">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -203,7 +235,9 @@ export default function ExpensesModule({ userRole }) {
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3 style={{ fontWeight: '700', color: '#f8fafc' }}>Registrar Gasto con Tarjeta</h3>
+              <h3 style={{ fontWeight: '700', color: '#f8fafc' }}>
+                {editingExpenseId ? 'Editar Gasto con Tarjeta' : 'Registrar Gasto con Tarjeta'}
+              </h3>
               <button onClick={() => setShowExpenseModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.2rem', cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSaveExpense}>

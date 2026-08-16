@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Bot, Plus, Trash2, Send, Lightbulb } from 'lucide-react';
+import { TrendingUp, Bot, Plus, Trash2, Edit3, Send, Lightbulb } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate } from '../utils/dateFormatter';
 
@@ -8,6 +8,7 @@ export default function InvestmentsModule({ userRole }) {
   const [invoices, setInvoices] = useState([]);
   const [otherIncome, setOtherIncome] = useState([]);
   const [cardExpenses, setCardExpenses] = useState([]);
+  const [editingId, setEditingId] = useState(null);
 
   // Bot Chat State
   const [chatMessages, setChatMessages] = useState([
@@ -60,6 +61,7 @@ export default function InvestmentsModule({ userRole }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const itemToSave = {
+      id: editingId || undefined,
       assetName: formData.assetName,
       category: formData.category,
       amountInvested: parseFloat(formData.amountInvested) || 0,
@@ -73,6 +75,18 @@ export default function InvestmentsModule({ userRole }) {
     resetForm();
   };
 
+  const handleEdit = (inv) => {
+    setEditingId(inv.id);
+    setFormData({
+      assetName: inv.assetName,
+      category: inv.category || 'Renta Fija',
+      amountInvested: inv.amountInvested.toString(),
+      expectedYieldPct: inv.expectedYieldPct !== undefined ? inv.expectedYieldPct.toString() : '10.0',
+      startDate: inv.startDate || new Date().toISOString().split('T')[0]
+    });
+    setShowModal(true);
+  };
+
   const handleDelete = (id) => {
     if (window.confirm('¿Eliminar este registro de inversión?')) {
       const updated = storageService.deleteInvestment(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
@@ -81,6 +95,7 @@ export default function InvestmentsModule({ userRole }) {
   };
 
   const resetForm = () => {
+    setEditingId(null);
     setFormData({
       assetName: '',
       category: 'Renta Fija',
@@ -215,9 +230,14 @@ Te aconsejo destinar entre $${recomendacionInversionMin.toFixed(2)} y $${recomen
                         ${inv.amountInvested.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                       </td>
                       <td>
-                        <button onClick={() => handleDelete(inv.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer' }}>
-                          <Trash2 size={16} />
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button onClick={() => handleEdit(inv)} style={{ background: 'none', border: 'none', color: '#38bdf8', cursor: 'pointer' }} title="Editar Inversión">
+                            <Edit3 size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(inv.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer' }} title="Eliminar Inversión">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -284,7 +304,9 @@ Te aconsejo destinar entre $${recomendacionInversionMin.toFixed(2)} y $${recomen
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3 style={{ fontWeight: '800', color: '#0f172a' }}>Registrar Activo de Inversión</h3>
+              <h3 style={{ fontWeight: '800', color: '#0f172a' }}>
+                {editingId ? 'Editar Activo de Inversión' : 'Registrar Activo de Inversión'}
+              </h3>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}>✕</button>
             </div>
             <form onSubmit={handleSubmit}>
