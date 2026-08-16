@@ -80,12 +80,28 @@ if (-not $SkipBuild) {
 Write-Step "2/5" "Verificación Activa de Base de Datos y Esquema (Supabase DB-First)"
 
 $supabaseUrl = "https://jyhuvmqibfvmfutcvzhw.supabase.co"
+$anonKey = ""
+
+if (Test-Path ".env") {
+    Get-Content ".env" | ForEach-Object {
+        if ($_ -match "^VITE_SUPABASE_ANON_KEY=(.+)$") {
+            $anonKey = $matches[1].Trim()
+        }
+    }
+}
+
 Write-Host "Conectando y auditando esquema en Supabase ($supabaseUrl)..." -ForegroundColor Gray
 
 try {
+    $headers = @{}
+    if (-not [string]::IsNullOrWhiteSpace($anonKey)) {
+        $headers["apikey"] = $anonKey
+        $headers["Authorization"] = "Bearer $anonKey"
+    }
+
     # Inspeccionar definición OpenAPI de Supabase para validar tablas en vivo
-    $swagger = Invoke-RestMethod -Uri "$supabaseUrl/rest/v1/" -Method Get -TimeoutSec 10 -ErrorAction Stop
-    Write-Success "Conexión a Supabase REST API activa."
+    $swagger = Invoke-RestMethod -Uri "$supabaseUrl/rest/v1/" -Headers $headers -Method Get -TimeoutSec 10 -ErrorAction Stop
+    Write-Success "Conexión a Supabase REST API verificada exitosamente."
 
     if ($swagger.definitions) {
         $expectedTables = @('invoices', 'clients', 'deductibles', 'account_deposits', 'tax_config', 'audit_logs')
@@ -97,17 +113,17 @@ try {
         }
 
         if ($missingTables.Count -eq 0) {
-            Write-Success "Todas las tablas requeridas ($($expectedTables -join ', ')) existen activas en Supabase."
+            Write-Success "Esquema en Vivo Confirmado: Todas las tablas requeridas ($($expectedTables -join ', ')) existen en Supabase."
         } else {
             Write-Warning "Faltan las siguientes tablas en Supabase: $($missingTables -join ', ')"
-            Write-Warning "Ejecuta las sentencias contenidas en deploy_migration.sql o supabase_schema.sql en el Editor SQL de Supabase."
+            Write-Warning "Ejecuta las sentencias en deploy_migration.sql o supabase_schema.sql en el Editor SQL de Supabase."
         }
 
         # Auditar columnas críticas en account_deposits
         if ($swagger.definitions.account_deposits -and $swagger.definitions.account_deposits.properties) {
             $depCols = $swagger.definitions.account_deposits.properties
             if ($depCols.applies_equipment_expense -and $depCols.equipment_expense -and $depCols.equipment_provider -and $depCols.real_utility) {
-                Write-Success "Esquema de 'account_deposits' verificado (Columnas de gasto de equipos y utilidad real activas)."
+                Write-Success "Esquema de 'account_deposits' verificado (Columnas de gasto de equipos y utilidad real 100% activas)."
             } else {
                 Write-Warning "Esquema de 'account_deposits' requiere actualización de columnas en Supabase (ejecutar deploy_migration.sql)."
             }
