@@ -163,14 +163,22 @@ $liveUrl = "https://conta.inovatel.mx"
 Write-Host "Verificando disponibilidad de $liveUrl..." -ForegroundColor Gray
 
 try {
-    $response = Invoke-WebRequest -Uri "$liveUrl?v=$(Get-Random)" -Method Head -TimeoutSec 15
+    $response = Invoke-WebRequest -Uri "$liveUrl?v=$(Get-Random)" -Method Head -TimeoutSec 15 -UseBasicParsing
     if ($response.StatusCode -eq 200) {
         Write-Success "URL de producción respondiendo HTTP 200 OK (En línea)."
     } else {
         Write-Warning "URL respondió con código: $($response.StatusCode)"
     }
 } catch {
-    Write-Warning "La verificación en vivo tardó más de lo esperado en propagar DNS/CDN. El deploy sigue en curso en Vercel."
+    # Fallback GET request if HEAD is restricted by CDN
+    try {
+        $getRes = Invoke-WebRequest -Uri $liveUrl -TimeoutSec 15 -UseBasicParsing
+        if ($getRes.StatusCode -eq 200) {
+            Write-Success "URL de producción respondiendo HTTP 200 OK (En línea)."
+        }
+    } catch {
+        Write-Warning "La verificación en vivo tardó más de lo esperado en propagar DNS/CDN. El deploy sigue en curso en Vercel."
+    }
 }
 
 $elapsed = (Get-Date) - $startTime
