@@ -81,7 +81,7 @@ function parseInvoiceText(text) {
 
   // 3. Detect Folio / Serie
   let invoiceNo = '';
-  const folioMatch = text.match(/(?:FOLIO|SERIE|FACTURA|COMPROBANTE|DOCUMENTO)[\s:#-]+([A-Z0-9\/-]+)/i) ||
+  const folioMatch = text.match(/(?:FOLIO|SERIE|FACTURA|COMPROBANTE|DOCUMENTO)[\s:#-]+([A-Z0-9/-]+)/i) ||
                      text.match(/FA\d{1,3}\/\d+/i) ||
                      text.match(/F-\d+/i);
   if (folioMatch) {

@@ -17,13 +17,13 @@ const STORAGE_KEYS = {
 
 // Initial Seed Data with 1.25% RESICO ISR default
 const initialClients = [
-  { id: 'c1', name: 'JOINT', rfc: 'JOI190822ABC', email: 'contacto@joint.mx', phone: '6641234567', sector: 'Inmobiliario', notes: 'Cliente recurrente' },
-  { id: 'c2', name: 'MAJESTIC', rfc: 'MAJ200115DEF', email: 'admin@majestic.com', phone: '6642345678', sector: 'Industrial', notes: 'Pagos vía SPEI' },
-  { id: 'c3', name: 'GRACIELA', rfc: 'GRA850410GHI', email: 'graciela@gmail.com', phone: '6643456789', sector: 'Comercial', notes: 'Facturación mensual' },
-  { id: 'c4', name: 'ELIZABEHT', rfc: 'ELI911005JKL', email: 'elizabeth@inovatel.mx', phone: '6644567890', sector: 'Servicios', notes: 'Cliente preferencial' },
-  { id: 'c5', name: 'ALCO', rfc: 'ALC180312MNO', email: 'finanzas@alco.mx', phone: '6645678901', sector: 'Manufactura', notes: 'Retención ISR 1.25%' },
-  { id: 'c6', name: 'ALVARADOS', rfc: 'ALV190930PQR', email: 'ventas@alvarados.com', phone: '6646789012', sector: 'Logística', notes: 'Retención ISR 1.25% aplicada' },
-  { id: 'c7', name: 'EDGAR', rfc: 'EDG920415XYZ', email: 'edgar@gmail.com', phone: '6647890123', sector: 'Comercial', notes: 'Sin retención' }
+  { id: 'c1', name: 'JOINT', rfc: 'JOI190822ABC', email: 'contacto@joint.mx', phone: '6641234567', sector: 'Inmobiliario', notes: 'Cliente recurrente', appliesIsr: true, isrRate: 1.25 },
+  { id: 'c2', name: 'MAJESTIC', rfc: 'MAJ200115DEF', email: 'admin@majestic.com', phone: '6642345678', sector: 'Industrial', notes: 'Pagos vía SPEI', appliesIsr: true, isrRate: 1.25 },
+  { id: 'c3', name: 'GRACIELA', rfc: 'GRA850410GHI', email: 'graciela@gmail.com', phone: '6643456789', sector: 'Comercial', notes: 'Facturación mensual', appliesIsr: false, isrRate: 0 },
+  { id: 'c4', name: 'ELIZABEHT', rfc: 'ELI911005JKL', email: 'elizabeth@inovatel.mx', phone: '6644567890', sector: 'Servicios', notes: 'Cliente preferencial', appliesIsr: false, isrRate: 0 },
+  { id: 'c5', name: 'ALCO', rfc: 'ALC180312MNO', email: 'finanzas@alco.mx', phone: '6645678901', sector: 'Manufactura', notes: 'Retención ISR 1.25%', appliesIsr: true, isrRate: 1.25 },
+  { id: 'c6', name: 'ALVARADOS', rfc: 'ALV190930PQR', email: 'ventas@alvarados.com', phone: '6646789012', sector: 'Logística', notes: 'Retención ISR 1.25% aplicada', appliesIsr: true, isrRate: 1.25 },
+  { id: 'c7', name: 'EDGAR', rfc: 'EDG920415XYZ', email: 'edgar@gmail.com', phone: '6647890123', sector: 'Comercial', notes: 'Sin retención', appliesIsr: false, isrRate: 0 }
 ];
 
 const initialInvoices = [
@@ -54,6 +54,13 @@ const initialAccountDeposits = [
   { id: 'dep3', concept: 'Transferencia Cobro Factura fk665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201' }
 ];
 
+const initialBankAccounts = [
+  { id: 'b1', bankName: 'Santander', type: 'Débito', accountNumber: '**** 8819', balance: 0 },
+  { id: 'b2', bankName: 'NU', type: 'Crédito', accountNumber: '**** 4420', balance: 0 },
+  { id: 'b3', bankName: 'Banregio', type: 'Débito', accountNumber: '**** 1190', balance: 0 },
+  { id: 'b4', bankName: 'Stori', type: 'Crédito', accountNumber: '**** 9931', balance: 0 }
+];
+
 function getStorageItem(key, defaultValue) {
   try {
     const data = localStorage.getItem(key);
@@ -76,6 +83,12 @@ function setStorageItem(key, value) {
   }
 }
 
+function notifyDataSynced() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('conta_data_synced'));
+  }
+}
+
 export const storageService = {
   // Sync on startup from Supabase
   syncFromSupabase: async () => {
@@ -89,47 +102,89 @@ export const storageService = {
       ]);
 
       if (invRes.data && invRes.data.length > 0) {
-        const mappedInvoices = invRes.data.map(i => ({
-          id: i.id,
-          folio: i.folio,
-          clientName: i.client_name,
-          rfc: i.rfc,
-          date: i.date,
-          isMixedTax: i.is_mixed_tax,
-          subtotal: parseFloat(i.subtotal) || 0,
-          discount: parseFloat(i.discount) || 0,
-          subtotal8: parseFloat(i.subtotal8) || 0,
-          subtotal16: parseFloat(i.subtotal16) || 0,
-          ivaRate: parseFloat(i.iva_rate) || 8,
-          ivaTotal: parseFloat(i.iva_total) || 0,
-          appliesIsr: i.applies_isr,
-          isrRate: parseFloat(i.isr_rate) || 1.25,
-          isrRetained: parseFloat(i.isr_retained) || 0,
-          baseNeta: parseFloat(i.base_neta) || 0,
-          total: parseFloat(i.total) || 0,
-          status: i.status || 'PAGADA'
-        }));
+        const localInvoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
+        const localMap = new Map(localInvoices.map(i => [i.id, i]));
+
+        const mappedInvoices = invRes.data.map(i => {
+          const local = localMap.get(i.id);
+          return {
+            id: i.id,
+            folio: i.folio,
+            clientName: i.client_name || i.clientName || local?.clientName || '',
+            rfc: i.rfc || local?.rfc || '',
+            date: i.date || local?.date || '',
+            isMixedTax: i.is_mixed_tax !== undefined && i.is_mixed_tax !== null ? !!i.is_mixed_tax : (local?.isMixedTax || false),
+            subtotal: parseFloat(i.subtotal) || 0,
+            discount: parseFloat(i.discount) || 0,
+            subtotal8: parseFloat(i.subtotal8) || 0,
+            subtotal16: parseFloat(i.subtotal16) || 0,
+            ivaRate: parseFloat(i.iva_rate) || 8,
+            ivaTotal: parseFloat(i.iva_total) || 0,
+            appliesIsr: i.applies_isr !== undefined && i.applies_isr !== null ? !!i.applies_isr : (local?.appliesIsr !== undefined ? !!local.appliesIsr : true),
+            isrRate: i.isr_rate !== undefined && i.isr_rate !== null ? (parseFloat(i.isr_rate) || 1.25) : (local?.isrRate || 1.25),
+            isrRetained: parseFloat(i.isr_retained) || 0,
+            baseNeta: parseFloat(i.base_neta) || 0,
+            total: parseFloat(i.total) || 0,
+            status: i.status || 'PAGADA'
+          };
+        });
         setStorageItem(STORAGE_KEYS.INVOICES, mappedInvoices);
       }
 
       if (cliRes.data && cliRes.data.length > 0) {
-        setStorageItem(STORAGE_KEYS.CLIENTS, cliRes.data);
+        const localClients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients);
+        const localMap = new Map(localClients.map(c => [c.id, c]));
+
+        const mappedClients = cliRes.data.map(c => {
+          const local = localMap.get(c.id);
+          
+          let appliesIsr = true;
+          if (c.applies_isr !== undefined && c.applies_isr !== null) {
+            appliesIsr = !!c.applies_isr;
+          } else if (c.appliesIsr !== undefined && c.appliesIsr !== null) {
+            appliesIsr = !!c.appliesIsr;
+          } else if (local && local.appliesIsr !== undefined) {
+            appliesIsr = !!local.appliesIsr;
+          }
+
+          let isrRate = 1.25;
+          if (c.isr_rate !== undefined && c.isr_rate !== null) {
+            isrRate = parseFloat(c.isr_rate);
+          } else if (c.isrRate !== undefined && c.isrRate !== null) {
+            isrRate = parseFloat(c.isrRate);
+          } else if (local && local.isrRate !== undefined) {
+            isrRate = parseFloat(local.isrRate);
+          }
+
+          return {
+            id: c.id,
+            name: c.name,
+            rfc: c.rfc,
+            email: c.email || (local?.email || ''),
+            phone: c.phone || (local?.phone || ''),
+            sector: c.sector || (local?.sector || ''),
+            notes: c.notes || (local?.notes || ''),
+            appliesIsr,
+            isrRate
+          };
+        });
+        setStorageItem(STORAGE_KEYS.CLIENTS, mappedClients);
       }
 
       if (dedRes.data && dedRes.data.length > 0) {
         const mappedDeds = dedRes.data.map(d => ({
           id: d.id,
-          providerName: d.provider_name,
+          providerName: d.provider_name || d.providerName,
           rfc: d.rfc,
-          invoiceNo: d.invoice_no,
+          invoiceNo: d.invoice_no || d.invoiceNo,
           date: d.date,
           subtotal: parseFloat(d.subtotal) || 0,
           discount: parseFloat(d.discount) || 0,
           ivaTotal: parseFloat(d.iva_total) || 0,
           total: parseFloat(d.total) || 0,
           category: d.category,
-          fileName: d.file_name,
-          fileUrl: d.file_url
+          fileName: d.file_name || d.fileName,
+          fileUrl: d.file_url || d.fileUrl
         }));
         setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, mappedDeds);
       }
@@ -140,7 +195,7 @@ export const storageService = {
           concept: dp.concept,
           amount: parseFloat(dp.amount) || 0,
           date: dp.date,
-          bankName: dp.bank_name,
+          bankName: dp.bank_name || dp.bankName,
           reference: dp.reference
         }));
         setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
@@ -151,9 +206,7 @@ export const storageService = {
       }
 
       // Notify UI components that cloud data has been synchronized
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('conta_data_synced'));
-      }
+      notifyDataSynced();
     } catch (err) {
       console.warn('Supabase sync warning (running offline / local cache):', err);
     }
@@ -168,14 +221,25 @@ export const storageService = {
       isr_estimated_rate: config.isrEstimatedRate,
       last_updated: new Date().toISOString()
     })).catch(err => console.error('Supabase TaxConfig error:', err));
+    notifyDataSynced();
   },
 
   // Clients
   getClients: () => getStorageItem(STORAGE_KEYS.CLIENTS, initialClients),
-  saveClient: (client) => {
+  saveClient: (client, user = 'admin') => {
     const clients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients);
     const existingIndex = clients.findIndex(c => c.id === client.id);
-    const clientToSave = { ...client, id: client.id || 'cli-' + Date.now() };
+    const existing = existingIndex >= 0 ? clients[existingIndex] : {};
+
+    const clientToSave = {
+      ...existing,
+      ...client,
+      id: client.id || 'cli-' + Date.now(),
+      name: (client.name || existing.name || '').toUpperCase().trim(),
+      rfc: (client.rfc || existing.rfc || '').toUpperCase().trim(),
+      appliesIsr: client.appliesIsr !== undefined ? !!client.appliesIsr : (existing.appliesIsr !== undefined ? !!existing.appliesIsr : true),
+      isrRate: client.appliesIsr ? (client.isrRate !== undefined ? parseFloat(client.isrRate) : (existing.isrRate || 1.25)) : 0
+    };
 
     if (existingIndex >= 0) {
       clients[existingIndex] = clientToSave;
@@ -189,18 +253,39 @@ export const storageService = {
       id: clientToSave.id,
       name: clientToSave.name,
       rfc: clientToSave.rfc,
-      email: clientToSave.email,
-      phone: clientToSave.phone,
-      sector: clientToSave.sector,
-      notes: clientToSave.notes
-    })).catch(err => console.error('Supabase Client save error:', err));
+      email: clientToSave.email || null,
+      phone: clientToSave.phone || null,
+      sector: clientToSave.sector || null,
+      notes: clientToSave.notes || null,
+      applies_isr: clientToSave.appliesIsr,
+      isr_rate: clientToSave.isrRate
+    })).catch(err => {
+      // Graceful fallback if table column is still propagating
+      if (err?.message?.includes('column') || err?.code === 'PGRST204') {
+        supabase.from('clients').upsert({
+          id: clientToSave.id,
+          name: clientToSave.name,
+          rfc: clientToSave.rfc,
+          email: clientToSave.email || null,
+          phone: clientToSave.phone || null,
+          sector: clientToSave.sector || null,
+          notes: clientToSave.notes || null
+        }).catch(e => console.error('Supabase Client fallback save error:', e));
+      } else {
+        console.error('Supabase Client save error:', err);
+      }
+    });
 
+    storageService.logAudit(user, existingIndex >= 0 ? 'EDITAR_CLIENTE' : 'CREAR_CLIENTE', `${clientToSave.name} (${clientToSave.rfc}) - ISR: ${clientToSave.appliesIsr ? `${clientToSave.isrRate}%` : 'NO'}`);
+    notifyDataSynced();
     return clients;
   },
-  deleteClient: (id) => {
+  deleteClient: (id, user = 'admin') => {
     const clients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients).filter(c => c.id !== id);
     setStorageItem(STORAGE_KEYS.CLIENTS, clients);
     Promise.resolve(supabase.from('clients').delete().eq('id', id)).catch(err => console.error('Supabase Client delete error:', err));
+    storageService.logAudit(user, 'ELIMINAR_CLIENTE', `ID ${id}`);
+    notifyDataSynced();
     return clients;
   },
 
@@ -241,6 +326,7 @@ export const storageService = {
     })).catch(err => console.error('Supabase Invoice save error:', err));
 
     storageService.logAudit(user, existingIndex >= 0 ? 'EDITAR_FACTURA' : 'CREAR_FACTURA', `Factura ${updatedInvoice.folio} (${updatedInvoice.clientName})`);
+    notifyDataSynced();
     return invoices;
   },
   deleteInvoice: (id, user = 'admin') => {
@@ -248,6 +334,7 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.INVOICES, invoices);
     Promise.resolve(supabase.from('invoices').delete().eq('id', id)).catch(err => console.error('Supabase Invoice delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_FACTURA', `ID ${id}`);
+    notifyDataSynced();
     return invoices;
   },
 
@@ -278,6 +365,7 @@ export const storageService = {
     })).catch(err => console.error('Supabase Deductible save error:', err));
 
     storageService.logAudit(user, 'GUARDAR_DEDUCCION_PROVEEDOR', `${itemToSave.providerName} - IVA $${itemToSave.ivaTotal}`);
+    notifyDataSynced();
     return list;
   },
   deleteDeductible: (id, user = 'admin') => {
@@ -285,6 +373,7 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, list);
     Promise.resolve(supabase.from('deductibles').delete().eq('id', id)).catch(err => console.error('Supabase Deductible delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_DEDUCCION', `ID ${id}`);
+    notifyDataSynced();
     return list;
   },
 
@@ -309,6 +398,7 @@ export const storageService = {
     })).catch(err => console.error('Supabase Deposit save error:', err));
 
     storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount})`);
+    notifyDataSynced();
     return list;
   },
   deleteAccountDeposit: (id, user = 'admin') => {
@@ -316,6 +406,7 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
     Promise.resolve(supabase.from('account_deposits').delete().eq('id', id)).catch(err => console.error('Supabase Deposit delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_DEPOSITO_CUENTA', `ID ${id}`);
+    notifyDataSynced();
     return list;
   },
 
@@ -323,32 +414,55 @@ export const storageService = {
   getOtherIncome: () => getStorageItem(STORAGE_KEYS.OTHER_INCOME, []),
   saveOtherIncome: (item, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.OTHER_INCOME, []);
-    if (!item.id) item.id = 'oth_' + Date.now();
-    const idx = list.findIndex(o => o.id === item.id);
-    if (idx >= 0) list[idx] = item; else list.push(item);
+    const itemToSave = { ...item, id: item.id || 'oth_' + Date.now() };
+    const idx = list.findIndex(o => o.id === itemToSave.id);
+    if (idx >= 0) list[idx] = itemToSave; else list.push(itemToSave);
     setStorageItem(STORAGE_KEYS.OTHER_INCOME, list);
-    storageService.logAudit(user, 'GUARDAR_OTRO_INGRESO', item.concept);
+    storageService.logAudit(user, 'GUARDAR_OTRO_INGRESO', `${itemToSave.concept} ($${itemToSave.amount})`);
+    notifyDataSynced();
+    return list;
+  },
+  deleteOtherIncome: (id, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.OTHER_INCOME, []).filter(o => o.id !== id);
+    setStorageItem(STORAGE_KEYS.OTHER_INCOME, list);
+    storageService.logAudit(user, 'ELIMINAR_OTRO_INGRESO', `ID ${id}`);
+    notifyDataSynced();
     return list;
   },
 
   // Bank Accounts & Card Expenses
-  getBankAccounts: () => getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, []),
+  getBankAccounts: () => getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, initialBankAccounts),
   saveBankAccount: (account) => {
-    const list = getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, []);
-    if (!account.id) account.id = 'b_' + Date.now();
-    const idx = list.findIndex(b => b.id === account.id);
-    if (idx >= 0) list[idx] = account; else list.push(account);
+    const list = getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, initialBankAccounts);
+    const bankToSave = { ...account, id: account.id || 'b_' + Date.now() };
+    const idx = list.findIndex(b => b.id === bankToSave.id);
+    if (idx >= 0) list[idx] = bankToSave; else list.push(bankToSave);
     setStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, list);
+    notifyDataSynced();
+    return list;
+  },
+  deleteBankAccount: (id) => {
+    const list = getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, initialBankAccounts).filter(b => b.id !== id);
+    setStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, list);
+    notifyDataSynced();
     return list;
   },
   getCardExpenses: () => getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []),
   saveCardExpense: (expense, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []);
-    if (!expense.id) expense.id = 'exp_' + Date.now();
-    const idx = list.findIndex(e => e.id === expense.id);
-    if (idx >= 0) list[idx] = expense; else list.push(expense);
+    const expToSave = { ...expense, id: expense.id || 'exp_' + Date.now() };
+    const idx = list.findIndex(e => e.id === expToSave.id);
+    if (idx >= 0) list[idx] = expToSave; else list.push(expToSave);
     setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
-    storageService.logAudit(user, 'REGISTRAR_GASTO_TARJETA', `$${expense.amount} - ${expense.bankName}`);
+    storageService.logAudit(user, 'REGISTRAR_GASTO_TARJETA', `$${expToSave.amount} - ${expToSave.bankName}`);
+    notifyDataSynced();
+    return list;
+  },
+  deleteCardExpense: (id, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []).filter(e => e.id !== id);
+    setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
+    storageService.logAudit(user, 'ELIMINAR_GASTO_TARJETA', `ID ${id}`);
+    notifyDataSynced();
     return list;
   },
 
@@ -356,11 +470,19 @@ export const storageService = {
   getInvestments: () => getStorageItem(STORAGE_KEYS.INVESTMENTS, []),
   saveInvestment: (inv, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.INVESTMENTS, []);
-    if (!inv.id) inv.id = 'inv_ast_' + Date.now();
-    const idx = list.findIndex(i => i.id === inv.id);
-    if (idx >= 0) list[idx] = inv; else list.push(inv);
+    const invToSave = { ...inv, id: inv.id || 'inv_ast_' + Date.now() };
+    const idx = list.findIndex(i => i.id === invToSave.id);
+    if (idx >= 0) list[idx] = invToSave; else list.push(invToSave);
     setStorageItem(STORAGE_KEYS.INVESTMENTS, list);
-    storageService.logAudit(user, 'REGISTRAR_INVERSION', `${inv.assetName} ($${inv.amountInvested})`);
+    storageService.logAudit(user, 'REGISTRAR_INVERSION', `${invToSave.assetName} ($${invToSave.amountInvested})`);
+    notifyDataSynced();
+    return list;
+  },
+  deleteInvestment: (id, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.INVESTMENTS, []).filter(i => i.id !== id);
+    setStorageItem(STORAGE_KEYS.INVESTMENTS, list);
+    storageService.logAudit(user, 'ELIMINAR_INVERSION', `ID ${id}`);
+    notifyDataSynced();
     return list;
   },
 

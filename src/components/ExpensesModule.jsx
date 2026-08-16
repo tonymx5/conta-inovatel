@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Plus, Trash2, Building, DollarSign } from 'lucide-react';
+import { CreditCard, Plus, Trash2, Building } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate } from '../utils/dateFormatter';
 
@@ -28,6 +28,12 @@ export default function ExpensesModule({ userRole }) {
 
   useEffect(() => {
     loadData();
+
+    const handleSync = () => {
+      loadData();
+    };
+    window.addEventListener('conta_data_synced', handleSync);
+    return () => window.removeEventListener('conta_data_synced', handleSync);
   }, []);
 
   const loadData = () => {
@@ -72,9 +78,8 @@ export default function ExpensesModule({ userRole }) {
 
   const handleDeleteExpense = (id) => {
     if (window.confirm('¿Eliminar este gasto de tarjeta?')) {
-      const updated = expenses.filter(e => e.id !== id);
+      const updated = storageService.deleteCardExpense(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
       setExpenses(updated);
-      localStorage.setItem('conta_inovatel_card_expenses', JSON.stringify(updated));
     }
   };
 
@@ -96,8 +101,6 @@ export default function ExpensesModule({ userRole }) {
       balance: '0'
     });
   };
-
-  const totalGastos = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>

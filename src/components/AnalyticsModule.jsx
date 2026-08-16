@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart3, PieChart as PieIcon, TrendingUp, DollarSign, Calendar, Sparkles } from 'lucide-react';
+import { BarChart3, PieChart as PieIcon, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { storageService } from '../services/storageService';
 
@@ -17,10 +17,20 @@ export default function AnalyticsModule() {
   const [otherIncome, setOtherIncome] = useState([]);
 
   useEffect(() => {
+    loadData();
+
+    const handleSync = () => {
+      loadData();
+    };
+    window.addEventListener('conta_data_synced', handleSync);
+    return () => window.removeEventListener('conta_data_synced', handleSync);
+  }, []);
+
+  const loadData = () => {
     setInvoices(storageService.getInvoices());
     setCardExpenses(storageService.getCardExpenses());
     setOtherIncome(storageService.getOtherIncome());
-  }, []);
+  };
 
   const totalIngresoFacturado = invoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
   const totalOtroIngreso = otherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);

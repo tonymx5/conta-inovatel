@@ -35,8 +35,14 @@ CREATE TABLE IF NOT EXISTS public.clients (
     phone TEXT,
     sector TEXT,
     notes TEXT,
+    applies_isr BOOLEAN DEFAULT TRUE,
+    isr_rate NUMERIC(5,2) DEFAULT 1.25,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migración segura si la tabla ya existía previamente
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS applies_isr BOOLEAN DEFAULT TRUE;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS isr_rate NUMERIC(5,2) DEFAULT 1.25;
 
 -- 3. TABLA: FACTURAS PROVEEDORES / DEDUCCIONES (deductibles)
 CREATE TABLE IF NOT EXISTS public.deductibles (
@@ -103,13 +109,19 @@ VALUES ('default', 1.25, NOW())
 ON CONFLICT (id) DO NOTHING;
 
 -- Clientes Iniciales
-INSERT INTO public.clients (id, name, rfc, email, phone, sector, notes) VALUES
-('cli-1', 'JOINT', 'JOI190822ABC', 'contacto@joint.mx', '6641234567', 'Inmobiliario', 'Cliente recurrente'),
-('cli-2', 'MAJESTIC', 'MAJ200115DEF', 'admin@majestic.com', '6642345678', 'Industrial', 'Pagos vía SPEI'),
-('cli-3', 'GRACIELA', 'GRA850410GHI', 'graciela@gmail.com', '6643456789', 'Comercial', 'Facturación mensual'),
-('cli-4', 'ELIZABEHT', 'ELI911005JKL', 'elizabeth@inovatel.mx', '6644567890', 'Servicios', 'Cliente preferencial'),
-('cli-5', 'ALVARADOS', 'ALV980612MNO', 'ventas@alvarados.com', '6645678901', 'Logística', 'Retención ISR 1.25% aplicada')
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO public.clients (id, name, rfc, email, phone, sector, notes, applies_isr, isr_rate) VALUES
+('cli-1', 'JOINT', 'JOI190822ABC', 'contacto@joint.mx', '6641234567', 'Inmobiliario', 'Cliente recurrente', true, 1.25),
+('cli-2', 'MAJESTIC', 'MAJ200115DEF', 'admin@majestic.com', '6642345678', 'Industrial', 'Pagos vía SPEI', true, 1.25),
+('cli-3', 'GRACIELA', 'GRA850410GHI', 'graciela@gmail.com', '6643456789', 'Comercial', 'Facturación mensual', false, 0.00),
+('cli-4', 'ELIZABEHT', 'ELI911005JKL', 'elizabeth@inovatel.mx', '6644567890', 'Servicios', 'Cliente preferencial', false, 0.00),
+('cli-5', 'ALCO', 'ALC180312MNO', 'finanzas@alco.mx', '6645678901', 'Manufactura', 'Retención ISR 1.25%', true, 1.25),
+('cli-6', 'ALVARADOS', 'ALV980612MNO', 'ventas@alvarados.com', '6645678901', 'Logística', 'Retención ISR 1.25% aplicada', true, 1.25),
+('cli-7', 'EDGAR', 'EDG920415XYZ', 'edgar@gmail.com', '6647890123', 'Comercial', 'Sin retención', false, 0.00)
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  rfc = EXCLUDED.rfc,
+  applies_isr = EXCLUDED.applies_isr,
+  isr_rate = EXCLUDED.isr_rate;
 
 -- Facturas Iniciales (Julio y Agosto)
 INSERT INTO public.invoices (id, folio, client_name, rfc, date, is_mixed_tax, subtotal, discount, subtotal8, subtotal16, iva_rate, iva_total, applies_isr, isr_rate, isr_retained, base_neta, total, status) VALUES

@@ -251,8 +251,6 @@ export default function ProviderDeductionsModule({ userRole }) {
   // Period Calculations
   const totalIvaVentas = filteredInvoices.reduce((sum, i) => sum + (i.ivaTotal || 0), 0);
   const totalIvaDeducible = filteredDeductibles.reduce((sum, d) => sum + (d.ivaTotal || 0), 0);
-  const totalSubtotalProveedores = filteredDeductibles.reduce((sum, d) => sum + (d.subtotal || 0), 0);
-  const totalGastoProveedores = filteredDeductibles.reduce((sum, d) => sum + (d.total || 0), 0);
 
   const ivaNetoPagar = Math.max(0, totalIvaVentas - totalIvaDeducible);
   const ahorroIva = Math.min(totalIvaVentas, totalIvaDeducible);

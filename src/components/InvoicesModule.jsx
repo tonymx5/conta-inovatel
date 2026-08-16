@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Info, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, ArrowDownRight, ShieldCheck, Tag, Landmark, ArrowUpRight, Wallet } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, ArrowDownRight, ShieldCheck, Tag, Landmark } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
 
@@ -136,9 +136,6 @@ export default function InvoicesModule({ userRole }) {
   const handleSubtotal8Change = (val) => {
     const s8 = parseFloat(val) || 0;
     const s16 = parseFloat(formData.subtotal16) || 0;
-    const totalSub = s8 + s16;
-    const disc = parseFloat(formData.discount) || 0;
-    const totalSubNeto = Math.max(0, totalSub - disc);
     
     // Proportional or direct mixed tax
     const iva8 = s8 * 0.08;

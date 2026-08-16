@@ -3,7 +3,7 @@ import Header from './components/Header';
 import RestrictedModal from './components/RestrictedModal';
 import AuditLogModal from './components/AuditLogModal';
 import SecurityReportModal from './components/SecurityReportModal';
-import { FileText, Plus, BarChart3, TrendingUp, CreditCard, DollarSign, Receipt, Users } from 'lucide-react';
+import { FileText, Plus, BarChart3, TrendingUp, CreditCard } from 'lucide-react';
 import { storageService } from './services/storageService';
 
 // 7 Application Modules

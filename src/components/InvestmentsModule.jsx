@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Bot, Plus, Trash2, ShieldCheck, Sparkles, Send, Lightbulb, Target } from 'lucide-react';
+import { TrendingUp, Bot, Plus, Trash2, Send, Lightbulb } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate } from '../utils/dateFormatter';
 
@@ -30,6 +30,12 @@ export default function InvestmentsModule({ userRole }) {
 
   useEffect(() => {
     loadData();
+
+    const handleSync = () => {
+      loadData();
+    };
+    window.addEventListener('conta_data_synced', handleSync);
+    return () => window.removeEventListener('conta_data_synced', handleSync);
   }, []);
 
   const loadData = () => {
@@ -69,9 +75,8 @@ export default function InvestmentsModule({ userRole }) {
 
   const handleDelete = (id) => {
     if (window.confirm('¿Eliminar este registro de inversión?')) {
-      const updated = investments.filter(i => i.id !== id);
+      const updated = storageService.deleteInvestment(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
       setInvestments(updated);
-      localStorage.setItem('conta_inovatel_investments', JSON.stringify(updated));
     }
   };
 

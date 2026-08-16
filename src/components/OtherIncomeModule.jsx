@@ -16,6 +16,12 @@ export default function OtherIncomeModule({ userRole }) {
 
   useEffect(() => {
     loadData();
+
+    const handleSync = () => {
+      loadData();
+    };
+    window.addEventListener('conta_data_synced', handleSync);
+    return () => window.removeEventListener('conta_data_synced', handleSync);
   }, []);
 
   const loadData = () => {
@@ -52,9 +58,8 @@ export default function OtherIncomeModule({ userRole }) {
 
   const handleDelete = (id) => {
     if (window.confirm('¿Eliminar este registro de otro ingreso?')) {
-      const updated = items.filter(i => i.id !== id);
+      const updated = storageService.deleteOtherIncome(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
       setItems(updated);
-      localStorage.setItem('conta_inovatel_other_income', JSON.stringify(updated));
     }
   };
 
