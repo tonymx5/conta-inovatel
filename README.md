@@ -63,6 +63,22 @@ npm install
 # Servidor local de desarrollo
 npm run dev
 
-# Compilar para producción
+# Compilar para producción (Local check)
 npm run build
+
+# Despliegue simultáneo y seguro (Supabase + GitHub + Vercel)
+npm run deploy
 ```
+
+---
+
+## 🚀 Flujo Canónico de Despliegue (`deploy.ps1`)
+
+Para garantizar **cero fallos en actualizaciones** y consistencia absoluta entre servicios:
+
+1. **Pre-flight & Linter:** Validación estática (`oxlint`) y build local (`vite build`).
+2. **Supabase DB-First:** Comprobación de salud del endpoint REST y migración SQL idempotente ([`deploy_migration.sql`](file:///d:/Antigravity/Proyectos/Conta%20inovatel/deploy_migration.sql)).
+3. **GitHub Sincronización:** Registro de commit semántico atómico y `git push origin main`.
+4. **Vercel CI/CD:** Activación automática del build de producción global.
+5. **Verificación en Vivo:** Comprobación HTTP 200 en [https://conta.inovatel.mx](https://conta.inovatel.mx).
+
