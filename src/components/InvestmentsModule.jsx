@@ -220,7 +220,7 @@ Te aconsejo destinar entre $${recomendacionInversionMin.toFixed(2)} y $${recomen
                     </td>
                   </tr>
                 ) : (
-                  investments.map((inv) => (
+                  [...investments].sort((a, b) => (b.startDate || '').localeCompare(a.startDate || '')).map((inv) => (
                     <tr key={inv.id}>
                       <td style={{ fontWeight: '700', color: '#0f172a' }}>{inv.assetName}</td>
                       <td><span className="badge badge-indigo">{inv.category}</span></td>

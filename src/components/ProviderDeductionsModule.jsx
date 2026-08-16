@@ -222,30 +222,48 @@ export default function ProviderDeductionsModule({ userRole }) {
     });
   };
 
-  // Filter deductibles by selected month & year
+  // Filter and sort deductibles by selected month & year (Most recent date at the top)
   const filteredDeductibles = useMemo(() => {
-    return deductibles.filter((d) => {
-      if (!d.date) return selectedMonth === 'ALL';
-      const [year, month] = d.date.split('-');
-      
-      const matchesYear = selectedYear === 'ALL' || year === selectedYear;
-      const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
+    return deductibles
+      .filter((d) => {
+        if (!d.date) return selectedMonth === 'ALL';
+        const [year, month] = d.date.split('-');
+        
+        const matchesYear = selectedYear === 'ALL' || year === selectedYear;
+        const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
 
-      return matchesYear && matchesMonth;
-    });
+        return matchesYear && matchesMonth;
+      })
+      .sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA);
+        }
+        return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+      });
   }, [deductibles, selectedMonth, selectedYear]);
 
-  // Filter sales invoices for comparing IVA in the selected period
+  // Filter and sort sales invoices for comparing IVA in the selected period (Most recent date at the top)
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      if (!inv.date) return selectedMonth === 'ALL';
-      const [year, month] = inv.date.split('-');
-      
-      const matchesYear = selectedYear === 'ALL' || year === selectedYear;
-      const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
+    return invoices
+      .filter((inv) => {
+        if (!inv.date) return selectedMonth === 'ALL';
+        const [year, month] = inv.date.split('-');
+        
+        const matchesYear = selectedYear === 'ALL' || year === selectedYear;
+        const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
 
-      return matchesYear && matchesMonth;
-    });
+        return matchesYear && matchesMonth;
+      })
+      .sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA);
+        }
+        return (b.folio || '').localeCompare(a.folio || '', undefined, { numeric: true });
+      });
   }, [invoices, selectedMonth, selectedYear]);
 
   // Period Calculations

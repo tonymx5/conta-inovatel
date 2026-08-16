@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, ArrowDownRight, ShieldCheck, Tag, Landmark } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
+import { formatFolio } from '../utils/folioFormatter';
 
 export default function InvoicesModule({ userRole }) {
   const [invoices, setInvoices] = useState([]);
@@ -217,7 +218,7 @@ export default function InvoicesModule({ userRole }) {
 
     const invoiceToSave = {
       id: editingId || undefined,
-      folio: formData.folio || 'F-' + (invoices.length + 101),
+      folio: formatFolio(formData.folio || ('FK-' + (invoices.length + 101))),
       clientName: formData.clientName,
       rfc: formData.rfc,
       date: formData.date,
@@ -227,6 +228,7 @@ export default function InvoicesModule({ userRole }) {
       subtotal,
       discount,
       baseNeta,
+      ivaRate: formData.isMixedTax ? 8 : (formData.ivaRate || 8),
       ivaTotal,
       appliesIsr: formData.appliesIsr,
       isrRate: formData.isrRate,
@@ -248,7 +250,7 @@ export default function InvoicesModule({ userRole }) {
     const baseNeta = inv.baseNeta || (inv.subtotal - disc);
 
     setFormData({
-      folio: inv.folio,
+      folio: formatFolio(inv.folio),
       clientName: inv.clientName,
       rfc: inv.rfc,
       date: inv.date,
@@ -257,7 +259,7 @@ export default function InvoicesModule({ userRole }) {
       subtotal8: inv.subtotal8 ? inv.subtotal8.toString() : '',
       subtotal16: inv.subtotal16 ? inv.subtotal16.toString() : '',
       subtotal: inv.subtotal.toString(),
-      ivaRate: baseNeta > 0 ? Math.round((inv.ivaTotal / baseNeta) * 100) : 8,
+      ivaRate: inv.ivaRate || (baseNeta > 0 ? (Math.abs(Math.round((inv.ivaTotal / baseNeta) * 100) - 16) <= 2 ? 16 : 8) : 8),
       ivaTotal: inv.ivaTotal.toString(),
       appliesIsr: inv.appliesIsr,
       isrRate: inv.isrRate || 1.25,
@@ -282,8 +284,11 @@ export default function InvoicesModule({ userRole }) {
 
   const resetForm = () => {
     setEditingId(null);
+    const nextNum = invoices.length > 0
+      ? (Math.max(0, ...invoices.map(i => parseInt(i.folio?.replace(/\D/g, '') || '0', 10))) + 1)
+      : 101;
     setFormData({
-      folio: '',
+      folio: `FK-${nextNum}`,
       clientName: '',
       rfc: '',
       date: new Date().toISOString().split('T')[0],
@@ -320,43 +325,70 @@ export default function InvoicesModule({ userRole }) {
     localStorage.setItem('conta_inovatel_invoices', JSON.stringify(updatedInvoices));
   };
 
-  // Filter invoices by selected month & year
+  // Filter and sort invoices by selected month & year (Most recent date at the top)
   const filteredInvoices = useMemo(() => {
-    return invoices.filter((inv) => {
-      if (!inv.date) return selectedMonth === 'ALL';
-      const [year, month] = inv.date.split('-');
-      
-      const matchesYear = selectedYear === 'ALL' || year === selectedYear;
-      const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
+    return invoices
+      .filter((inv) => {
+        if (!inv.date) return selectedMonth === 'ALL';
+        const [year, month] = inv.date.split('-');
+        
+        const matchesYear = selectedYear === 'ALL' || year === selectedYear;
+        const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
 
-      return matchesYear && matchesMonth;
-    });
+        return matchesYear && matchesMonth;
+      })
+      .sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA);
+        }
+        return (b.folio || '').localeCompare(a.folio || '', undefined, { numeric: true });
+      });
   }, [invoices, selectedMonth, selectedYear]);
 
-  // Filter provider deductibles by selected month & year
+  // Filter and sort provider deductibles by selected month & year (Most recent date at the top)
   const filteredDeductibles = useMemo(() => {
-    return deductibles.filter((d) => {
-      if (!d.date) return selectedMonth === 'ALL';
-      const [year, month] = d.date.split('-');
-      
-      const matchesYear = selectedYear === 'ALL' || year === selectedYear;
-      const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
+    return deductibles
+      .filter((d) => {
+        if (!d.date) return selectedMonth === 'ALL';
+        const [year, month] = d.date.split('-');
+        
+        const matchesYear = selectedYear === 'ALL' || year === selectedYear;
+        const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
 
-      return matchesYear && matchesMonth;
-    });
+        return matchesYear && matchesMonth;
+      })
+      .sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA);
+        }
+        return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+      });
   }, [deductibles, selectedMonth, selectedYear]);
 
-  // Filter account deposits (transferencias) by selected month & year
+  // Filter and sort account deposits (Most recent date at the top)
   const filteredDeposits = useMemo(() => {
-    return deposits.filter((d) => {
-      if (!d.date) return selectedMonth === 'ALL';
-      const [year, month] = d.date.split('-');
-      
-      const matchesYear = selectedYear === 'ALL' || year === selectedYear;
-      const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
+    return deposits
+      .filter((d) => {
+        if (!d.date) return selectedMonth === 'ALL';
+        const [year, month] = d.date.split('-');
+        
+        const matchesYear = selectedYear === 'ALL' || year === selectedYear;
+        const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
 
-      return matchesYear && matchesMonth;
-    });
+        return matchesYear && matchesMonth;
+      })
+      .sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) {
+          return dateB.localeCompare(dateA);
+        }
+        return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+      });
   }, [deposits, selectedMonth, selectedYear]);
 
   const totalDepositosCuenta = filteredDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
@@ -599,7 +631,7 @@ export default function InvoicesModule({ userRole }) {
                       {/* Folio */}
                       <td style={{ whiteSpace: 'nowrap' }}>
                         <strong style={{ color: '#047857', fontWeight: '800', fontSize: '0.92rem' }}>
-                          {inv.folio}
+                          {formatFolio(inv.folio)}
                         </strong>
                       </td>
 
@@ -639,7 +671,7 @@ export default function InvoicesModule({ userRole }) {
                         </div>
                       </td>
 
-                      {/* IVA Trasladado con badge de tasa */}
+                      {/* IVA Trasladado con badge de tasa real */}
                       <td style={{ whiteSpace: 'nowrap', color: '#0284c7', fontWeight: '600', textAlign: 'right', fontSize: '0.92rem' }}>
                         ${inv.ivaTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         {isMixed ? (
@@ -648,7 +680,7 @@ export default function InvoicesModule({ userRole }) {
                           </span>
                         ) : (
                           <span style={{ fontSize: '0.68rem', background: '#f1f5f9', color: '#64748b', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: '700', marginLeft: '0.3rem' }}>
-                            {base > 0 ? `${Math.round((inv.ivaTotal / base) * 100)}%` : '8%'}
+                            {inv.ivaRate ? `${inv.ivaRate}%` : (base > 0 && Math.round((inv.ivaTotal / base) * 100) >= 14 ? '16%' : '8%')}
                           </span>
                         )}
                       </td>
@@ -1054,9 +1086,10 @@ export default function InvoicesModule({ userRole }) {
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Ej: F-109"
+                      placeholder="Ej: FK-659"
                       value={formData.folio}
-                      onChange={(e) => setFormData({ ...formData, folio: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, folio: e.target.value.toUpperCase() })}
+                      onBlur={(e) => setFormData({ ...formData, folio: formatFolio(e.target.value) })}
                     />
                   </div>
                   <div className="form-group">

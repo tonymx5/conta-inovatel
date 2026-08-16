@@ -1,45 +1,44 @@
 // LocalStorage & Supabase Dual-Sync Service for Conta Inovatel
-import { supabase } from './supabaseClient';
+import { supabase } from '../lib/supabaseClient';
+import { formatFolio } from '../utils/folioFormatter';
 
 const STORAGE_KEYS = {
   CLIENTS: 'conta_inovatel_clients',
   INVOICES: 'conta_inovatel_invoices',
-  OTHER_INCOME: 'conta_inovatel_other_income',
+  TAX_CONFIG: 'conta_inovatel_tax_config',
   DEDUCTIBLE_EXPENSES: 'conta_inovatel_deductibles',
-  ACCOUNT_DEPOSITS: 'conta_inovatel_account_deposits',
-  BANK_ACCOUNTS: 'conta_inovatel_bank_accounts',
+  OTHER_INCOME: 'conta_inovatel_other_income',
   CARD_EXPENSES: 'conta_inovatel_card_expenses',
+  BANK_ACCOUNTS: 'conta_inovatel_bank_accounts',
   INVESTMENTS: 'conta_inovatel_investments',
   AUDIT_LOGS: 'conta_inovatel_audit_logs',
-  SECURITY_INCIDENTS: 'conta_inovatel_security_incidents',
-  TAX_CONFIG: 'conta_inovatel_tax_config'
+  SECURITY_INCIDENTS: 'conta_inovatel_security_incidents'
 };
 
-// Initial Seed Data with 1.25% RESICO ISR default
 const initialClients = [
-  { id: 'c1', name: 'JOINT', rfc: 'JOI190822ABC', email: 'contacto@joint.mx', phone: '6641234567', sector: 'Inmobiliario', notes: 'Cliente recurrente', appliesIsr: true, isrRate: 1.25 },
-  { id: 'c2', name: 'MAJESTIC', rfc: 'MAJ200115DEF', email: 'admin@majestic.com', phone: '6642345678', sector: 'Industrial', notes: 'Pagos vía SPEI', appliesIsr: true, isrRate: 1.25 },
-  { id: 'c3', name: 'GRACIELA', rfc: 'GRA850410GHI', email: 'graciela@gmail.com', phone: '6643456789', sector: 'Comercial', notes: 'Facturación mensual', appliesIsr: false, isrRate: 0 },
-  { id: 'c4', name: 'ELIZABEHT', rfc: 'ELI911005JKL', email: 'elizabeth@inovatel.mx', phone: '6644567890', sector: 'Servicios', notes: 'Cliente preferencial', appliesIsr: false, isrRate: 0 },
-  { id: 'c5', name: 'ALCO', rfc: 'ALC180312MNO', email: 'finanzas@alco.mx', phone: '6645678901', sector: 'Manufactura', notes: 'Retención ISR 1.25%', appliesIsr: true, isrRate: 1.25 },
+  { id: 'c1', name: 'JOINT', rfc: 'JOI190822ABC', email: 'contacto@joint.mx', phone: '6641234567', sector: 'Tecnología', notes: 'Retención ISR 1.25% aplicada', appliesIsr: true, isrRate: 1.25 },
+  { id: 'c2', name: 'MAJESTIC', rfc: 'MAJ200115DEF', email: 'finanzas@majestic.com', phone: '6642345678', sector: 'Servicios', notes: 'Retención ISR 1.25% aplicada', appliesIsr: true, isrRate: 1.25 },
+  { id: 'c3', name: 'GRACIELA', rfc: 'GRA850410GHI', email: 'graciela@empresa.com', phone: '6643456789', sector: 'Consultoría', notes: 'Sin retención', appliesIsr: false, isrRate: 0 },
+  { id: 'c4', name: 'ELIZABEHT', rfc: 'ELI911005JKL', email: 'elizabeth@inovatel.mx', phone: '6644567890', sector: 'Salud', notes: 'Sin retención', appliesIsr: false, isrRate: 0 },
+  { id: 'c5', name: 'ALCO', rfc: 'ALC180312MNO', email: 'compras@alco.mx', phone: '6645678901', sector: 'Construcción', notes: 'Retención ISR 1.25% aplicada', appliesIsr: true, isrRate: 1.25 },
   { id: 'c6', name: 'ALVARADOS', rfc: 'ALV190930PQR', email: 'ventas@alvarados.com', phone: '6646789012', sector: 'Logística', notes: 'Retención ISR 1.25% aplicada', appliesIsr: true, isrRate: 1.25 },
   { id: 'c7', name: 'EDGAR', rfc: 'EDG920415XYZ', email: 'edgar@gmail.com', phone: '6647890123', sector: 'Comercial', notes: 'Sin retención', appliesIsr: false, isrRate: 0 }
 ];
 
 const initialInvoices = [
   // Julio 2026 (8 Facturas)
-  { id: 'inv1', folio: 'F-101', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-07-01', subtotal: 7006.41, discount: 0, baseNeta: 7006.41, ivaRate: 8, ivaTotal: 560.52, appliesIsr: true, isrRate: 1.25, isrRetained: 87.52, total: 7479.41, status: 'PAGADA' },
-  { id: 'inv2', folio: 'F-102', clientName: 'MAJESTIC', rfc: 'MAJ200115DEF', date: '2026-07-03', subtotal: 649.87, discount: 0, baseNeta: 649.87, ivaRate: 8, ivaTotal: 52.00, appliesIsr: true, isrRate: 1.25, isrRetained: 8.00, total: 693.87, status: 'PAGADA' },
-  { id: 'inv3', folio: 'F-103', clientName: 'GRACIELA', rfc: 'GRA850410GHI', date: '2026-07-05', subtotal: 780.00, discount: 0, baseNeta: 780.00, ivaRate: 8, ivaTotal: 62.40, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 842.40, status: 'PAGADA' },
-  { id: 'inv4', folio: 'F-104', clientName: 'ELIZABEHT', rfc: 'ELI911005JKL', date: '2026-07-07', subtotal: 1235.00, discount: 0, baseNeta: 1235.00, ivaRate: 8, ivaTotal: 98.80, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 1333.80, status: 'PAGADA' },
-  { id: 'inv5', folio: 'F-105', clientName: 'ALCO', rfc: 'ALC180312MNO', date: '2026-07-09', subtotal: 1600.00, discount: 0, baseNeta: 1600.00, ivaRate: 8, ivaTotal: 128.00, appliesIsr: true, isrRate: 1.25, isrRetained: 20.00, total: 1708.00, status: 'PAGADA' },
-  { id: 'inv6', folio: 'F-106', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-07-11', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
-  { id: 'inv7', folio: 'F-107', clientName: 'EDGAR', rfc: 'EDG920415XYZ', date: '2026-07-15', subtotal: 450.00, discount: 0, baseNeta: 450.00, ivaRate: 8, ivaTotal: 36.00, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 486.00, status: 'PAGADA' },
-  { id: 'inv8', folio: 'F-108', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-07-20', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
+  { id: 'inv1', folio: 'FK-101', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-07-01', subtotal: 7006.41, discount: 0, baseNeta: 7006.41, ivaRate: 8, ivaTotal: 560.52, appliesIsr: true, isrRate: 1.25, isrRetained: 87.52, total: 7479.41, status: 'PAGADA' },
+  { id: 'inv2', folio: 'FK-102', clientName: 'MAJESTIC', rfc: 'MAJ200115DEF', date: '2026-07-03', subtotal: 649.87, discount: 0, baseNeta: 649.87, ivaRate: 8, ivaTotal: 52.00, appliesIsr: true, isrRate: 1.25, isrRetained: 8.00, total: 693.87, status: 'PAGADA' },
+  { id: 'inv3', folio: 'FK-103', clientName: 'GRACIELA', rfc: 'GRA850410GHI', date: '2026-07-05', subtotal: 780.00, discount: 0, baseNeta: 780.00, ivaRate: 8, ivaTotal: 62.40, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 842.40, status: 'PAGADA' },
+  { id: 'inv4', folio: 'FK-104', clientName: 'ELIZABEHT', rfc: 'ELI911005JKL', date: '2026-07-07', subtotal: 1235.00, discount: 0, baseNeta: 1235.00, ivaRate: 8, ivaTotal: 98.80, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 1333.80, status: 'PAGADA' },
+  { id: 'inv5', folio: 'FK-105', clientName: 'ALCO', rfc: 'ALC180312MNO', date: '2026-07-09', subtotal: 1600.00, discount: 0, baseNeta: 1600.00, ivaRate: 8, ivaTotal: 128.00, appliesIsr: true, isrRate: 1.25, isrRetained: 20.00, total: 1708.00, status: 'PAGADA' },
+  { id: 'inv6', folio: 'FK-106', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-07-11', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
+  { id: 'inv7', folio: 'FK-107', clientName: 'EDGAR', rfc: 'EDG920415XYZ', date: '2026-07-15', subtotal: 450.00, discount: 0, baseNeta: 450.00, ivaRate: 8, ivaTotal: 36.00, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 486.00, status: 'PAGADA' },
+  { id: 'inv8', folio: 'FK-108', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-07-20', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
 
   // Agosto 2026 (2 Facturas)
-  { id: 'inv9', folio: 'fk665', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-08-04', subtotal: 35720.00, discount: 1786.00, baseNeta: 33934.00, ivaRate: 8, ivaTotal: 2714.72, appliesIsr: true, isrRate: 1.25, isrRetained: 424.18, total: 36224.54, status: 'PAGADA' },
-  { id: 'inv10', folio: 'F-110', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-10', subtotal: 7376.33, discount: 0, baseNeta: 6909.60, ivaRate: 8, ivaTotal: 553.10, appliesIsr: true, isrRate: 1.25, isrRetained: 86.37, total: 7376.33, status: 'PAGADA' }
+  { id: 'inv9', folio: 'FK-665', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-08-04', subtotal: 35720.00, discount: 1786.00, baseNeta: 33934.00, ivaRate: 8, ivaTotal: 2714.72, appliesIsr: true, isrRate: 1.25, isrRetained: 424.18, total: 36224.54, status: 'PAGADA' },
+  { id: 'inv10', folio: 'FK-659', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-10', subtotal: 6909.60, discount: 0, baseNeta: 6909.60, ivaRate: 8, ivaTotal: 553.10, appliesIsr: true, isrRate: 1.25, isrRetained: 86.37, total: 7376.33, status: 'PAGADA' }
 ];
 
 const initialDeductibles = [
@@ -49,9 +48,9 @@ const initialDeductibles = [
 ];
 
 const initialAccountDeposits = [
-  { id: 'dep1', concept: 'Transferencia Cobro Factura F-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192' },
-  { id: 'dep2', concept: 'Transferencia Cobro Factura F-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910' },
-  { id: 'dep3', concept: 'Transferencia Cobro Factura fk665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201' }
+  { id: 'dep1', concept: 'Transferencia Cobro Factura FK-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192' },
+  { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910' },
+  { id: 'dep3', concept: 'Transferencia Cobro Factura FK-665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201' }
 ];
 
 const initialBankAccounts = [
@@ -109,7 +108,7 @@ export const storageService = {
           const local = localMap.get(i.id);
           return {
             id: i.id,
-            folio: i.folio,
+            folio: formatFolio(i.folio || local?.folio),
             clientName: i.client_name || i.clientName || local?.clientName || '',
             rfc: i.rfc || local?.rfc || '',
             date: i.date || local?.date || '',
@@ -290,11 +289,18 @@ export const storageService = {
   },
 
   // Invoices
-  getInvoices: () => getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices),
+  getInvoices: () => {
+    const list = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
+    return list.map(inv => ({ ...inv, folio: formatFolio(inv.folio) }));
+  },
   saveInvoice: (invoice, user = 'admin') => {
     const invoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
     const existingIndex = invoices.findIndex(i => i.id === invoice.id);
-    const updatedInvoice = { ...invoice, id: invoice.id || 'inv-' + Date.now() };
+    const updatedInvoice = { 
+      ...invoice, 
+      id: invoice.id || 'inv-' + Date.now(),
+      folio: formatFolio(invoice.folio)
+    };
 
     if (existingIndex >= 0) {
       invoices[existingIndex] = updatedInvoice;

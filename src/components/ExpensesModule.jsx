@@ -200,7 +200,7 @@ export default function ExpensesModule({ userRole }) {
                 </td>
               </tr>
             ) : (
-              expenses.map((e) => (
+              [...expenses].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((e) => (
                 <tr key={e.id}>
                   <td style={{ fontSize: '0.88rem', color: '#334155', fontWeight: '600', whiteSpace: 'nowrap' }}>{formatDate(e.date)}</td>
                   <td style={{ fontWeight: '600', color: '#f8fafc' }}>{e.description}</td>

@@ -125,14 +125,16 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- Facturas Iniciales (Julio y Agosto)
 INSERT INTO public.invoices (id, folio, client_name, rfc, date, is_mixed_tax, subtotal, discount, subtotal8, subtotal16, iva_rate, iva_total, applies_isr, isr_rate, isr_retained, base_neta, total, status) VALUES
-('inv-1', 'F-101', 'JOINT', 'JOI190822ABC', '2026-08-01', false, 7479.41, 0, 0, 0, 7.49, 560.52, true, 1.25, 93.49, 7479.41, 7946.44, 'PAGADA'),
-('inv-2', 'F-102', 'MAJESTIC', 'MAJ200115DEF', '2026-08-03', false, 693.87, 0, 0, 0, 7.49, 52.00, true, 1.25, 8.67, 693.87, 737.20, 'PAGADA'),
-('inv-3', 'F-103', 'GRACIELA', 'GRA850410GHI', '2026-08-05', false, 842.40, 0, 0, 0, 7.41, 62.40, false, 1.25, 0.00, 842.40, 904.80, 'PAGADA'),
-('inv-4', 'F-104', 'ELIZABEHT', 'ELI911005JKL', '2026-08-07', false, 1333.80, 0, 0, 0, 7.41, 98.80, false, 1.25, 0.00, 1333.80, 1432.60, 'PAGADA'),
-('inv-5', 'F-105', 'JOINT', 'JOI190822ABC', '2026-08-10', false, 1146.41, 0, 0, 0, 7.49, 85.92, true, 1.25, 14.33, 1146.41, 1218.00, 'PAGADA'),
-('inv-6', 'F-106', 'ALVARADOS', 'ALV980612MNO', '2026-08-12', false, 8346.54, 0, 0, 0, 7.49, 625.54, true, 1.25, 104.33, 8346.54, 8867.75, 'PAGADA'),
-('inv-7', 'fk665', 'ALVARADOS', 'ALV980612MNO', '2026-08-05', false, 34098.46, 1786.00, 0, 0, 7.60, 2451.26, true, 1.25, 403.91, 32312.46, 34359.81, 'PAGADA'),
-('inv-8', 'F-110', 'JOINT', 'JOI190822ABC', '2026-08-10', false, 7376.33, 0, 0, 0, 8.00, 553.10, true, 1.25, 86.37, 7376.33, 7376.33, 'PAGADA')
+('inv-1', 'FK-101', 'JOINT', 'JOI190822ABC', '2026-07-01', false, 7006.41, 0, 0, 0, 8.00, 560.52, true, 1.25, 87.52, 7006.41, 7479.41, 'PAGADA'),
+('inv-2', 'FK-102', 'MAJESTIC', 'MAJ200115DEF', '2026-07-03', false, 649.87, 0, 0, 0, 8.00, 52.00, true, 1.25, 8.00, 649.87, 693.87, 'PAGADA'),
+('inv-3', 'FK-103', 'GRACIELA', 'GRA850410GHI', '2026-07-05', false, 780.00, 0, 0, 0, 8.00, 62.40, false, 0, 0.00, 780.00, 842.40, 'PAGADA'),
+('inv-4', 'FK-104', 'ELIZABEHT', 'ELI911005JKL', '2026-07-07', false, 1235.00, 0, 0, 0, 8.00, 98.80, false, 0, 0.00, 1235.00, 1333.80, 'PAGADA'),
+('inv-5', 'FK-105', 'ALCO', 'ALC180312MNO', '2026-07-09', false, 1600.00, 0, 0, 0, 8.00, 128.00, true, 1.25, 20.00, 1600.00, 1708.00, 'PAGADA'),
+('inv-6', 'FK-106', 'ALVARADOS', 'ALV190930PQR', '2026-07-11', false, 4000.00, 0, 0, 0, 8.00, 320.00, true, 1.25, 50.00, 4000.00, 4270.00, 'PAGADA'),
+('inv-7', 'FK-107', 'EDGAR', 'EDG920415XYZ', '2026-07-15', false, 450.00, 0, 0, 0, 8.00, 36.00, false, 0, 0.00, 450.00, 486.00, 'PAGADA'),
+('inv-8', 'FK-108', 'ALVARADOS', 'ALV190930PQR', '2026-07-20', false, 4000.00, 0, 0, 0, 8.00, 320.00, true, 1.25, 50.00, 4000.00, 4270.00, 'PAGADA'),
+('inv-9', 'FK-665', 'ALVARADOS', 'ALV190930PQR', '2026-08-04', false, 35720.00, 1786.00, 0, 0, 8.00, 2714.72, true, 1.25, 424.18, 33934.00, 36224.54, 'PAGADA'),
+('inv-10', 'FK-659', 'JOINT', 'JOI190822ABC', '2026-08-10', false, 6909.60, 0, 0, 0, 8.00, 553.10, true, 1.25, 86.37, 6909.60, 7376.33, 'PAGADA')
 ON CONFLICT (id) DO NOTHING;
 
 -- Proveedores / Deducciones Iniciales
@@ -144,5 +146,5 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Depósitos a Cuenta Iniciales
 INSERT INTO public.account_deposits (id, concept, amount, date, bank_name, reference) VALUES
-('dep-1', 'Transferencia Cobro Factura fk665 (ALVARADOS)', 36224.54, '2026-08-05', 'Santander', 'SPEI-99201')
+('dep-1', 'Transferencia Cobro Factura FK-665 (ALVARADOS)', 36224.54, '2026-08-05', 'Santander', 'SPEI-99201')
 ON CONFLICT (id) DO NOTHING;

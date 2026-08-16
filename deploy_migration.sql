@@ -95,3 +95,13 @@ ALTER TABLE public.deductibles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.account_deposits DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tax_config DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs DISABLE ROW LEVEL SECURITY;
+
+-- 7. NORMALIZACIÓN AUTOMÁTICA DE FOLIOS A FK- Y TASAS DE IVA
+UPDATE public.invoices 
+SET folio = 'FK-' || regexp_replace(UPPER(folio), '^(FK-?|F-?)', '', 'i')
+WHERE folio NOT LIKE 'FK-%';
+
+UPDATE public.invoices 
+SET iva_rate = 8.00 
+WHERE iva_rate >= 7.00 AND iva_rate <= 7.99;
+

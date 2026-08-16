@@ -112,7 +112,7 @@ export default function OtherIncomeModule({ userRole }) {
                   </td>
                 </tr>
               ) : (
-                items.map((i) => (
+                [...items].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((i) => (
                   <tr key={i.id}>
                     <td style={{ fontSize: '0.88rem', color: '#334155', fontWeight: '600', whiteSpace: 'nowrap' }}>{formatDate(i.date)}</td>
                     <td style={{ fontWeight: '700', color: '#0f172a' }}>{i.concept}</td>
