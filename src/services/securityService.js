@@ -4,13 +4,14 @@ import { storageService } from './storageService';
 
 const PASSWORDS = {
   OPERATOR: '2020',
-  ADMIN: 'PulguitA'
+  ADMIN_MASTER: 'PulguitA',
+  ADMIN_PIN: '0808'
 };
 
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 export const securityService = {
-  // Check if admin is currently locked out
+  // Check if admin/user is currently locked out
   isLockedOut: () => {
     const lockUntil = localStorage.getItem('admin_lockout_until');
     if (!lockUntil) return false;
@@ -25,26 +26,89 @@ export const securityService = {
     return false;
   },
 
-  // Validate Admin Password
-  validateAdminPass: (inputPassword, triedHistory = []) => {
+  // Validate Initial Gatekeeper Password (User 2020 or Admin 0808/PulguitA)
+  validateLoginPass: (inputPassword) => {
+    const lockedMs = securityService.isLockedOut();
+    if (lockedMs) {
+      return { 
+        success: false, 
+        isLocked: true, 
+        remainingMs: lockedMs, 
+        message: '¡ACCESO BLOQUEADO POR 5 MINUTOS! Se han detectado múltiples intentos fallidos.' 
+      };
+    }
+
+    const clean = inputPassword ? inputPassword.trim() : '';
+
+    // Admin Access
+    if (clean === PASSWORDS.ADMIN_PIN || clean === PASSWORDS.ADMIN_MASTER) {
+      localStorage.removeItem('admin_failed_attempts');
+      localStorage.removeItem('admin_tried_passwords');
+      storageService.logAudit('ADMIN', 'LOGIN_PORTAL', 'Acceso Administrador concedido al portal');
+      return { success: true, role: 'admin' };
+    }
+
+    // Operator / User Access
+    if (clean === PASSWORDS.OPERATOR) {
+      localStorage.removeItem('admin_failed_attempts');
+      localStorage.removeItem('admin_tried_passwords');
+      storageService.logAudit('USUARIO', 'LOGIN_PORTAL', 'Acceso Usuario concedido al portal');
+      return { success: true, role: 'operator' };
+    }
+
+    // Failed attempt handling
+    let attempts = parseInt(localStorage.getItem('admin_failed_attempts') || '0', 10) + 1;
+    let triedPasswords = JSON.parse(localStorage.getItem('admin_tried_passwords') || '[]');
+    triedPasswords.push(clean);
+
+    localStorage.setItem('admin_failed_attempts', attempts.toString());
+    localStorage.setItem('admin_tried_passwords', JSON.stringify(triedPasswords));
+
+    if (attempts >= 3) {
+      const lockUntil = Date.now() + LOCKOUT_DURATION_MS;
+      localStorage.setItem('admin_lockout_until', lockUntil.toString());
+
+      securityService.fetchClientIpAndLog(attempts, triedPasswords);
+      storageService.logAudit('SISTEMA', 'BLOQUEO_INTRUSO', `3 intentos fallidos de clave de acceso. Sistema bloqueado por 5 min.`);
+
+      return {
+        success: false,
+        isLocked: true,
+        remainingMs: LOCKOUT_DURATION_MS,
+        message: '¡ACCESO BLOQUEADO POR 5 MINUTOS! Se han alcanzado 3 intentos fallidos y registrado un reporte de intruso.'
+      };
+    }
+
+    return {
+      success: false,
+      isLocked: false,
+      attemptsRemaining: 3 - attempts,
+      message: `Contraseña incorrecta. Intentos restantes: ${3 - attempts}`
+    };
+  },
+
+  // Validate Admin Password for Restricted Modals
+  validateAdminPass: (inputPassword) => {
     // Check lockout first
     const lockedMs = securityService.isLockedOut();
     if (lockedMs) {
       return { success: false, isLocked: true, remainingMs: lockedMs };
     }
 
-    if (inputPassword === PASSWORDS.ADMIN) {
+    const clean = inputPassword ? inputPassword.trim() : '';
+
+    if (clean === PASSWORDS.ADMIN_PIN || clean === PASSWORDS.ADMIN_MASTER) {
       // Reset attempts on success
       localStorage.removeItem('admin_failed_attempts');
       localStorage.removeItem('admin_tried_passwords');
-      storageService.logAudit('ADMIN', 'LOGIN_EXITOSO', 'Acceso Administrador concedido');
+      storageService.logAudit('ADMIN', 'LOGIN_ADMIN', 'Acceso Administrador desbloqueado');
       return { success: true };
     }
 
     // Handle failure
     let attempts = parseInt(localStorage.getItem('admin_failed_attempts') || '0', 10) + 1;
     let triedPasswords = JSON.parse(localStorage.getItem('admin_tried_passwords') || '[]');
-    triedPasswords.push(inputPassword);
+    triedPasswords.push(clean);
 
     localStorage.setItem('admin_failed_attempts', attempts.toString());
     localStorage.setItem('admin_tried_passwords', JSON.stringify(triedPasswords));

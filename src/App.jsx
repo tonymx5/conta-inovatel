@@ -3,6 +3,7 @@ import Header from './components/Header';
 import RestrictedModal from './components/RestrictedModal';
 import AuditLogModal from './components/AuditLogModal';
 import SecurityReportModal from './components/SecurityReportModal';
+import LoginGateModal from './components/LoginGateModal';
 import { FileText, Plus, BarChart3, TrendingUp, CreditCard } from 'lucide-react';
 import { storageService } from './services/storageService';
 
@@ -17,7 +18,8 @@ import InvestmentsModule from './components/InvestmentsModule';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('invoices');
-  const [userRole, setUserRole] = useState('operator'); // Default: 'operator' (password 2020)
+  const [userRole, setUserRole] = useState('operator'); // 'operator' (USUARIO) | 'admin' (ADMIN)
+  const [isSessionLocked, setIsSessionLocked] = useState(true); // Bloqueado al inicio por seguridad
 
   useEffect(() => {
     // Initial silent sync with cloud database (Supabase)
@@ -47,6 +49,16 @@ export default function App() {
     }
   };
 
+  const handleLoginSuccess = (role) => {
+    setUserRole(role);
+    setIsSessionLocked(false);
+  };
+
+  const handleLockSession = () => {
+    setIsSessionLocked(true);
+    setUserRole('operator');
+  };
+
   const handleMobileNav = (tabId, label, isRestricted) => {
     if (isRestricted && userRole !== 'admin') {
       handleRestrictedClick(label, tabId);
@@ -56,93 +68,112 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Top Glassmorphic Navigation Header with Notch Safe Area Inset Support */}
-      <Header
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        userRole={userRole}
-        setUserRole={setUserRole}
-        onOpenAuditLog={() => setShowAuditModal(true)}
-        onOpenSecurityReport={() => setShowSecurityModal(true)}
-        onRestrictedClick={(name) => handleRestrictedClick(name)}
+    <div style={{ minHeight: '100vh', position: 'relative' }}>
+      {/* Login Gatekeeper Lock Modal (Pide contraseña al inicio) */}
+      <LoginGateModal
+        isOpen={isSessionLocked}
+        onLoginSuccess={handleLoginSuccess}
       />
 
-      {/* Main Module Content */}
-      <main style={{ flex: 1, padding: '1.25rem', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
-        {activeTab === 'invoices' && <InvoicesModule userRole={userRole} />}
-        {activeTab === 'other_income' && <OtherIncomeModule userRole={userRole} />}
-        {activeTab === 'provider_deductions' && <ProviderDeductionsModule userRole={userRole} />}
-        {activeTab === 'clients' && <ClientsModule userRole={userRole} />}
-        {activeTab === 'expenses' && <ExpensesModule userRole={userRole} />}
-        {activeTab === 'analytics' && <AnalyticsModule userRole={userRole} />}
-        {activeTab === 'investments' && <InvestmentsModule userRole={userRole} />}
-      </main>
+      {/* Main Application Container with blur & opacity when locked */}
+      <div 
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          filter: isSessionLocked ? 'blur(14px)' : 'none',
+          opacity: isSessionLocked ? 0.18 : 1,
+          pointerEvents: isSessionLocked ? 'none' : 'auto',
+          userSelect: isSessionLocked ? 'none' : 'auto',
+          transition: 'filter 0.4s ease, opacity 0.4s ease'
+        }}
+      >
+        {/* Top Glassmorphic Navigation Header */}
+        <Header
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          userRole={userRole}
+          onOpenAuditLog={() => setShowAuditModal(true)}
+          onOpenSecurityReport={() => setShowSecurityModal(true)}
+          onRestrictedClick={(name) => handleRestrictedClick(name)}
+          onLock={handleLockSession}
+        />
 
-      {/* Mobile Floating Bottom Navigation Bar (Inspired by Template Floating Dock & Green + Button) */}
-      <nav className="mobile-bottom-nav">
-        <button
-          className={`mobile-nav-item ${activeTab === 'invoices' ? 'active' : ''}`}
-          onClick={() => handleMobileNav('invoices', 'Facturas', false)}
-        >
-          <FileText size={20} color={activeTab === 'invoices' ? '#10b981' : '#64748b'} />
-          <span>Facturas</span>
-        </button>
+        {/* Main Module Content */}
+        <main style={{ flex: 1, padding: '1.25rem', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
+          {activeTab === 'invoices' && <InvoicesModule userRole={userRole} />}
+          {activeTab === 'other_income' && <OtherIncomeModule userRole={userRole} />}
+          {activeTab === 'provider_deductions' && <ProviderDeductionsModule userRole={userRole} />}
+          {activeTab === 'clients' && <ClientsModule userRole={userRole} />}
+          {activeTab === 'expenses' && <ExpensesModule userRole={userRole} />}
+          {activeTab === 'analytics' && <AnalyticsModule userRole={userRole} />}
+          {activeTab === 'investments' && <InvestmentsModule userRole={userRole} />}
+        </main>
 
-        <button
-          className={`mobile-nav-item ${activeTab === 'expenses' ? 'active' : ''}`}
-          onClick={() => handleMobileNav('expenses', 'Gastos & Bancos', true)}
-        >
-          <CreditCard size={20} color={activeTab === 'expenses' ? '#10b981' : '#64748b'} />
-          <span>Gastos</span>
-        </button>
+        {/* Mobile Floating Bottom Navigation Bar */}
+        <nav className="mobile-bottom-nav">
+          <button
+            className={`mobile-nav-item ${activeTab === 'invoices' ? 'active' : ''}`}
+            onClick={() => handleMobileNav('invoices', 'Facturas', false)}
+          >
+            <FileText size={20} color={activeTab === 'invoices' ? '#10b981' : '#64748b'} />
+            <span>Facturas</span>
+          </button>
 
-        {/* Center Floating Green Action FAB (+) Button */}
-        <button
-          className="mobile-fab-btn"
-          onClick={() => {
-            if (activeTab !== 'invoices') setActiveTab('invoices');
-            // Trigger new invoice form event if needed
-          }}
-          title="Nueva Factura"
-        >
-          <Plus size={28} strokeWidth={3} />
-        </button>
+          <button
+            className={`mobile-nav-item ${activeTab === 'expenses' ? 'active' : ''}`}
+            onClick={() => handleMobileNav('expenses', 'Gastos & Bancos', true)}
+          >
+            <CreditCard size={20} color={activeTab === 'expenses' ? '#10b981' : '#64748b'} />
+            <span>Gastos</span>
+          </button>
 
-        <button
-          className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
-          onClick={() => handleMobileNav('analytics', 'Métricas & Analíticas', true)}
-        >
-          <BarChart3 size={20} color={activeTab === 'analytics' ? '#10b981' : '#64748b'} />
-          <span>Métricas</span>
-        </button>
+          {/* Center Floating Green Action FAB (+) Button */}
+          <button
+            className="mobile-fab-btn"
+            onClick={() => {
+              if (activeTab !== 'invoices') setActiveTab('invoices');
+            }}
+            title="Nueva Factura"
+          >
+            <Plus size={28} strokeWidth={3} />
+          </button>
 
-        <button
-          className={`mobile-nav-item ${activeTab === 'investments' ? 'active' : ''}`}
-          onClick={() => handleMobileNav('investments', 'Inversiones & Bot IA', true)}
-        >
-          <TrendingUp size={20} color={activeTab === 'investments' ? '#10b981' : '#64748b'} />
-          <span>Inversiones</span>
-        </button>
-      </nav>
+          <button
+            className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => handleMobileNav('analytics', 'Métricas & Analíticas', true)}
+          >
+            <BarChart3 size={20} color={activeTab === 'analytics' ? '#10b981' : '#64748b'} />
+            <span>Métricas</span>
+          </button>
 
-      {/* Modals */}
-      <RestrictedModal
-        isOpen={showRestrictedModal}
-        onClose={() => setShowRestrictedModal(false)}
-        onSuccess={handleUnlockSuccess}
-        targetModuleName={restrictedTargetName}
-      />
+          <button
+            className={`mobile-nav-item ${activeTab === 'investments' ? 'active' : ''}`}
+            onClick={() => handleMobileNav('investments', 'Inversiones & Bot IA', true)}
+          >
+            <TrendingUp size={20} color={activeTab === 'investments' ? '#10b981' : '#64748b'} />
+            <span>Inversiones</span>
+          </button>
+        </nav>
 
-      <AuditLogModal
-        isOpen={showAuditModal}
-        onClose={() => setShowAuditModal(false)}
-      />
+        {/* Modals */}
+        <RestrictedModal
+          isOpen={showRestrictedModal}
+          onClose={() => setShowRestrictedModal(false)}
+          onSuccess={handleUnlockSuccess}
+          targetModuleName={restrictedTargetName}
+        />
 
-      <SecurityReportModal
-        isOpen={showSecurityModal}
-        onClose={() => setShowSecurityModal(false)}
-      />
+        <AuditLogModal
+          isOpen={showAuditModal}
+          onClose={() => setShowAuditModal(false)}
+        />
+
+        <SecurityReportModal
+          isOpen={showSecurityModal}
+          onClose={() => setShowSecurityModal(false)}
+        />
+      </div>
     </div>
   );
 }

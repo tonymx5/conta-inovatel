@@ -1,17 +1,17 @@
 import React from 'react';
 import { 
   FileText, DollarSign, Receipt, Users, CreditCard, BarChart3, TrendingUp, 
-  ShieldCheck, ShieldAlert, History, Lock, Unlock, Sparkles
+  ShieldAlert, History, Lock, Sparkles
 } from 'lucide-react';
 
 export default function Header({ 
   activeTab, 
   setActiveTab, 
   userRole, 
-  setUserRole, 
   onOpenAuditLog, 
   onOpenSecurityReport,
-  onRestrictedClick 
+  onRestrictedClick,
+  onLock
 }) {
   const tabs = [
     { id: 'invoices', label: 'Facturas', icon: FileText, restricted: false },
@@ -75,15 +75,15 @@ export default function Header({
           {/* User Role Indicator */}
           <div style={{ background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '9999px', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.65rem', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
             <span className={`badge ${userRole === 'admin' ? 'badge-amber' : 'badge-emerald'}`}>
-              {userRole === 'admin' ? <ShieldCheck size={14} /> : <Lock size={14} />}
-              {userRole === 'admin' ? 'ADMINISTRADOR' : 'OPERADOR (2020)'}
+              <Lock size={14} />
+              {userRole === 'admin' ? 'ADMIN' : 'USUARIO'}
             </span>
 
             {userRole === 'admin' ? (
               <button
-                onClick={() => setUserRole('operator')}
+                onClick={onLock}
                 style={{ background: 'none', border: 'none', color: '#64748b', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '600' }}
-                title="Cerrar sesión de Admin y pasar a Operador"
+                title="Bloquear pantalla de acceso"
               >
                 <Lock size={13} /> Bloquear
               </button>
@@ -92,7 +92,7 @@ export default function Header({
                 onClick={() => onRestrictedClick('Panel de Administración')}
                 style={{ background: 'none', border: 'none', color: '#b45309', fontSize: '0.78rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: '700' }}
               >
-                <Unlock size={13} /> Desbloquear Admin
+                <Lock size={13} /> Admin
               </button>
             )}
           </div>

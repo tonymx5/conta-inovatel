@@ -110,7 +110,7 @@ export default function RestrictedModal({ isOpen, onClose, onSuccess, targetModu
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                  El usuario estándar (Pass: <strong>2020</strong>) solo puede manipular Facturas. Introduce la contraseña de Administrador para acceder.
+                  El rol actual es <strong>USUARIO</strong>. Introduce la clave de Administrador para desbloquear este módulo.
                 </p>
               </div>
 
