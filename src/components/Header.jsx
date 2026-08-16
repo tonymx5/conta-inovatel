@@ -58,15 +58,19 @@ export default function Header({
           </div>
         </div>
 
-        {/* Audit & Security Controls */}
+        {/* Audit & Security Controls (Exclusivo para Administrador) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn-secondary" onClick={onOpenAuditLog} style={{ fontSize: '0.85rem' }}>
-            <History size={16} color="#10b981" /> Bitácora
-          </button>
+          {userRole === 'admin' && (
+            <>
+              <button className="btn-secondary" onClick={onOpenAuditLog} style={{ fontSize: '0.85rem' }}>
+                <History size={16} color="#10b981" /> Bitácora
+              </button>
 
-          <button className="btn-secondary" onClick={onOpenSecurityReport} style={{ fontSize: '0.85rem' }}>
-            <ShieldAlert size={16} color="#f43f5e" /> Intrusos
-          </button>
+              <button className="btn-secondary" onClick={onOpenSecurityReport} style={{ fontSize: '0.85rem' }}>
+                <ShieldAlert size={16} color="#f43f5e" /> Intrusos
+              </button>
+            </>
+          )}
 
           {/* User Role Indicator */}
           <div style={{ background: 'rgba(255, 255, 255, 0.9)', border: '1px solid rgba(203, 213, 225, 0.6)', borderRadius: '9999px', padding: '0.4rem 0.9rem', display: 'flex', alignItems: 'center', gap: '0.65rem', boxShadow: '0 2px 10px rgba(0,0,0,0.03)' }}>
