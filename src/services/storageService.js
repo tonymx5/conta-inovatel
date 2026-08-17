@@ -274,45 +274,17 @@ export const storageService = {
         }))).catch(e => console.error('Seed deductibles error:', e));
       }
 
-      // 4. Account Deposits (Fusión Bidireccional No Destructiva: Prioridad Local Absoluta)
+      // 4. Account Deposits (Supabase como Fuente Única de Verdad)
       const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
-      const effectiveLocalDeps = (localDeps && localDeps.length > 0) ? localDeps : initialAccountDeposits;
 
       if (depRes.data && depRes.data.length > 0) {
-        const remoteMap = new Map(depRes.data.map(dp => [dp.id, mapDepositFromSupabase(dp)]));
-        const mergedDepsMap = new Map();
-
-        // 1. Conservar intactos los depósitos locales (ediciones del usuario)
-        effectiveLocalDeps.forEach(localDep => {
-          mergedDepsMap.set(localDep.id, localDep);
-        });
-
-        // 2. Agregar registros de Supabase que no existan localmente
-        remoteMap.forEach((remoteDep, id) => {
-          if (!mergedDepsMap.has(id)) {
-            mergedDepsMap.set(id, remoteDep);
-          }
-        });
-
-        const finalDepsList = Array.from(mergedDepsMap.values());
-        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, finalDepsList);
-
-        // Subir a Supabase depósitos locales que no existan remotamente
-        const missingInRemote = effectiveLocalDeps.filter(d => !remoteMap.has(d.id));
-        if (missingInRemote.length > 0) {
-          Promise.all(missingInRemote.map(dp => supabase.from('account_deposits').upsert({
-            id: dp.id, concept: dp.concept, amount: dp.amount, date: dp.date, bank_name: dp.bankName || 'Santander',
-            reference: dp.reference, applies_equipment_expense: dp.appliesEquipmentExpense,
-            equipment_expense: dp.equipmentExpense, equipment_provider: dp.equipmentProvider, real_utility: dp.realUtility
-          }))).catch(e => console.error('Sync missing deposits error:', e));
-        }
-      } else {
-        // Preservar depósitos locales y sembrar en Supabase para evitar vacíos
-        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, effectiveLocalDeps);
-        Promise.all(effectiveLocalDeps.map(dp => supabase.from('account_deposits').upsert({
+        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp));
+        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
+      } else if (localDeps && localDeps.length > 0) {
+        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, localDeps);
+        Promise.all(localDeps.map(dp => supabase.from('account_deposits').upsert({
           id: dp.id, concept: dp.concept, amount: dp.amount, date: dp.date, bank_name: dp.bankName || 'Santander',
-          reference: dp.reference, applies_equipment_expense: dp.appliesEquipmentExpense,
-          equipment_expense: dp.equipmentExpense, equipment_provider: dp.equipmentProvider, real_utility: dp.realUtility
+          reference: dp.reference
         }))).catch(e => console.error('Seed account_deposits error:', e));
       }
 
