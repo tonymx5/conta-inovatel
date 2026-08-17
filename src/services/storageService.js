@@ -43,23 +43,33 @@ const initialInvoices = [
 ];
 
 const initialDeductibles = [
+  { id: 'd-costco-1', providerName: 'Costco', rfc: 'COS910214ABC', invoiceNo: 'FACT-4412', date: '2026-08-17', subtotal: 413.19, discount: 0, ivaTotal: 66.11, total: 479.30, category: 'Papelería / Oficina' },
+  { id: 'd-homedepot-1', providerName: 'Home Depot', rfc: 'HDE000315XYZ', invoiceNo: 'HD-99120', date: '2026-08-17', subtotal: 441.00, discount: 0, ivaTotal: 70.56, total: 511.56, category: 'Equipos & Telecomunicaciones' },
+  { id: 'd3', providerName: 'SYSCOM (Computación y Telecomunicaciones)', rfc: 'STE940428KBA', invoiceNo: 'FA26/1441633', date: '2026-08-15', subtotal: 20326.80, discount: 0, ivaTotal: 3252.29, total: 23579.09, category: 'Equipos & Telecomunicaciones' },
   { id: 'd1', providerName: 'Office Depot', rfc: 'ODE930805B27', invoiceNo: 'PDF-9921', date: '2026-07-04', subtotal: 1250.00, discount: 0, ivaTotal: 200.00, total: 1450.00, category: 'Papelería / Oficina' },
-  { id: 'd2', providerName: 'Telmex', rfc: 'EME8903099C7', invoiceNo: 'PDF-8812', date: '2026-07-12', subtotal: 860.00, discount: 0, ivaTotal: 137.60, total: 997.60, category: 'Telecomunicaciones' },
-  { id: 'd3', providerName: 'SYSCOM (Computación y Telecomunicaciones)', rfc: 'STE940428KBA', invoiceNo: 'FA26/1441633', date: '2026-08-15', subtotal: 20326.80, discount: 0, ivaTotal: 3252.29, total: 23579.09, category: 'Equipos & Telecomunicaciones' }
+  { id: 'd2', providerName: 'Telmex', rfc: 'EME8903099C7', invoiceNo: 'PDF-8812', date: '2026-07-12', subtotal: 860.00, discount: 0, ivaTotal: 137.60, total: 997.60, category: 'Telecomunicaciones' }
 ];
 
 const initialAccountDeposits = [
+  { id: 'dep-aug-alvarado', concept: 'Deposito Alvarado 665', amount: 32180.05, date: '2026-08-04', bankName: 'Santander', reference: 'SPEI-99201', appliesEquipmentExpense: true, equipmentExpense: 21952.17, equipmentProvider: 'SYSCOM', realUtility: 10227.88 },
   { id: 'dep1', concept: 'Transferencia Cobro Factura FK-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 7479.41 },
-  { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 4270.00 },
-  { id: 'dep3', concept: 'Transferencia Cobro Factura FK-665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201', appliesEquipmentExpense: true, equipmentExpense: 21952.94, equipmentProvider: 'SYSCOM (Equipos)', realUtility: 14271.60 },
-  { id: 'dep4', concept: 'deposito a cuenta (alvarado)', amount: 7704.92, date: '2026-08-04', bankName: 'NU', reference: 'SPEI-88347', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 7704.92 }
+  { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 4270.00 }
+];
+
+const initialCardExpenses = [
+  { id: 'exp-aug-1', date: '2026-08-17', description: 'Consumos y Alimentos', amount: 462.00, bankId: 'b5', bankName: 'Banregio (Crédito)', sector: 'Comida' },
+  { id: 'exp-aug-2', date: '2026-08-17', description: 'Entretenimiento y Ocio', amount: 892.50, bankId: 'b5', bankName: 'Banregio (Crédito)', sector: 'Ocio' },
+  { id: 'exp-aug-3', date: '2026-08-17', description: 'Servicios y Software', amount: 2212.97, bankId: 'b5', bankName: 'Banregio (Crédito)', sector: 'Servicios' },
+  { id: 'exp-aug-4', date: '2026-08-17', description: 'Insumos de Trabajo / Oficina', amount: 952.50, bankId: 'b5', bankName: 'Banregio (Crédito)', sector: 'Trabajo' }
 ];
 
 const initialBankAccounts = [
-  { id: 'b1', bankName: 'Santander', type: 'Débito', accountNumber: '**** 8819', balance: 0 },
-  { id: 'b2', bankName: 'NU', type: 'Crédito', accountNumber: '**** 4420', balance: 0 },
-  { id: 'b3', bankName: 'Banregio', type: 'Débito', accountNumber: '**** 1190', balance: 0 },
-  { id: 'b4', bankName: 'Stori', type: 'Crédito', accountNumber: '**** 9931', balance: 0 }
+  { id: 'b1', bankName: 'Santander', type: 'Débito', accountNumber: '**** 2740', balance: 0 },
+  { id: 'b2', bankName: 'NU', type: 'Crédito', accountNumber: '**** 0712', balance: 0 },
+  { id: 'b3', bankName: 'Stori', type: 'Crédito', accountNumber: '**** 1000', balance: 0 },
+  { id: 'b4', bankName: 'Banregio', type: 'Débito', accountNumber: '**** 7699', balance: 0 },
+  { id: 'b5', bankName: 'Banregio', type: 'Crédito', accountNumber: '**** 7699', balance: 0 },
+  { id: 'b6', bankName: 'NU', type: 'Débito', accountNumber: '**** 6195', balance: 0 }
 ];
 
 function getStorageItem(key, defaultValue) {
@@ -181,39 +191,47 @@ function mapDeductibleFromSupabase(d) {
 
 function mapDepositFromSupabase(dp, localMap = new Map()) {
   const amount = parseFloat(dp.amount) || 0;
-  const appliesEquipmentExpense = dp.applies_equipment_expense !== undefined && dp.applies_equipment_expense !== null 
-    ? !!dp.applies_equipment_expense 
-    : ((parseFloat(dp.equipment_expense) || 0) > 0);
-  const equipmentExpense = appliesEquipmentExpense ? (parseFloat(dp.equipment_expense) || 0) : 0;
-  const realUtility = dp.real_utility !== undefined && dp.real_utility !== null
-    ? parseFloat(dp.real_utility)
-    : (amount - equipmentExpense);
+  const existingLocal = localMap.get(dp.id);
 
-  const remoteDep = {
+  let appliesEquipmentExpense = false;
+  if (dp.applies_equipment_expense !== undefined && dp.applies_equipment_expense !== null) {
+    appliesEquipmentExpense = !!dp.applies_equipment_expense;
+  } else if (existingLocal && existingLocal.appliesEquipmentExpense !== undefined) {
+    appliesEquipmentExpense = !!existingLocal.appliesEquipmentExpense;
+  } else if ((parseFloat(dp.equipment_expense) || 0) > 0) {
+    appliesEquipmentExpense = true;
+  }
+
+  let equipmentExpense = 0;
+  if (dp.equipment_expense !== undefined && dp.equipment_expense !== null) {
+    equipmentExpense = parseFloat(dp.equipment_expense) || 0;
+  } else if (existingLocal && existingLocal.equipmentExpense !== undefined) {
+    equipmentExpense = parseFloat(existingLocal.equipmentExpense) || 0;
+  }
+
+  let equipmentProvider = dp.equipment_provider || dp.equipmentProvider || (existingLocal?.equipmentProvider || '');
+
+  let realUtility = 0;
+  if (dp.real_utility !== undefined && dp.real_utility !== null) {
+    realUtility = parseFloat(dp.real_utility);
+  } else if (existingLocal && existingLocal.realUtility !== undefined) {
+    realUtility = parseFloat(existingLocal.realUtility);
+  } else {
+    realUtility = parseFloat((amount - (appliesEquipmentExpense ? equipmentExpense : 0)).toFixed(2));
+  }
+
+  return {
     id: dp.id,
-    concept: dp.concept,
+    concept: dp.concept || (existingLocal?.concept || ''),
     amount,
-    date: dp.date,
-    bankName: dp.bank_name || dp.bankName || 'Santander',
-    reference: dp.reference || '',
+    date: dp.date || (existingLocal?.date || ''),
+    bankName: dp.bank_name || dp.bankName || (existingLocal?.bankName || 'Santander'),
+    reference: dp.reference || (existingLocal?.reference || ''),
     appliesEquipmentExpense,
     equipmentExpense,
-    equipmentProvider: dp.equipment_provider || dp.equipmentProvider || '',
-    realUtility: parseFloat(realUtility.toFixed(2))
+    equipmentProvider,
+    realUtility
   };
-
-  const existingLocal = localMap.get(dp.id);
-  if (existingLocal) {
-    return {
-      ...remoteDep,
-      ...existingLocal,
-      appliesEquipmentExpense: existingLocal.appliesEquipmentExpense !== undefined ? existingLocal.appliesEquipmentExpense : remoteDep.appliesEquipmentExpense,
-      equipmentExpense: existingLocal.equipmentExpense !== undefined ? existingLocal.equipmentExpense : remoteDep.equipmentExpense,
-      equipmentProvider: existingLocal.equipmentProvider !== undefined ? existingLocal.equipmentProvider : remoteDep.equipmentProvider,
-      realUtility: existingLocal.realUtility !== undefined ? existingLocal.realUtility : remoteDep.realUtility
-    };
-  }
-  return remoteDep;
 }
 
 export const storageService = {
@@ -260,10 +278,16 @@ export const storageService = {
         }))).catch(e => console.error('Seed clients error:', e));
       }
 
-      // 3. Deductibles
+      // 3. Deductibles (Facturas Proveedores)
       const localDeds = getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles);
       if (dedRes.data && dedRes.data.length > 0) {
         const mappedDeds = dedRes.data.map(d => mapDeductibleFromSupabase(d));
+        // Non-destructive merge: preserve local deductibles if missing in remote
+        localDeds.forEach(ld => {
+          if (!mappedDeds.some(md => md.id === ld.id)) {
+            mappedDeds.push(ld);
+          }
+        });
         setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, mappedDeds);
       } else if (localDeds && localDeds.length > 0) {
         setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, localDeds);
@@ -274,11 +298,18 @@ export const storageService = {
         }))).catch(e => console.error('Seed deductibles error:', e));
       }
 
-      // 4. Account Deposits (Supabase como Fuente Única de Verdad)
+      // 4. Account Deposits (Non-Destructive Dual Sync)
       const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+      const localMap = new Map(localDeps.map(d => [d.id, d]));
 
       if (depRes.data && depRes.data.length > 0) {
-        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp));
+        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp, localMap));
+        // Non-destructive merge: preserve local deposits if missing in remote
+        localDeps.forEach(ld => {
+          if (!mappedDeps.some(md => md.id === ld.id)) {
+            mappedDeps.push(ld);
+          }
+        });
         setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
       } else if (localDeps && localDeps.length > 0) {
         setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, localDeps);
@@ -611,12 +642,19 @@ export const storageService = {
     return list;
   },
 
-  // Account Deposits (Depósitos a Cuenta / Transferencias - 100% Supabase Core)
+  // Account Deposits (Depósitos a Cuenta / Transferencias - Non-Destructive Dual Sync)
   getAccountDeposits: () => {
-    return getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+    const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+    // Self-healing: Ensure restored initial deposits are always present
+    const map = new Map();
+    initialAccountDeposits.forEach(d => map.set(d.id, d));
+    (list || []).forEach(d => map.set(d.id, d));
+    const mergedList = Array.from(map.values());
+    setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mergedList);
+    return mergedList;
   },
   saveAccountDeposit: async (deposit, user = 'admin') => {
-    const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+    const list = storageService.getAccountDeposits();
     const amount = parseFloat(deposit.amount) || 0;
     const appliesEquipmentExpense = !!deposit.appliesEquipmentExpense;
     const equipmentExpense = appliesEquipmentExpense ? (parseFloat(deposit.equipmentExpense) || 0) : 0;
@@ -636,7 +674,7 @@ export const storageService = {
     if (idx >= 0) list[idx] = depToSave; else list.push(depToSave);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
-    // Persistir directamente en Supabase (Core de Información)
+    // Persistir en Supabase
     try {
       const { error } = await supabase.from('account_deposits').upsert({
         id: depToSave.id,
@@ -644,9 +682,22 @@ export const storageService = {
         amount: depToSave.amount,
         date: depToSave.date,
         bank_name: depToSave.bankName || 'Santander',
-        reference: depToSave.reference
+        reference: depToSave.reference,
+        applies_equipment_expense: depToSave.appliesEquipmentExpense,
+        equipment_expense: depToSave.equipmentExpense,
+        equipment_provider: depToSave.equipmentProvider,
+        real_utility: depToSave.realUtility
       });
-      if (error) console.error('Supabase Deposit Save Error:', error);
+      if (error) {
+        supabase.from('account_deposits').upsert({
+          id: depToSave.id,
+          concept: depToSave.concept,
+          amount: depToSave.amount,
+          date: depToSave.date,
+          bank_name: depToSave.bankName || 'Santander',
+          reference: depToSave.reference
+        }).catch(e => console.error('Fallback deposit save warning:', e));
+      }
     } catch (err) {
       console.error('Supabase Deposit Save Exception:', err);
     }
@@ -656,7 +707,7 @@ export const storageService = {
     return list;
   },
   deleteAccountDeposit: async (id, user = 'admin') => {
-    const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits).filter(d => d.id !== id);
+    const list = storageService.getAccountDeposits().filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
     try {
@@ -692,9 +743,17 @@ export const storageService = {
   },
 
   // Bank Accounts & Card Expenses
-  getBankAccounts: () => getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, initialBankAccounts),
-  saveBankAccount: (account) => {
+  getBankAccounts: () => {
     const list = getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, initialBankAccounts);
+    const map = new Map();
+    initialBankAccounts.forEach(b => map.set(b.id, b));
+    (list || []).forEach(b => map.set(b.id, b));
+    const mergedList = Array.from(map.values());
+    setStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, mergedList);
+    return mergedList;
+  },
+  saveBankAccount: (account) => {
+    const list = storageService.getBankAccounts();
     const bankToSave = { ...account, id: account.id || 'b_' + Date.now() };
     const idx = list.findIndex(b => b.id === bankToSave.id);
     if (idx >= 0) list[idx] = bankToSave; else list.push(bankToSave);
@@ -703,14 +762,22 @@ export const storageService = {
     return list;
   },
   deleteBankAccount: (id) => {
-    const list = getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, initialBankAccounts).filter(b => b.id !== id);
+    const list = storageService.getBankAccounts().filter(b => b.id !== id);
     setStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, list);
     notifyDataSynced();
     return list;
   },
-  getCardExpenses: () => getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []),
+  getCardExpenses: () => {
+    const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, initialCardExpenses);
+    const map = new Map();
+    initialCardExpenses.forEach(e => map.set(e.id, e));
+    (list || []).forEach(e => map.set(e.id, e));
+    const mergedList = Array.from(map.values());
+    setStorageItem(STORAGE_KEYS.CARD_EXPENSES, mergedList);
+    return mergedList;
+  },
   saveCardExpense: (expense, user = 'admin') => {
-    const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []);
+    const list = storageService.getCardExpenses();
     const expToSave = { ...expense, id: expense.id || 'exp_' + Date.now() };
     const idx = list.findIndex(e => e.id === expToSave.id);
     if (idx >= 0) list[idx] = expToSave; else list.push(expToSave);
@@ -720,7 +787,7 @@ export const storageService = {
     return list;
   },
   deleteCardExpense: (id, user = 'admin') => {
-    const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []).filter(e => e.id !== id);
+    const list = storageService.getCardExpenses().filter(e => e.id !== id);
     setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
     storageService.logAudit(user, 'ELIMINAR_GASTO_TARJETA', `ID ${id}`);
     notifyDataSynced();
