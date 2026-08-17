@@ -9,6 +9,12 @@
       "purpose": "any maskable"
     },
     {
+      "src": "/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "1024x1024",
+      "purpose": "any maskable"
+    },
+    {
       "src": "/favicon.png",
       "type": "image/png",
       "sizes": "512x512"
