@@ -217,7 +217,7 @@ function mapDepositFromSupabase(dp, localMap = new Map()) {
 }
 
 export const storageService = {
-  // Sync on startup from Supabase
+  // Sync on startup from Supabase (Non-Destructive Protection)
   syncFromSupabase: async () => {
     try {
       const [invRes, cliRes, dedRes, depRes, taxRes] = await Promise.all([
@@ -228,30 +228,68 @@ export const storageService = {
         supabase.from('tax_config').select('*').limit(1).single()
       ]);
 
-      if (invRes.data !== null) {
-        const localInvoices = getStorageItem(STORAGE_KEYS.INVOICES, []);
+      // 1. Invoices
+      const localInvoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
+      if (invRes.data && invRes.data.length > 0) {
         const localMap = new Map(localInvoices.map(i => [i.id, i]));
         const mappedInvoices = invRes.data.map(i => mapInvoiceFromSupabase(i, localMap));
         setStorageItem(STORAGE_KEYS.INVOICES, mappedInvoices);
+      } else if (localInvoices && localInvoices.length > 0) {
+        setStorageItem(STORAGE_KEYS.INVOICES, localInvoices);
+        // Seed Supabase if remote is empty
+        Promise.all(localInvoices.map(inv => supabase.from('invoices').upsert({
+          id: inv.id, folio: inv.folio, client_name: inv.clientName, rfc: inv.rfc, date: inv.date,
+          is_mixed_tax: !!inv.isMixedTax, subtotal: inv.subtotal || 0, discount: inv.discount || 0,
+          subtotal8: inv.subtotal8 || 0, subtotal16: inv.subtotal16 || 0, iva_rate: inv.ivaRate || 8,
+          iva_total: inv.ivaTotal || 0, applies_isr: !!inv.appliesIsr, isr_rate: inv.isrRate || 1.25,
+          isr_retained: inv.isrRetained || 0, base_neta: inv.baseNeta || 0, total: inv.total || 0, status: inv.status || 'PAGADA'
+        }))).catch(e => console.error('Seed invoices error:', e));
       }
 
-      if (cliRes.data !== null) {
-        const localClients = getStorageItem(STORAGE_KEYS.CLIENTS, []);
+      // 2. Clients
+      const localClients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients);
+      if (cliRes.data && cliRes.data.length > 0) {
         const localMap = new Map(localClients.map(c => [c.id, c]));
         const mappedClients = cliRes.data.map(c => mapClientFromSupabase(c, localMap));
         setStorageItem(STORAGE_KEYS.CLIENTS, mappedClients);
+      } else if (localClients && localClients.length > 0) {
+        setStorageItem(STORAGE_KEYS.CLIENTS, localClients);
+        Promise.all(localClients.map(c => supabase.from('clients').upsert({
+          id: c.id, name: c.name, rfc: c.rfc, email: c.email || null, phone: c.phone || null,
+          sector: c.sector || null, notes: c.notes || null, applies_isr: c.appliesIsr, isr_rate: c.isrRate
+        }))).catch(e => console.error('Seed clients error:', e));
       }
 
-      if (dedRes.data !== null) {
+      // 3. Deductibles
+      const localDeds = getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles);
+      if (dedRes.data && dedRes.data.length > 0) {
         const mappedDeds = dedRes.data.map(d => mapDeductibleFromSupabase(d));
         setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, mappedDeds);
+      } else if (localDeds && localDeds.length > 0) {
+        setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, localDeds);
+        Promise.all(localDeds.map(d => supabase.from('deductibles').upsert({
+          id: d.id, provider_name: d.providerName, rfc: d.rfc, invoice_no: d.invoiceNo, date: d.date,
+          subtotal: d.subtotal || 0, discount: d.discount || 0, iva_total: d.ivaTotal || 0, total: d.total || 0,
+          category: d.category || 'Telecomunicaciones', file_name: d.fileName, file_url: d.fileUrl
+        }))).catch(e => console.error('Seed deductibles error:', e));
       }
 
-      if (depRes.data !== null) {
-        const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, []);
-        const localMap = new Map(localDeps.map(d => [d.id, d]));
+      // 4. Account Deposits (Protección indestructible de depósitos a cuenta)
+      const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+      const effectiveLocalDeps = (localDeps && localDeps.length > 0) ? localDeps : initialAccountDeposits;
+
+      if (depRes.data && depRes.data.length > 0) {
+        const localMap = new Map(effectiveLocalDeps.map(d => [d.id, d]));
         const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp, localMap));
         setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
+      } else {
+        // Preservar depósitos locales y sembrar en Supabase para evitar vacíos accidentales
+        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, effectiveLocalDeps);
+        Promise.all(effectiveLocalDeps.map(dp => supabase.from('account_deposits').upsert({
+          id: dp.id, concept: dp.concept, amount: dp.amount, date: dp.date, bank_name: dp.bankName || 'Santander',
+          reference: dp.reference, applies_equipment_expense: dp.appliesEquipmentExpense,
+          equipment_expense: dp.equipmentExpense, equipment_provider: dp.equipmentProvider, real_utility: dp.realUtility
+        }))).catch(e => console.error('Seed account_deposits error:', e));
       }
 
       if (taxRes.data) {
@@ -578,7 +616,14 @@ export const storageService = {
   },
 
   // Account Deposits (Depósitos a Cuenta / Transferencias)
-  getAccountDeposits: () => getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits),
+  getAccountDeposits: () => {
+    const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+    if (!list || list.length === 0) {
+      setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+      return initialAccountDeposits;
+    }
+    return list;
+  },
   saveAccountDeposit: (deposit, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
     const amount = parseFloat(deposit.amount) || 0;
