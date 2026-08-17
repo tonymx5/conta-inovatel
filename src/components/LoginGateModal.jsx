@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Key, AlertTriangle, Clock, Sparkles, ArrowRight } from 'lucide-react';
+import { Lock, Key, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 import { securityService } from '../services/securityService';
 
 export default function LoginGateModal({ isOpen, onLoginSuccess }) {
@@ -99,20 +99,20 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
           textAlign: 'center'
         }}
       >
-        {/* Brand Icon Header */}
+        {/* Brand Icon Header con Icono Oficial Simétrico */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.2rem' }}>
-          <div style={{
-            background: isLocked ? 'linear-gradient(135deg, #f43f5e, #e11d48)' : 'linear-gradient(135deg, #10b981, #059669)',
-            width: '64px',
-            height: '64px',
-            borderRadius: '20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: isLocked ? '0 10px 25px rgba(244, 63, 94, 0.35)' : '0 10px 25px rgba(16, 185, 129, 0.35)'
-          }}>
-            {isLocked ? <Lock color="#ffffff" size={32} /> : <Sparkles color="#ffffff" size={32} />}
-          </div>
+          <img 
+            src="/app-icon.jpg" 
+            alt="Conta Inovatel App Icon"
+            style={{
+              width: '68px',
+              height: '68px',
+              borderRadius: '18px',
+              objectFit: 'cover',
+              boxShadow: '0 12px 25px rgba(0, 0, 0, 0.2), 0 0 15px rgba(16, 185, 129, 0.25)',
+              border: isLocked ? '2px solid #f43f5e' : '2px solid rgba(255, 255, 255, 0.9)'
+            }}
+          />
         </div>
 
         <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', letterSpacing: '-0.02em', marginBottom: '0.35rem' }}>

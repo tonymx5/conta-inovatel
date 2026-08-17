@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, DollarSign, Receipt, Users, CreditCard, BarChart3, TrendingUp, 
-  ShieldAlert, History, Lock, Sparkles, Wifi, WifiOff, RefreshCw, Settings
+  ShieldAlert, History, Lock, Wifi, WifiOff, RefreshCw, Settings
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
@@ -45,20 +45,20 @@ export default function Header({
   return (
     <header className="app-header">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.1rem', flexWrap: 'wrap', gap: '1rem' }}>
-        {/* Brand Header */}
+        {/* Brand Header con Icono Oficial Simétrico */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem' }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            width: '46px',
-            height: '46px',
-            borderRadius: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)'
-          }}>
-            <Sparkles color="#ffffff" size={26} />
-          </div>
+          <img 
+            src="/app-icon.jpg" 
+            alt="Conta Inovatel Icon"
+            style={{
+              width: '46px',
+              height: '46px',
+              borderRadius: '14px',
+              objectFit: 'cover',
+              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.25), 0 0 10px rgba(255, 255, 255, 0.1)',
+              border: '1px solid rgba(255, 255, 255, 0.2)'
+            }}
+          />
           <div>
             <h1 style={{ fontSize: '1.45rem', fontWeight: '800', letterSpacing: '-0.02em', color: '#0f172a' }}>
               CONTA INOVATEL
