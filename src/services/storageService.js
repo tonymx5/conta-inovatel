@@ -611,31 +611,11 @@ export const storageService = {
     return list;
   },
 
-  // Account Deposits (Depósitos a Cuenta / Transferencias)
+  // Account Deposits (Depósitos a Cuenta / Transferencias - 100% Supabase Core)
   getAccountDeposits: () => {
-    const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
-    if (!list || list.length === 0) {
-      setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
-      return initialAccountDeposits;
-    }
-    // Autocuración: asegurar que los depósitos base de agosto de la empresa existan
-    let updated = false;
-    initialAccountDeposits.forEach(initDep => {
-      const idx = list.findIndex(d => d.id === initDep.id);
-      if (idx === -1) {
-        list.push(initDep);
-        updated = true;
-      } else if (initDep.id === 'dep4' && list[idx].amount === 32180.05) {
-        list[idx] = { ...initDep };
-        updated = true;
-      }
-    });
-    if (updated) {
-      setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
-    }
-    return list;
+    return getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
   },
-  saveAccountDeposit: (deposit, user = 'admin') => {
+  saveAccountDeposit: async (deposit, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
     const amount = parseFloat(deposit.amount) || 0;
     const appliesEquipmentExpense = !!deposit.appliesEquipmentExpense;
@@ -656,28 +636,36 @@ export const storageService = {
     if (idx >= 0) list[idx] = depToSave; else list.push(depToSave);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
-    // Sync to Supabase
-    Promise.resolve(supabase.from('account_deposits').upsert({
-      id: depToSave.id,
-      concept: depToSave.concept,
-      amount: depToSave.amount,
-      date: depToSave.date,
-      bank_name: depToSave.bankName || 'Santander',
-      reference: depToSave.reference,
-      applies_equipment_expense: depToSave.appliesEquipmentExpense,
-      equipment_expense: depToSave.equipmentExpense,
-      equipment_provider: depToSave.equipmentProvider,
-      real_utility: depToSave.realUtility
-    })).catch(err => console.error('Supabase Deposit save error:', err));
+    // Persistir directamente en Supabase (Core de Información)
+    try {
+      const { error } = await supabase.from('account_deposits').upsert({
+        id: depToSave.id,
+        concept: depToSave.concept,
+        amount: depToSave.amount,
+        date: depToSave.date,
+        bank_name: depToSave.bankName || 'Santander',
+        reference: depToSave.reference
+      });
+      if (error) console.error('Supabase Deposit Save Error:', error);
+    } catch (err) {
+      console.error('Supabase Deposit Save Exception:', err);
+    }
 
     storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount}) | Utilidad Real: $${depToSave.realUtility}`);
     notifyDataSynced();
     return list;
   },
-  deleteAccountDeposit: (id, user = 'admin') => {
+  deleteAccountDeposit: async (id, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits).filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
-    Promise.resolve(supabase.from('account_deposits').delete().eq('id', id)).catch(err => console.error('Supabase Deposit delete error:', err));
+
+    try {
+      const { error } = await supabase.from('account_deposits').delete().eq('id', id);
+      if (error) console.error('Supabase Deposit Delete Error:', error);
+    } catch (err) {
+      console.error('Supabase Deposit Delete Exception:', err);
+    }
+
     storageService.logAudit(user, 'ELIMINAR_DEPOSITO_CUENTA', `ID ${id}`);
     notifyDataSynced();
     return list;

@@ -406,7 +406,7 @@ export default function InvoicesModule({ userRole }) {
     return sum + (d.realUtility !== undefined ? d.realUtility : (amt - eq));
   }, 0);
 
-  const handleDepositSubmit = (e) => {
+  const handleDepositSubmit = async (e) => {
     e.preventDefault();
     const amount = parseFloat(depositFormData.amount) || 0;
     const appliesEquipmentExpense = !!depositFormData.appliesEquipmentExpense;
@@ -426,7 +426,7 @@ export default function InvoicesModule({ userRole }) {
       realUtility
     };
 
-    const updated = storageService.saveAccountDeposit(depositToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+    const updated = await storageService.saveAccountDeposit(depositToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
     setDeposits(updated);
     setShowDepositModal(false);
     resetDepositForm();
@@ -457,9 +457,9 @@ export default function InvoicesModule({ userRole }) {
     setShowDepositModal(true);
   };
 
-  const handleDeleteDeposit = (id) => {
+  const handleDeleteDeposit = async (id) => {
     if (window.confirm('¿Eliminar este registro de transferencia / depósito?')) {
-      const updated = storageService.deleteAccountDeposit(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+      const updated = await storageService.deleteAccountDeposit(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
       setDeposits(updated);
     }
   };
