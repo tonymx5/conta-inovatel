@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, DollarSign, Receipt, Users, CreditCard, BarChart3, TrendingUp, 
-  ShieldAlert, History, Lock, Sparkles, Wifi, WifiOff, RefreshCw
+  ShieldAlert, History, Lock, Sparkles, Wifi, WifiOff, RefreshCw, Settings
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
@@ -11,6 +11,7 @@ export default function Header({
   userRole, 
   onOpenAuditLog, 
   onOpenSecurityReport,
+  onOpenConfig,
   onRestrictedClick,
   onLock
 }) {
@@ -134,6 +135,11 @@ export default function Header({
                 <span>Modo Offline</span>
               </>
             )}
+          </button>
+
+          {/* Botón de Configuración Global */}
+          <button className="btn-secondary" onClick={onOpenConfig} style={{ fontSize: '0.85rem' }} title="Configuración de Tarjetas y Cuentas">
+            <Settings size={16} color="#0284c7" /> Config
           </button>
 
           {userRole === 'admin' && (

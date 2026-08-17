@@ -4,6 +4,7 @@ import RestrictedModal from './components/RestrictedModal';
 import AuditLogModal from './components/AuditLogModal';
 import SecurityReportModal from './components/SecurityReportModal';
 import LoginGateModal from './components/LoginGateModal';
+import ConfigModal from './components/ConfigModal';
 import { FileText, BarChart3, TrendingUp, CreditCard } from 'lucide-react';
 import { storageService } from './services/storageService';
 
@@ -106,7 +107,6 @@ export default function App() {
       clearInterval(checkInactivityInterval);
     };
   }, [isSessionLocked, userRole]);
-  
   // Modals Control
   const [showRestrictedModal, setShowRestrictedModal] = useState(false);
   const [restrictedTargetName, setRestrictedTargetName] = useState('');
@@ -114,6 +114,7 @@ export default function App() {
 
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
 
   const handleRestrictedClick = (moduleName, targetTabId = null) => {
     setRestrictedTargetName(moduleName);
@@ -185,6 +186,7 @@ export default function App() {
           userRole={userRole}
           onOpenAuditLog={() => setShowAuditModal(true)}
           onOpenSecurityReport={() => setShowSecurityModal(true)}
+          onOpenConfig={() => setShowConfigModal(true)}
           onRestrictedClick={(name) => handleRestrictedClick(name)}
           onLock={handleLockSession}
         />
@@ -217,8 +219,6 @@ export default function App() {
             <CreditCard size={20} color={activeTab === 'expenses' ? '#10b981' : '#64748b'} />
             <span>Gastos</span>
           </button>
-
-
 
           <button
             className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
@@ -253,6 +253,12 @@ export default function App() {
         <SecurityReportModal
           isOpen={showSecurityModal}
           onClose={() => setShowSecurityModal(false)}
+        />
+
+        <ConfigModal
+          isOpen={showConfigModal}
+          onClose={() => setShowConfigModal(false)}
+          userRole={userRole}
         />
       </div>
     </div>

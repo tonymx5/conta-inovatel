@@ -6,6 +6,7 @@ import { formatDate } from '../utils/dateFormatter';
 export default function ExpensesModule({ userRole }) {
   const [expenses, setExpenses] = useState([]);
   const [bankAccounts, setBankAccounts] = useState([]);
+  const [selectedCardId, setSelectedCardId] = useState(null);
 
   // Modal States
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -147,36 +148,95 @@ export default function ExpensesModule({ userRole }) {
         </div>
       </div>
 
-      {/* Cards of Registered Banks */}
+      {/* Cards of Registered Banks - Stacked Overlapping 1/4 View */}
       <div>
-        <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Bancos y Tarjetas Registradas
-        </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
-          {bankAccounts.map((b) => {
-            const expensesForBank = expenses.filter(e => e.bankId === b.id).reduce((sum, e) => sum + e.amount, 0);
-            return (
-              <div key={b.id} className="glass-card" style={{ background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.9))', border: '1px solid var(--border-glass)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <span className={`badge ${b.type === 'Crédito' ? 'badge-rose' : 'badge-emerald'}`}>
-                      {b.type}
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontFamily: 'monospace' }}>{b.accountNumber}</span>
-                  </div>
-                  <button onClick={() => handleDeleteBank(b.id)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }} title="Eliminar Tarjeta">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                <h4 style={{ fontSize: '1.1rem', fontWeight: '700', color: '#f8fafc' }}>{b.bankName}</h4>
-                <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Gastos Acumulados:</span>
-                  <strong style={{ color: '#fda4af' }}>${expensesForBank.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
-                </div>
-              </div>
-            );
-          })}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: 0 }}>
+            Bancos y Tarjetas Registradas (Mazo Interactivo)
+          </h3>
+          <span style={{ fontSize: '0.78rem', color: '#94a3b8', background: 'rgba(255, 255, 255, 0.06)', padding: '0.2rem 0.6rem', borderRadius: '9999px' }}>
+            Pasa el mouse para expandir (Sobresale 1/4)
+          </span>
         </div>
+
+        {bankAccounts.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '16px', border: '1px dashed rgba(255, 255, 255, 0.1)' }}>
+            No hay tarjetas bancarias registradas. Ve al botón <strong>Config</strong> para dar de alta tus tarjetas de débito, crédito o virtuales.
+          </div>
+        ) : (
+          <div className="cards-stack-container" style={{ paddingBottom: bankAccounts.length > 1 ? `${(bankAccounts.length - 1) * 30}px` : '0px' }}>
+            <div className="card-group-stack">
+              {bankAccounts.map((b, index) => {
+                const expensesForBank = expenses.filter(e => e.bankId === b.id).reduce((sum, e) => sum + e.amount, 0);
+                const isSelected = selectedCardId === b.id;
+                const isOverlap = index > 0;
+
+                return (
+                  <div
+                    key={b.id}
+                    className={`stacked-card-item ${isSelected ? 'selected' : ''}`}
+                    onClick={() => setSelectedCardId(isSelected ? null : b.id)}
+                    style={{
+                      marginTop: isOverlap ? '-115px' : '0px',
+                      zIndex: isSelected ? 90 : index + 1,
+                      background: b.type === 'Crédito'
+                        ? 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 60%, #431407 100%)'
+                        : b.type === 'Virtual'
+                        ? 'linear-gradient(135deg, #3b0764 0%, #0f172a 60%, #1e1b4b 100%)'
+                        : 'linear-gradient(135deg, #064e3b 0%, #0f172a 60%, #022c22 100%)',
+                      border: `1px solid ${
+                        b.type === 'Crédito' ? 'rgba(244, 63, 94, 0.4)' : b.type === 'Virtual' ? 'rgba(192, 132, 252, 0.4)' : 'rgba(16, 185, 129, 0.4)'
+                      }`,
+                      padding: '1.25rem 1.5rem',
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                      minHeight: '170px'
+                    }}
+                  >
+                    {/* Top 1/4 Visible Header Fraction */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                        <span className={`badge ${b.type === 'Crédito' ? 'badge-rose' : b.type === 'Virtual' ? 'badge-indigo' : 'badge-emerald'}`} style={{ fontWeight: '800', letterSpacing: '0.05em' }}>
+                          {b.type === 'Crédito' ? '🔥 CRÉDITO' : b.type === 'Virtual' ? '⚡ VIRTUAL' : '💳 DÉBITO'}
+                        </span>
+                        <span style={{ fontSize: '0.9rem', fontWeight: '800', color: '#f8fafc', letterSpacing: '-0.01em' }}>
+                          {b.bankName}
+                        </span>
+                        <span style={{ fontSize: '0.8rem', color: '#94a3b8', fontFamily: 'monospace' }}>
+                          ({b.accountNumber})
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#cbd5e1', fontWeight: '600' }}>
+                          Gastos: <strong style={{ color: '#fda4af' }}>${expensesForBank.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
+                        </span>
+                        <button 
+                          onClick={(evt) => { evt.stopPropagation(); handleDeleteBank(b.id); }} 
+                          style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: '4px' }} 
+                          title="Eliminar Tarjeta"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bottom Fraction Details */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Institución Emitente</span>
+                        <p style={{ fontSize: '0.95rem', fontWeight: '700', color: '#e2e8f0', margin: 0 }}>{b.bankName}</p>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.72rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Saldo Inicial</span>
+                        <p style={{ fontSize: '1rem', fontWeight: '800', color: '#10b981', margin: 0 }}>${(b.balance || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Expenses Table */}
