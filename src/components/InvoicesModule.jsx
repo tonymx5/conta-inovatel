@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, ArrowDownRight, ShieldCheck, Tag, Landmark } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, ArrowDownRight, ShieldCheck, Tag, Landmark, ChevronDown, ChevronUp } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
 import { formatFolio } from '../utils/folioFormatter';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function InvoicesModule({ userRole }) {
+  const isMobile = useIsMobile();
+  const [expandedInvoiceId, setExpandedInvoiceId] = useState(null);
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
   const [deductibles, setDeductibles] = useState([]);
@@ -646,151 +649,268 @@ export default function InvoicesModule({ userRole }) {
           </div>
         </div>
 
-        {/* Table of Invoices (Full Width 100%) */}
-        <div className="table-container" style={{ margin: 0 }}>
-          <table className="custom-table" style={{ width: '100%', minWidth: '920px' }}>
-            <thead>
-              <tr>
-                <th style={{ minWidth: '85px', whiteSpace: 'nowrap' }}>Folio</th>
-                <th style={{ minWidth: '220px', whiteSpace: 'nowrap' }}>Cliente / RFC</th>
-                <th style={{ minWidth: '140px', whiteSpace: 'nowrap' }}>Fecha</th>
-                <th style={{ minWidth: '130px', whiteSpace: 'nowrap', textAlign: 'right' }}>Subtotal</th>
-                <th style={{ minWidth: '125px', whiteSpace: 'nowrap', textAlign: 'right' }}>IVA Trasladado</th>
-                <th style={{ minWidth: '115px', whiteSpace: 'nowrap', textAlign: 'right' }}>Retención ISR</th>
-                <th style={{ minWidth: '135px', whiteSpace: 'nowrap', textAlign: 'right' }}>Ingreso Total</th>
-                <th style={{ minWidth: '110px', whiteSpace: 'nowrap', textAlign: 'center' }}>Estado</th>
-                <th style={{ minWidth: '95px', whiteSpace: 'nowrap', textAlign: 'center' }}>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredInvoices.length === 0 ? (
-                <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', color: '#64748b', padding: '2.5rem' }}>
-                    No hay facturas registradas para el período seleccionado ({selectedMonth === 'ALL' ? 'Todos los Meses' : MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} {selectedYear}).
-                  </td>
-                </tr>
-              ) : (
-                filteredInvoices.map((inv) => {
-                  const base = inv.baseNeta !== undefined ? inv.baseNeta : (inv.subtotal - (inv.discount || 0));
-                  const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * (currentIsrRate / 100))) : 0;
-                  const ingresoTotal = inv.total !== undefined ? inv.total : (base + inv.ivaTotal - isrRetained);
-                  const isMixed = inv.isMixedTax || (inv.subtotal8 > 0 && inv.subtotal16 > 0);
+        {/* Conditional Rendering: Mobile Touch Cards vs Desktop High Density Table */}
+        {isMobile ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+            {filteredInvoices.length === 0 ? (
+              <div style={{ textAlign: 'center', color: '#94a3b8', padding: '2.5rem', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '20px', border: '1px dashed rgba(255, 255, 255, 0.1)' }}>
+                No hay facturas registradas para el período seleccionado.
+              </div>
+            ) : (
+              filteredInvoices.map((inv) => {
+                const base = inv.baseNeta !== undefined ? inv.baseNeta : (inv.subtotal - (inv.discount || 0));
+                const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * (currentIsrRate / 100))) : 0;
+                const ingresoTotal = inv.total !== undefined ? inv.total : (base + inv.ivaTotal - isrRetained);
+                const isExpanded = expandedInvoiceId === inv.id;
 
-                  return (
-                    <tr key={inv.id} style={{ height: '56px' }}>
-                      {/* Folio */}
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <strong style={{ color: '#047857', fontWeight: '800', fontSize: '0.92rem' }}>
+                return (
+                  <div key={inv.id} className="mobile-touch-card">
+                    {/* Header Row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#10b981', background: 'rgba(16, 185, 129, 0.12)', padding: '0.2rem 0.6rem', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
                           {formatFolio(inv.folio)}
-                        </strong>
-                      </td>
+                        </span>
+                        <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '600' }}>
+                          {formatDate(inv.date)}
+                        </span>
+                      </div>
 
-                      {/* Cliente + RFC on same line */}
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <span style={{ fontWeight: '700', color: '#0f172a' }}>{inv.clientName}</span>
-                          <span style={{
-                            fontSize: '0.72rem',
-                            color: '#475569',
-                            fontFamily: 'monospace',
-                            background: '#f1f5f9',
-                            padding: '0.15rem 0.4rem',
-                            borderRadius: '6px',
-                            border: '1px solid rgba(203, 213, 225, 0.8)',
-                            fontWeight: '600'
-                          }}>
-                            {inv.rfc}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Fecha Formatted DD/Mes/YYYY */}
-                      <td style={{ whiteSpace: 'nowrap', fontSize: '0.86rem', color: '#334155', fontWeight: '600' }}>
-                        {formatDate(inv.date)}
-                      </td>
-
-                      {/* Subtotal Base con descuento si aplica */}
-                      <td style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#475569', textAlign: 'right', fontSize: '0.92rem' }}>
-                        <div>
-                          ${inv.subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                          {inv.discount > 0 && (
-                            <span style={{ display: 'block', fontSize: '0.7rem', color: '#dc2626', fontWeight: '700' }}>
-                              -${inv.discount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} desc.
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* IVA Trasladado con badge de tasa real */}
-                      <td style={{ whiteSpace: 'nowrap', color: '#0284c7', fontWeight: '600', textAlign: 'right', fontSize: '0.92rem' }}>
-                        ${inv.ivaTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                        {isMixed ? (
-                          <span style={{ fontSize: '0.68rem', background: '#e0f2fe', color: '#0369a1', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '800', marginLeft: '0.35rem' }}>
-                            8%+16%
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(inv)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        {inv.status === 'PENDIENTE' ? (
+                          <span className="badge badge-amber" style={{ fontSize: '0.74rem' }}>
+                            <Clock size={12} /> PENDIENTE
                           </span>
                         ) : (
-                          <span style={{ fontSize: '0.68rem', background: '#f1f5f9', color: '#64748b', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: '700', marginLeft: '0.3rem' }}>
-                            {inv.ivaRate ? `${inv.ivaRate}%` : (base > 0 && Math.round((inv.ivaTotal / base) * 100) >= 14 ? '16%' : '8%')}
+                          <span className="badge badge-emerald" style={{ fontSize: '0.74rem' }}>
+                            <CheckCircle size={12} /> PAGADA
                           </span>
                         )}
-                      </td>
+                      </button>
+                    </div>
 
-                      {/* ISR Retenido */}
-                      <td style={{ whiteSpace: 'nowrap', color: inv.appliesIsr ? '#b45309' : '#94a3b8', fontWeight: '700', textAlign: 'right', fontSize: '0.92rem' }}>
-                        {inv.appliesIsr ? `$${isrRetained.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
-                      </td>
+                    {/* Main Info */}
+                    <div style={{ marginBottom: '0.75rem' }}>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f8fafc', margin: '0 0 0.2rem 0' }}>
+                        {inv.clientName}
+                      </h4>
+                      <span style={{ fontSize: '0.76rem', color: '#94a3b8', fontFamily: 'monospace', background: 'rgba(255, 255, 255, 0.05)', padding: '0.15rem 0.45rem', borderRadius: '6px' }}>
+                        {inv.rfc}
+                      </span>
+                    </div>
 
-                      {/* Ingreso Total */}
-                      <td style={{ whiteSpace: 'nowrap', fontWeight: '800', color: '#047857', textAlign: 'right', fontSize: '0.98rem' }}>
-                        ${ingresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </td>
+                    {/* Total Amount & Action Bar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.65rem', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700' }}>Total Factura</span>
+                        <p style={{ fontSize: '1.25rem', fontWeight: '800', color: '#10b981', margin: 0, letterSpacing: '-0.02em' }}>
+                          ${ingresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
 
-                      {/* Estado (Clickeable con opción PAGADA y PENDIENTE) */}
-                      <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <button
-                          type="button"
-                          onClick={() => handleToggleStatus(inv)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                          title="Clic para cambiar estado (PAGADA / PENDIENTE)"
+                          onClick={() => setExpandedInvoiceId(isExpanded ? null : inv.id)}
+                          className="btn-secondary"
+                          style={{ minHeight: '36px', padding: '0.3rem 0.65rem', fontSize: '0.75rem' }}
                         >
-                          {inv.status === 'PENDIENTE' ? (
-                            <span className="badge badge-amber" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <Clock size={13} /> PENDIENTE
+                          {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />} Detalles
+                        </button>
+                        <button
+                          onClick={() => handleEdit(inv)}
+                          style={{ background: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#818cf8', borderRadius: '10px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justify: 'center', cursor: 'pointer' }}
+                          title="Editar Factura"
+                        >
+                          <Edit3 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(inv.id)}
+                          style={{ background: 'rgba(244, 63, 94, 0.15)', border: '1px solid rgba(244, 63, 94, 0.3)', color: '#fda4af', borderRadius: '10px', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justify: 'center', cursor: 'pointer' }}
+                          title="Eliminar Factura"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expandable Breakdown Drawer */}
+                    {isExpanded && (
+                      <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px dashed rgba(255, 255, 255, 0.1)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.78rem' }}>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Subtotal:</span>
+                          <strong style={{ display: 'block', color: '#cbd5e1' }}>${inv.subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>IVA Trasladado:</span>
+                          <strong style={{ display: 'block', color: '#38bdf8' }}>${inv.ivaTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Retención ISR:</span>
+                          <strong style={{ display: 'block', color: inv.appliesIsr ? '#fbbf24' : '#94a3b8' }}>
+                            {inv.appliesIsr ? `$${isrRetained.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+                          </strong>
+                        </div>
+                        <div>
+                          <span style={{ color: '#64748b' }}>Tasa IVA:</span>
+                          <strong style={{ display: 'block', color: '#cbd5e1' }}>{inv.ivaRate ? `${inv.ivaRate}%` : '8%'}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        ) : (
+          <div className="table-container" style={{ margin: 0 }}>
+            <table className="custom-table" style={{ width: '100%', minWidth: '920px' }}>
+              <thead>
+                <tr>
+                  <th style={{ minWidth: '85px', whiteSpace: 'nowrap' }}>Folio</th>
+                  <th style={{ minWidth: '220px', whiteSpace: 'nowrap' }}>Cliente / RFC</th>
+                  <th style={{ minWidth: '140px', whiteSpace: 'nowrap' }}>Fecha</th>
+                  <th style={{ minWidth: '130px', whiteSpace: 'nowrap', textAlign: 'right' }}>Subtotal</th>
+                  <th style={{ minWidth: '125px', whiteSpace: 'nowrap', textAlign: 'right' }}>IVA Trasladado</th>
+                  <th style={{ minWidth: '115px', whiteSpace: 'nowrap', textAlign: 'right' }}>Retención ISR</th>
+                  <th style={{ minWidth: '135px', whiteSpace: 'nowrap', textAlign: 'right' }}>Ingreso Total</th>
+                  <th style={{ minWidth: '110px', whiteSpace: 'nowrap', textAlign: 'center' }}>Estado</th>
+                  <th style={{ minWidth: '95px', whiteSpace: 'nowrap', textAlign: 'center' }}>Acción</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInvoices.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" style={{ textAlign: 'center', color: '#64748b', padding: '2.5rem' }}>
+                      No hay facturas registradas para el período seleccionado ({selectedMonth === 'ALL' ? 'Todos los Meses' : MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} {selectedYear}).
+                    </td>
+                  </tr>
+                ) : (
+                  filteredInvoices.map((inv) => {
+                    const base = inv.baseNeta !== undefined ? inv.baseNeta : (inv.subtotal - (inv.discount || 0));
+                    const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * (currentIsrRate / 100))) : 0;
+                    const ingresoTotal = inv.total !== undefined ? inv.total : (base + inv.ivaTotal - isrRetained);
+                    const isMixed = inv.isMixedTax || (inv.subtotal8 > 0 && inv.subtotal16 > 0);
+
+                    return (
+                      <tr key={inv.id} style={{ height: '56px' }}>
+                        {/* Folio */}
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <strong style={{ color: '#047857', fontWeight: '800', fontSize: '0.92rem' }}>
+                            {formatFolio(inv.folio)}
+                          </strong>
+                        </td>
+
+                        {/* Cliente + RFC on same line */}
+                        <td style={{ whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontWeight: '700', color: '#0f172a' }}>{inv.clientName}</span>
+                            <span style={{
+                              fontSize: '0.72rem',
+                              color: '#475569',
+                              fontFamily: 'monospace',
+                              background: '#f1f5f9',
+                              padding: '0.15rem 0.4rem',
+                              borderRadius: '6px',
+                              border: '1px solid rgba(203, 213, 225, 0.8)',
+                              fontWeight: '600'
+                            }}>
+                              {inv.rfc}
+                            </span>
+                          </div>
+                        </td>
+
+                        {/* Fecha Formatted DD/Mes/YYYY */}
+                        <td style={{ whiteSpace: 'nowrap', fontSize: '0.86rem', color: '#334155', fontWeight: '600' }}>
+                          {formatDate(inv.date)}
+                        </td>
+
+                        {/* Subtotal Base con descuento si aplica */}
+                        <td style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#475569', textAlign: 'right', fontSize: '0.92rem' }}>
+                          <div>
+                            ${inv.subtotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            {inv.discount > 0 && (
+                              <span style={{ display: 'block', fontSize: '0.7rem', color: '#dc2626', fontWeight: '700' }}>
+                                -${inv.discount.toLocaleString('es-MX', { minimumFractionDigits: 2 })} desc.
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* IVA Trasladado con badge de tasa real */}
+                        <td style={{ whiteSpace: 'nowrap', color: '#0284c7', fontWeight: '600', textAlign: 'right', fontSize: '0.92rem' }}>
+                          ${inv.ivaTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          {isMixed ? (
+                            <span style={{ fontSize: '0.68rem', background: '#e0f2fe', color: '#0369a1', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '800', marginLeft: '0.35rem' }}>
+                              8%+16%
                             </span>
                           ) : (
-                            <span className="badge badge-emerald" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                              <CheckCircle size={13} /> PAGADA
+                            <span style={{ fontSize: '0.68rem', background: '#f1f5f9', color: '#64748b', padding: '0.1rem 0.3rem', borderRadius: '4px', fontWeight: '700', marginLeft: '0.3rem' }}>
+                              {inv.ivaRate ? `${inv.ivaRate}%` : (base > 0 && Math.round((inv.ivaTotal / base) * 100) >= 14 ? '16%' : '8%')}
                             </span>
                           )}
-                        </button>
-                      </td>
+                        </td>
 
-                      {/* Acción */}
-                      <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                        {/* ISR Retenido */}
+                        <td style={{ whiteSpace: 'nowrap', color: inv.appliesIsr ? '#b45309' : '#94a3b8', fontWeight: '700', textAlign: 'right', fontSize: '0.92rem' }}>
+                          {inv.appliesIsr ? `$${isrRetained.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+                        </td>
+
+                        {/* Ingreso Total */}
+                        <td style={{ whiteSpace: 'nowrap', fontWeight: '800', color: '#047857', textAlign: 'right', fontSize: '0.98rem' }}>
+                          ${ingresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </td>
+
+                        {/* Estado (Clickeable con opción PAGADA y PENDIENTE) */}
+                        <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <button
-                            onClick={() => handleEdit(inv)}
-                            style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
-                            title="Editar Factura"
+                            type="button"
+                            onClick={() => handleToggleStatus(inv)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                            title="Clic para cambiar estado (PAGADA / PENDIENTE)"
                           >
-                            <Edit3 size={16} />
+                            {inv.status === 'PENDIENTE' ? (
+                              <span className="badge badge-amber" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <Clock size={13} /> PENDIENTE
+                              </span>
+                            ) : (
+                              <span className="badge badge-emerald" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                                <CheckCircle size={13} /> PAGADA
+                              </span>
+                            )}
                           </button>
-                          <button
-                            onClick={() => handleDelete(inv.id)}
-                            style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
-                            title="Eliminar Factura"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                        </td>
+
+                        {/* Acción */}
+                        <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                            <button
+                              onClick={() => handleEdit(inv)}
+                              style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
+                              title="Editar Factura"
+                            >
+                              <Edit3 size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(inv.id)}
+                              style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
+                              title="Eliminar Factura"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Bottom Section: 3 Tarjetas Simétricas en Dashboard (Liquidación Fiscal | Fact Prov | Depósito a Cuenta) */}

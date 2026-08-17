@@ -5,7 +5,7 @@ import AuditLogModal from './components/AuditLogModal';
 import SecurityReportModal from './components/SecurityReportModal';
 import LoginGateModal from './components/LoginGateModal';
 import ConfigModal from './components/ConfigModal';
-import { FileText, BarChart3, TrendingUp, CreditCard } from 'lucide-react';
+import { FileText, BarChart3, TrendingUp, CreditCard, Users, Settings } from 'lucide-react';
 import { storageService } from './services/storageService';
 
 // 7 Application Modules
@@ -202,38 +202,60 @@ export default function App() {
           {activeTab === 'investments' && <InvestmentsModule userRole={userRole} />}
         </main>
 
-        {/* Mobile Floating Bottom Navigation Bar */}
-        <nav className="mobile-bottom-nav">
+        {/* Mobile Floating Icon-Only Navigation Bar (Solo Iconos Interactivos) */}
+        <nav className="mobile-icon-nav mobile-only-flex">
           <button
-            className={`mobile-nav-item ${activeTab === 'invoices' ? 'active' : ''}`}
+            className={`mobile-icon-btn ${activeTab === 'invoices' ? 'active' : ''}`}
             onClick={() => handleMobileNav('invoices', 'Facturas', false)}
+            aria-label="Facturas"
           >
-            <FileText size={20} color={activeTab === 'invoices' ? '#10b981' : '#64748b'} />
-            <span>Facturas</span>
+            <FileText size={22} />
+            <span className="tooltip">Facturas</span>
           </button>
 
           <button
-            className={`mobile-nav-item ${activeTab === 'expenses' ? 'active' : ''}`}
+            className={`mobile-icon-btn ${activeTab === 'clients' ? 'active' : ''}`}
+            onClick={() => handleMobileNav('clients', 'Clientes', false)}
+            aria-label="Clientes"
+          >
+            <Users size={22} />
+            <span className="tooltip">Clientes</span>
+          </button>
+
+          <button
+            className={`mobile-icon-btn ${activeTab === 'expenses' ? 'active' : ''}`}
             onClick={() => handleMobileNav('expenses', 'Gastos & Bancos', true)}
+            aria-label="Gastos"
           >
-            <CreditCard size={20} color={activeTab === 'expenses' ? '#10b981' : '#64748b'} />
-            <span>Gastos</span>
+            <CreditCard size={22} />
+            <span className="tooltip">Gastos</span>
           </button>
 
           <button
-            className={`mobile-nav-item ${activeTab === 'analytics' ? 'active' : ''}`}
+            className={`mobile-icon-btn ${activeTab === 'analytics' ? 'active' : ''}`}
             onClick={() => handleMobileNav('analytics', 'Métricas & Analíticas', true)}
+            aria-label="Métricas"
           >
-            <BarChart3 size={20} color={activeTab === 'analytics' ? '#10b981' : '#64748b'} />
-            <span>Métricas</span>
+            <BarChart3 size={22} />
+            <span className="tooltip">Métricas</span>
           </button>
 
           <button
-            className={`mobile-nav-item ${activeTab === 'investments' ? 'active' : ''}`}
+            className={`mobile-icon-btn ${activeTab === 'investments' ? 'active' : ''}`}
             onClick={() => handleMobileNav('investments', 'Inversiones & Bot IA', true)}
+            aria-label="IA & Inversiones"
           >
-            <TrendingUp size={20} color={activeTab === 'investments' ? '#10b981' : '#64748b'} />
-            <span>Inversiones</span>
+            <TrendingUp size={22} />
+            <span className="tooltip">Inversiones</span>
+          </button>
+
+          <button
+            className="mobile-icon-btn"
+            onClick={() => setShowConfigModal(true)}
+            aria-label="Configuración"
+          >
+            <Settings size={22} />
+            <span className="tooltip">Config</span>
           </button>
         </nav>
 
