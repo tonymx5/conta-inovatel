@@ -1,6 +1,6 @@
 // LocalStorage & Supabase Dual-Sync Service for Conta Inovatel
-import { supabase } from './supabaseClient';
-import { formatFolio } from '../utils/folioFormatter';
+import { supabase } from './supabaseClient.js';
+import { formatFolio } from '../utils/folioFormatter.js';
 
 const STORAGE_KEYS = {
   CLIENTS: 'conta_inovatel_clients',
@@ -689,14 +689,14 @@ export const storageService = {
         real_utility: depToSave.realUtility
       });
       if (error) {
-        supabase.from('account_deposits').upsert({
+        await supabase.from('account_deposits').upsert({
           id: depToSave.id,
           concept: depToSave.concept,
           amount: depToSave.amount,
           date: depToSave.date,
           bank_name: depToSave.bankName || 'Santander',
           reference: depToSave.reference
-        }).catch(e => console.error('Fallback deposit save warning:', e));
+        });
       }
     } catch (err) {
       console.error('Supabase Deposit Save Exception:', err);
