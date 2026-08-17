@@ -52,7 +52,7 @@ const initialAccountDeposits = [
   { id: 'dep1', concept: 'Transferencia Cobro Factura FK-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 7479.41 },
   { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 4270.00 },
   { id: 'dep3', concept: 'Transferencia Cobro Factura FK-665 (ALVARADOS)', amount: 36224.54, date: '2026-08-05', bankName: 'Santander', reference: 'SPEI-99201', appliesEquipmentExpense: true, equipmentExpense: 21952.94, equipmentProvider: 'SYSCOM (Equipos)', realUtility: 14271.60 },
-  { id: 'dep4', concept: 'deposito a cuenta (alvarado)', amount: 32180.05, date: '2026-08-04', bankName: 'NU', reference: 'SPEI-88347', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 32180.05 }
+  { id: 'dep4', concept: 'deposito a cuenta (alvarado)', amount: 7704.92, date: '2026-08-04', bankName: 'NU', reference: 'SPEI-88347', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 7704.92 }
 ];
 
 const initialBankAccounts = [
@@ -621,6 +621,21 @@ export const storageService = {
     if (!list || list.length === 0) {
       setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
       return initialAccountDeposits;
+    }
+    // Autocuración: asegurar que los depósitos base de agosto de la empresa existan
+    let updated = false;
+    initialAccountDeposits.forEach(initDep => {
+      const idx = list.findIndex(d => d.id === initDep.id);
+      if (idx === -1) {
+        list.push(initDep);
+        updated = true;
+      } else if (initDep.id === 'dep4' && list[idx].amount === 32180.05) {
+        list[idx] = { ...initDep };
+        updated = true;
+      }
+    });
+    if (updated) {
+      setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
     }
     return list;
   },
