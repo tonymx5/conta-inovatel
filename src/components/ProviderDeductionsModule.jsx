@@ -167,7 +167,7 @@ export default function ProviderDeductionsModule({ userRole }) {
     setShowModal(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const subtotal = parseFloat(formData.subtotal) || 0;
     const ivaTotal = parseFloat(formData.ivaTotal) || 0;
@@ -188,15 +188,15 @@ export default function ProviderDeductionsModule({ userRole }) {
       scannedWithOcr: true
     };
 
-    const updated = storageService.saveDeductible(itemToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+    const updated = await storageService.saveDeductible(itemToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
     setDeductibles(updated);
     setShowModal(false);
     resetForm();
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Eliminar esta factura de proveedor?')) {
-      const updated = storageService.deleteDeductible(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+      const updated = await storageService.deleteDeductible(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
       setDeductibles(updated);
     }
   };

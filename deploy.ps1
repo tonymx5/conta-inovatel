@@ -79,58 +79,13 @@ if (-not $SkipBuild) {
 # ------------------------------------------------------------------------------
 Write-Step "2/5" "Verificación Activa de Base de Datos y Esquema (Supabase DB-First)"
 
-$supabaseUrl = "https://jyhuvmqibfvmfutcvzhw.supabase.co"
-$anonKey = ""
-
-if (Test-Path ".env") {
-    Get-Content ".env" | ForEach-Object {
-        if ($_ -match "^VITE_SUPABASE_ANON_KEY=(.+)$") {
-            $anonKey = $matches[1].Trim()
-        }
-    }
-}
-
-Write-Host "Conectando y auditando esquema en Supabase ($supabaseUrl)..." -ForegroundColor Gray
-
+Write-Host "Ejecutando auditoría de persistencia en vivo en Supabase (node scripts/audit-supabase.js)..." -ForegroundColor Gray
 try {
-    $headers = @{}
-    if (-not [string]::IsNullOrWhiteSpace($anonKey)) {
-        $headers["apikey"] = $anonKey
-        $headers["Authorization"] = "Bearer $anonKey"
-    }
-
-    # Inspeccionar definición OpenAPI de Supabase para validar tablas en vivo
-    $swagger = Invoke-RestMethod -Uri "$supabaseUrl/rest/v1/" -Headers $headers -Method Get -TimeoutSec 10 -ErrorAction Stop
-    Write-Success "Conexión a Supabase REST API verificada exitosamente."
-
-    if ($swagger.definitions) {
-        $expectedTables = @('invoices', 'clients', 'deductibles', 'account_deposits', 'tax_config', 'audit_logs')
-        $missingTables = @()
-        foreach ($tbl in $expectedTables) {
-            if (-not $swagger.definitions.$tbl) {
-                $missingTables += $tbl
-            }
-        }
-
-        if ($missingTables.Count -eq 0) {
-            Write-Success "Esquema en Vivo Confirmado: Todas las tablas requeridas ($($expectedTables -join ', ')) existen en Supabase."
-        } else {
-            Write-Warning "Faltan las siguientes tablas en Supabase: $($missingTables -join ', ')"
-            Write-Warning "Ejecuta las sentencias en deploy_migration.sql o supabase_schema.sql en el Editor SQL de Supabase."
-        }
-
-        # Auditar columnas críticas en account_deposits
-        if ($swagger.definitions.account_deposits -and $swagger.definitions.account_deposits.properties) {
-            $depCols = $swagger.definitions.account_deposits.properties
-            if ($depCols.applies_equipment_expense -and $depCols.equipment_expense -and $depCols.equipment_provider -and $depCols.real_utility) {
-                Write-Success "Esquema de 'account_deposits' verificado (Columnas de gasto de equipos y utilidad real 100% activas)."
-            } else {
-                Write-Warning "Esquema de 'account_deposits' requiere actualización de columnas en Supabase (ejecutar deploy_migration.sql)."
-            }
-        }
-    }
+    node scripts/audit-supabase.js
+    Write-Success "Auditoría de persistencia en Supabase superada exitosamente (Todas las tablas activas HTTP 200)."
 } catch {
-    Write-Warning "No se pudo auditar la especificación OpenAPI de Supabase directamente ($($_.Exception.Message)). Continuando verificación básica."
+    Write-ErrorMsg "Falló la verificación de base de datos en Supabase. Revisa la conectividad y el esquema."
+    exit 1
 }
 
 if (Test-Path "deploy_migration.sql") {

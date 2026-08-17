@@ -27,7 +27,7 @@ export default function ClientsModule() {
     setClients(storageService.getClients());
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const clientToSave = {
       id: editingId || undefined,
@@ -37,7 +37,7 @@ export default function ClientsModule() {
       isrRate: formData.appliesIsr ? (formData.isrRate || 1.25) : 0
     };
 
-    const updated = storageService.saveClient(clientToSave);
+    const updated = await storageService.saveClient(clientToSave);
     setClients(updated);
     setShowModal(false);
     resetForm();
@@ -54,9 +54,9 @@ export default function ClientsModule() {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar este cliente del catálogo?')) {
-      const updated = storageService.deleteClient(id);
+      const updated = await storageService.deleteClient(id);
       setClients(updated);
     }
   };
