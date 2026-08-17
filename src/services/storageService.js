@@ -90,6 +90,132 @@ function notifyDataSynced() {
   }
 }
 
+// Global Realtime State & Event Handlers
+let realtimeChannel = null;
+let currentSyncStatus = typeof navigator !== 'undefined' && navigator.onLine ? 'ONLINE_REALTIME' : 'OFFLINE';
+const syncStatusListeners = new Set();
+
+function setSyncStatus(status) {
+  currentSyncStatus = status;
+  syncStatusListeners.forEach(fn => {
+    try { fn(status); } catch (e) { console.error('SyncStatus listener error:', e); }
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('conta_sync_status_changed', { detail: status }));
+  }
+}
+
+function mapInvoiceFromSupabase(i, localMap = new Map()) {
+  const local = localMap.get(i.id);
+  return {
+    id: i.id,
+    folio: formatFolio(i.folio || local?.folio),
+    clientName: i.client_name || i.clientName || local?.clientName || '',
+    rfc: i.rfc || local?.rfc || '',
+    date: i.date || local?.date || '',
+    isMixedTax: i.is_mixed_tax !== undefined && i.is_mixed_tax !== null ? !!i.is_mixed_tax : (local?.isMixedTax || false),
+    subtotal: parseFloat(i.subtotal) || 0,
+    discount: parseFloat(i.discount) || 0,
+    subtotal8: parseFloat(i.subtotal8) || 0,
+    subtotal16: parseFloat(i.subtotal16) || 0,
+    ivaRate: parseFloat(i.iva_rate) || 8,
+    ivaTotal: parseFloat(i.iva_total) || 0,
+    appliesIsr: i.applies_isr !== undefined && i.applies_isr !== null ? !!i.applies_isr : (local?.appliesIsr !== undefined ? !!local.appliesIsr : true),
+    isrRate: i.isr_rate !== undefined && i.isr_rate !== null ? (parseFloat(i.isr_rate) || 1.25) : (local?.isrRate || 1.25),
+    isrRetained: parseFloat(i.isr_retained) || 0,
+    baseNeta: parseFloat(i.base_neta) || 0,
+    total: parseFloat(i.total) || 0,
+    status: i.status || 'PAGADA'
+  };
+}
+
+function mapClientFromSupabase(c, localMap = new Map()) {
+  const local = localMap.get(c.id);
+  let appliesIsr = true;
+  if (c.applies_isr !== undefined && c.applies_isr !== null) {
+    appliesIsr = !!c.applies_isr;
+  } else if (c.appliesIsr !== undefined && c.appliesIsr !== null) {
+    appliesIsr = !!c.appliesIsr;
+  } else if (local && local.appliesIsr !== undefined) {
+    appliesIsr = !!local.appliesIsr;
+  }
+
+  let isrRate = 1.25;
+  if (c.isr_rate !== undefined && c.isr_rate !== null) {
+    isrRate = parseFloat(c.isr_rate);
+  } else if (c.isrRate !== undefined && c.isrRate !== null) {
+    isrRate = parseFloat(c.isrRate);
+  } else if (local && local.isrRate !== undefined) {
+    isrRate = parseFloat(local.isrRate);
+  }
+
+  return {
+    id: c.id,
+    name: c.name,
+    rfc: c.rfc,
+    email: c.email || (local?.email || ''),
+    phone: c.phone || (local?.phone || ''),
+    sector: c.sector || (local?.sector || ''),
+    notes: c.notes || (local?.notes || ''),
+    appliesIsr,
+    isrRate
+  };
+}
+
+function mapDeductibleFromSupabase(d) {
+  return {
+    id: d.id,
+    providerName: d.provider_name || d.providerName,
+    rfc: d.rfc,
+    invoiceNo: d.invoice_no || d.invoiceNo,
+    date: d.date,
+    subtotal: parseFloat(d.subtotal) || 0,
+    discount: parseFloat(d.discount) || 0,
+    ivaTotal: parseFloat(d.iva_total) || 0,
+    total: parseFloat(d.total) || 0,
+    category: d.category,
+    fileName: d.file_name || d.fileName,
+    fileUrl: d.file_url || d.fileUrl
+  };
+}
+
+function mapDepositFromSupabase(dp, localMap = new Map()) {
+  const amount = parseFloat(dp.amount) || 0;
+  const appliesEquipmentExpense = dp.applies_equipment_expense !== undefined && dp.applies_equipment_expense !== null 
+    ? !!dp.applies_equipment_expense 
+    : ((parseFloat(dp.equipment_expense) || 0) > 0);
+  const equipmentExpense = appliesEquipmentExpense ? (parseFloat(dp.equipment_expense) || 0) : 0;
+  const realUtility = dp.real_utility !== undefined && dp.real_utility !== null
+    ? parseFloat(dp.real_utility)
+    : (amount - equipmentExpense);
+
+  const remoteDep = {
+    id: dp.id,
+    concept: dp.concept,
+    amount,
+    date: dp.date,
+    bankName: dp.bank_name || dp.bankName || 'Santander',
+    reference: dp.reference || '',
+    appliesEquipmentExpense,
+    equipmentExpense,
+    equipmentProvider: dp.equipment_provider || dp.equipmentProvider || '',
+    realUtility: parseFloat(realUtility.toFixed(2))
+  };
+
+  const existingLocal = localMap.get(dp.id);
+  if (existingLocal) {
+    return {
+      ...remoteDep,
+      ...existingLocal,
+      appliesEquipmentExpense: existingLocal.appliesEquipmentExpense !== undefined ? existingLocal.appliesEquipmentExpense : remoteDep.appliesEquipmentExpense,
+      equipmentExpense: existingLocal.equipmentExpense !== undefined ? existingLocal.equipmentExpense : remoteDep.equipmentExpense,
+      equipmentProvider: existingLocal.equipmentProvider !== undefined ? existingLocal.equipmentProvider : remoteDep.equipmentProvider,
+      realUtility: existingLocal.realUtility !== undefined ? existingLocal.realUtility : remoteDep.realUtility
+    };
+  }
+  return remoteDep;
+}
+
 export const storageService = {
   // Sync on startup from Supabase
   syncFromSupabase: async () => {
@@ -102,149 +228,181 @@ export const storageService = {
         supabase.from('tax_config').select('*').limit(1).single()
       ]);
 
-      if (invRes.data && invRes.data.length > 0) {
-        const localInvoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
+      if (invRes.data !== null) {
+        const localInvoices = getStorageItem(STORAGE_KEYS.INVOICES, []);
         const localMap = new Map(localInvoices.map(i => [i.id, i]));
-
-        const mappedInvoices = invRes.data.map(i => {
-          const local = localMap.get(i.id);
-          return {
-            id: i.id,
-            folio: formatFolio(i.folio || local?.folio),
-            clientName: i.client_name || i.clientName || local?.clientName || '',
-            rfc: i.rfc || local?.rfc || '',
-            date: i.date || local?.date || '',
-            isMixedTax: i.is_mixed_tax !== undefined && i.is_mixed_tax !== null ? !!i.is_mixed_tax : (local?.isMixedTax || false),
-            subtotal: parseFloat(i.subtotal) || 0,
-            discount: parseFloat(i.discount) || 0,
-            subtotal8: parseFloat(i.subtotal8) || 0,
-            subtotal16: parseFloat(i.subtotal16) || 0,
-            ivaRate: parseFloat(i.iva_rate) || 8,
-            ivaTotal: parseFloat(i.iva_total) || 0,
-            appliesIsr: i.applies_isr !== undefined && i.applies_isr !== null ? !!i.applies_isr : (local?.appliesIsr !== undefined ? !!local.appliesIsr : true),
-            isrRate: i.isr_rate !== undefined && i.isr_rate !== null ? (parseFloat(i.isr_rate) || 1.25) : (local?.isrRate || 1.25),
-            isrRetained: parseFloat(i.isr_retained) || 0,
-            baseNeta: parseFloat(i.base_neta) || 0,
-            total: parseFloat(i.total) || 0,
-            status: i.status || 'PAGADA'
-          };
-        });
+        const mappedInvoices = invRes.data.map(i => mapInvoiceFromSupabase(i, localMap));
         setStorageItem(STORAGE_KEYS.INVOICES, mappedInvoices);
       }
 
-      if (cliRes.data && cliRes.data.length > 0) {
-        const localClients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients);
+      if (cliRes.data !== null) {
+        const localClients = getStorageItem(STORAGE_KEYS.CLIENTS, []);
         const localMap = new Map(localClients.map(c => [c.id, c]));
-
-        const mappedClients = cliRes.data.map(c => {
-          const local = localMap.get(c.id);
-          
-          let appliesIsr = true;
-          if (c.applies_isr !== undefined && c.applies_isr !== null) {
-            appliesIsr = !!c.applies_isr;
-          } else if (c.appliesIsr !== undefined && c.appliesIsr !== null) {
-            appliesIsr = !!c.appliesIsr;
-          } else if (local && local.appliesIsr !== undefined) {
-            appliesIsr = !!local.appliesIsr;
-          }
-
-          let isrRate = 1.25;
-          if (c.isr_rate !== undefined && c.isr_rate !== null) {
-            isrRate = parseFloat(c.isr_rate);
-          } else if (c.isrRate !== undefined && c.isrRate !== null) {
-            isrRate = parseFloat(c.isrRate);
-          } else if (local && local.isrRate !== undefined) {
-            isrRate = parseFloat(local.isrRate);
-          }
-
-          return {
-            id: c.id,
-            name: c.name,
-            rfc: c.rfc,
-            email: c.email || (local?.email || ''),
-            phone: c.phone || (local?.phone || ''),
-            sector: c.sector || (local?.sector || ''),
-            notes: c.notes || (local?.notes || ''),
-            appliesIsr,
-            isrRate
-          };
-        });
+        const mappedClients = cliRes.data.map(c => mapClientFromSupabase(c, localMap));
         setStorageItem(STORAGE_KEYS.CLIENTS, mappedClients);
       }
 
-      if (dedRes.data && dedRes.data.length > 0) {
-        const mappedDeds = dedRes.data.map(d => ({
-          id: d.id,
-          providerName: d.provider_name || d.providerName,
-          rfc: d.rfc,
-          invoiceNo: d.invoice_no || d.invoiceNo,
-          date: d.date,
-          subtotal: parseFloat(d.subtotal) || 0,
-          discount: parseFloat(d.discount) || 0,
-          ivaTotal: parseFloat(d.iva_total) || 0,
-          total: parseFloat(d.total) || 0,
-          category: d.category,
-          fileName: d.file_name || d.fileName,
-          fileUrl: d.file_url || d.fileUrl
-        }));
+      if (dedRes.data !== null) {
+        const mappedDeds = dedRes.data.map(d => mapDeductibleFromSupabase(d));
         setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, mappedDeds);
       }
 
-      if (depRes.data && depRes.data.length > 0) {
-        const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+      if (depRes.data !== null) {
+        const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, []);
         const localMap = new Map(localDeps.map(d => [d.id, d]));
-
-        depRes.data.forEach(dp => {
-          const amount = parseFloat(dp.amount) || 0;
-          const appliesEquipmentExpense = dp.applies_equipment_expense !== undefined && dp.applies_equipment_expense !== null 
-            ? !!dp.applies_equipment_expense 
-            : ((parseFloat(dp.equipment_expense) || 0) > 0);
-          const equipmentExpense = appliesEquipmentExpense ? (parseFloat(dp.equipment_expense) || 0) : 0;
-          const realUtility = dp.real_utility !== undefined && dp.real_utility !== null
-            ? parseFloat(dp.real_utility)
-            : (amount - equipmentExpense);
-
-          const remoteDep = {
-            id: dp.id,
-            concept: dp.concept,
-            amount,
-            date: dp.date,
-            bankName: dp.bank_name || dp.bankName || 'Santander',
-            reference: dp.reference || '',
-            appliesEquipmentExpense,
-            equipmentExpense,
-            equipmentProvider: dp.equipment_provider || dp.equipmentProvider || '',
-            realUtility: parseFloat(realUtility.toFixed(2))
-          };
-
-          const existingLocal = localMap.get(dp.id);
-          if (existingLocal) {
-            localMap.set(dp.id, {
-              ...remoteDep,
-              ...existingLocal,
-              appliesEquipmentExpense: existingLocal.appliesEquipmentExpense !== undefined ? existingLocal.appliesEquipmentExpense : remoteDep.appliesEquipmentExpense,
-              equipmentExpense: existingLocal.equipmentExpense !== undefined ? existingLocal.equipmentExpense : remoteDep.equipmentExpense,
-              equipmentProvider: existingLocal.equipmentProvider !== undefined ? existingLocal.equipmentProvider : remoteDep.equipmentProvider,
-              realUtility: existingLocal.realUtility !== undefined ? existingLocal.realUtility : remoteDep.realUtility
-            });
-          } else {
-            localMap.set(dp.id, remoteDep);
-          }
-        });
-
-        const mergedDeps = Array.from(localMap.values());
-        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mergedDeps);
+        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp, localMap));
+        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
       }
 
       if (taxRes.data) {
         setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 1.25 });
       }
 
-      // Notify UI components that cloud data has been synchronized
       notifyDataSynced();
     } catch (err) {
       console.warn('Supabase sync warning (running offline / local cache):', err);
     }
+  },
+
+  // Realtime Subscriptions & Connection State
+  initRealtimeSubscription: () => {
+    if (typeof window === 'undefined') return;
+
+    const handleOnline = async () => {
+      setSyncStatus('RECONNECTING');
+      await storageService.syncFromSupabase();
+      setSyncStatus('ONLINE_REALTIME');
+    };
+
+    const handleOffline = () => {
+      setSyncStatus('OFFLINE');
+    };
+
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    if (!navigator.onLine) {
+      setSyncStatus('OFFLINE');
+      return;
+    }
+
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel);
+    }
+
+    setSyncStatus('ONLINE_REALTIME');
+
+    realtimeChannel = supabase
+      .channel('conta_realtime_sync_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'invoices' },
+        (payload) => {
+          const list = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
+          const localMap = new Map(list.map(item => [item.id, item]));
+
+          if (payload.eventType === 'DELETE') {
+            const newList = list.filter(item => item.id !== payload.old.id);
+            setStorageItem(STORAGE_KEYS.INVOICES, newList);
+          } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const mapped = mapInvoiceFromSupabase(payload.new, localMap);
+            const idx = list.findIndex(i => i.id === mapped.id);
+            if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+            setStorageItem(STORAGE_KEYS.INVOICES, list);
+          }
+          notifyDataSynced();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'clients' },
+        (payload) => {
+          const list = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients);
+          const localMap = new Map(list.map(item => [item.id, item]));
+
+          if (payload.eventType === 'DELETE') {
+            const newList = list.filter(item => item.id !== payload.old.id);
+            setStorageItem(STORAGE_KEYS.CLIENTS, newList);
+          } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const mapped = mapClientFromSupabase(payload.new, localMap);
+            const idx = list.findIndex(c => c.id === mapped.id);
+            if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+            setStorageItem(STORAGE_KEYS.CLIENTS, list);
+          }
+          notifyDataSynced();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'deductibles' },
+        (payload) => {
+          const list = getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles);
+          if (payload.eventType === 'DELETE') {
+            const newList = list.filter(item => item.id !== payload.old.id);
+            setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, newList);
+          } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const mapped = mapDeductibleFromSupabase(payload.new);
+            const idx = list.findIndex(d => d.id === mapped.id);
+            if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+            setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, list);
+          }
+          notifyDataSynced();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'account_deposits' },
+        (payload) => {
+          const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
+          const localMap = new Map(list.map(item => [item.id, item]));
+
+          if (payload.eventType === 'DELETE') {
+            const newList = list.filter(item => item.id !== payload.old.id);
+            setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, newList);
+          } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const mapped = mapDepositFromSupabase(payload.new, localMap);
+            const idx = list.findIndex(dp => dp.id === mapped.id);
+            if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+            setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
+          }
+          notifyDataSynced();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'tax_config' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            if (payload.new && payload.new.isr_estimated_rate) {
+              setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(payload.new.isr_estimated_rate) || 1.25 });
+              notifyDataSynced();
+            }
+          }
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          setSyncStatus('ONLINE_REALTIME');
+        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+          setSyncStatus('RECONNECTING');
+        }
+      });
+  },
+
+  unsubscribeRealtime: () => {
+    if (realtimeChannel) {
+      supabase.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+  },
+
+  getSyncStatus: () => currentSyncStatus,
+  onSyncStatusChange: (callback) => {
+    syncStatusListeners.add(callback);
+    callback(currentSyncStatus);
+    return () => syncStatusListeners.delete(callback);
   },
 
   // Config

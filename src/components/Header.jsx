@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   FileText, DollarSign, Receipt, Users, CreditCard, BarChart3, TrendingUp, 
-  ShieldAlert, History, Lock, Sparkles
+  ShieldAlert, History, Lock, Sparkles, Wifi, WifiOff, RefreshCw
 } from 'lucide-react';
+import { storageService } from '../services/storageService';
 
 export default function Header({ 
   activeTab, 
@@ -13,6 +14,15 @@ export default function Header({
   onRestrictedClick,
   onLock
 }) {
+  const [syncStatus, setSyncStatus] = useState(storageService.getSyncStatus());
+
+  useEffect(() => {
+    const unsubscribe = storageService.onSyncStatusChange((status) => {
+      setSyncStatus(status);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const tabs = [
     { id: 'invoices', label: 'Facturas', icon: FileText, restricted: false },
     { id: 'clients', label: 'Clientes', icon: Users, restricted: false },
@@ -60,6 +70,72 @@ export default function Header({
 
         {/* Audit & Security Controls (Exclusivo para Administrador) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {/* Indicador de Sincronización Multidispositivo en Tiempo Real */}
+          <button 
+            onClick={async () => {
+              try {
+                await storageService.syncFromSupabase();
+              } catch (e) {
+                console.error('Manual sync error:', e);
+              }
+            }}
+            title={
+              syncStatus === 'ONLINE_REALTIME' 
+                ? 'Sincronizado en tiempo real con la nube. Haz clic para forzar resincronización.' 
+                : syncStatus === 'RECONNECTING' 
+                ? 'Reconectando con la nube...' 
+                : 'Modo Offline: Usando caché local. Haz clic para reintentar.'
+            }
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.4rem',
+              background: syncStatus === 'ONLINE_REALTIME' 
+                ? 'rgba(16, 185, 129, 0.1)' 
+                : syncStatus === 'RECONNECTING' 
+                ? 'rgba(245, 158, 11, 0.1)' 
+                : 'rgba(148, 163, 184, 0.15)',
+              border: `1px solid ${
+                syncStatus === 'ONLINE_REALTIME' 
+                  ? 'rgba(16, 185, 129, 0.3)' 
+                  : syncStatus === 'RECONNECTING' 
+                  ? 'rgba(245, 158, 11, 0.3)' 
+                  : 'rgba(148, 163, 184, 0.3)'
+              }`,
+              color: syncStatus === 'ONLINE_REALTIME' 
+                ? '#047857' 
+                : syncStatus === 'RECONNECTING' 
+                ? '#b45309' 
+                : '#475569',
+              borderRadius: '9999px',
+              padding: '0.35rem 0.75rem',
+              fontSize: '0.76rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            {syncStatus === 'ONLINE_REALTIME' && (
+              <>
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
+                <Wifi size={13} color="#10b981" />
+                <span>Tiempo Real Activo</span>
+              </>
+            )}
+            {syncStatus === 'RECONNECTING' && (
+              <>
+                <RefreshCw size={13} className="animate-spin" color="#f59e0b" />
+                <span>Reconectando...</span>
+              </>
+            )}
+            {syncStatus === 'OFFLINE' && (
+              <>
+                <WifiOff size={13} color="#64748b" />
+                <span>Modo Offline</span>
+              </>
+            )}
+          </button>
+
           {userRole === 'admin' && (
             <>
               <button className="btn-secondary" onClick={onOpenAuditLog} style={{ fontSize: '0.85rem' }}>

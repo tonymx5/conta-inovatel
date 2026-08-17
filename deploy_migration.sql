@@ -114,3 +114,20 @@ UPDATE public.invoices
 SET iva_rate = 8.00 
 WHERE iva_rate >= 7.00 AND iva_rate <= 7.99;
 
+-- 8. HABILITAR SUPABASE REALTIME MULTIDISPOSITIVO (TIEMPO REAL ENTERPRISE)
+ALTER TABLE public.invoices REPLICA IDENTITY FULL;
+ALTER TABLE public.clients REPLICA IDENTITY FULL;
+ALTER TABLE public.deductibles REPLICA IDENTITY FULL;
+ALTER TABLE public.account_deposits REPLICA IDENTITY FULL;
+ALTER TABLE public.tax_config REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.invoices, public.clients, public.deductibles, public.account_deposits, public.tax_config;
+    END IF;
+EXCEPTION WHEN OTHERS THEN
+    NULL;
+END $$;
+
+
