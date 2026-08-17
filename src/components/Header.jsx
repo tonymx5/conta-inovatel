@@ -28,7 +28,7 @@ export default function Header({
     { id: 'invoices', label: 'Facturas', icon: FileText, restricted: false },
     { id: 'clients', label: 'Clientes', icon: Users, restricted: false },
     { id: 'other_income', label: 'Otros Ingresos', icon: DollarSign, restricted: true },
-    { id: 'provider_deductions', label: 'Fact Prov', icon: Receipt, restricted: true },
+    { id: 'provider_deductions', label: 'Fact Prov', icon: Receipt, restricted: false },
     { id: 'expenses', label: 'Gastos & Bancos', icon: CreditCard, restricted: true },
     { id: 'analytics', label: 'Métricas & Analíticas', icon: BarChart3, restricted: true },
     { id: 'investments', label: 'Inversiones & Bot IA', icon: TrendingUp, restricted: true }

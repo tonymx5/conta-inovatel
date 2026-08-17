@@ -5,7 +5,7 @@ import AuditLogModal from './components/AuditLogModal';
 import SecurityReportModal from './components/SecurityReportModal';
 import LoginGateModal from './components/LoginGateModal';
 import ConfigModal from './components/ConfigModal';
-import { FileText, BarChart3, TrendingUp, CreditCard, Users, Settings } from 'lucide-react';
+import { FileText, BarChart3, TrendingUp, CreditCard, Users, Settings, Receipt } from 'lucide-react';
 import { storageService } from './services/storageService';
 
 // 7 Application Modules
@@ -220,6 +220,15 @@ export default function App() {
           >
             <Users size={22} />
             <span className="tooltip">Clientes</span>
+          </button>
+
+          <button
+            className={`mobile-icon-btn ${activeTab === 'provider_deductions' ? 'active' : ''}`}
+            onClick={() => handleMobileNav('provider_deductions', 'Fact Prov', false)}
+            aria-label="Fact Prov"
+          >
+            <Receipt size={22} />
+            <span className="tooltip">Fact Prov</span>
           </button>
 
           <button
