@@ -38,7 +38,7 @@ export default function AnalyticsModule() {
   const totalOtroIngreso = otherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresoGlobal = totalIngresoFacturado + totalOtroIngreso;
 
-  // Depósitos y Utilidad Real en Banco
+  // Depósitos y Utilidad Real en Banco (Facturas / Depósito de Cuenta)
   const totalDepositos = deposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
   const totalGastosEquipos = deposits.reduce((sum, d) => sum + (d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0), 0);
   const totalUtilidadRealEnCuenta = deposits.reduce((sum, d) => {
@@ -47,8 +47,11 @@ export default function AnalyticsModule() {
     return sum + (d.realUtility !== undefined ? d.realUtility : (amt - eq));
   }, 0);
 
+  // Base principal de dinero real disponible en cuenta bancaria
+  const baseUtilidadReal = totalUtilidadRealEnCuenta > 0 ? totalUtilidadRealEnCuenta : totalIngresoGlobal;
+
   const totalGastos = cardExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const flujoLibre = Math.max(0, (totalUtilidadRealEnCuenta > 0 ? totalUtilidadRealEnCuenta : totalIngresoGlobal) - totalGastos);
+  const flujoLibre = Math.max(0, baseUtilidadReal - totalGastos);
 
   // Sector breakdown math
   const sectorTotals = {
@@ -70,8 +73,7 @@ export default function AnalyticsModule() {
 
   const pieData = Object.keys(sectorTotals).map(sec => {
     const amount = sectorTotals[sec];
-    const baseIngreso = totalUtilidadRealEnCuenta > 0 ? totalUtilidadRealEnCuenta : totalIngresoGlobal;
-    const pctOfIncome = baseIngreso > 0 ? ((amount / baseIngreso) * 100).toFixed(1) : 0;
+    const pctOfIncome = baseUtilidadReal > 0 ? ((amount / baseUtilidadReal) * 100).toFixed(1) : 0;
     return {
       name: sec,
       value: amount,
@@ -80,7 +82,7 @@ export default function AnalyticsModule() {
   }).filter(d => d.value > 0);
 
   // Quarterly Projections Math
-  const q1Actual = totalUtilidadRealEnCuenta > 0 ? totalUtilidadRealEnCuenta : totalIngresoGlobal;
+  const q1Actual = baseUtilidadReal;
   const q2Projected = q1Actual * 1.05;
   const q3Projected = q1Actual * 1.1025;
   const q4Projected = q1Actual * 1.1576;
@@ -100,7 +102,7 @@ export default function AnalyticsModule() {
           <BarChart3 color="#6366f1" size={26} /> Métricas & Analíticas Financieras
         </h2>
         <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
-          Visualización de la distribución de gastos, margen real en cuenta bancaria y proyecciones de crecimiento
+          Visualización basada en la Utilidad Real en Cuenta (Facturas / Depósito de Cuenta), distribución de gastos y proyecciones
         </p>
       </div>
 
@@ -146,7 +148,7 @@ export default function AnalyticsModule() {
         {/* Sector Table */}
         <div className="glass-panel" style={{ padding: '1.5rem' }}>
           <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <PieIcon size={20} color="#f59e0b" /> Gastos por Sector (% del Ingreso Total)
+            <PieIcon size={20} color="#f59e0b" /> Gastos por Sector (% Utilidad Real en Cuenta)
           </h3>
           <div className="table-container">
             <table className="custom-table">
@@ -154,13 +156,13 @@ export default function AnalyticsModule() {
                 <tr>
                   <th>Sector</th>
                   <th>Monto Gasto</th>
-                  <th>% del Ingreso Total</th>
+                  <th>% Utilidad Real en Cuenta</th>
                 </tr>
               </thead>
               <tbody>
                 {Object.keys(sectorTotals).map(sec => {
                   const amount = sectorTotals[sec];
-                  const pct = totalIngresoGlobal > 0 ? ((amount / totalIngresoGlobal) * 100).toFixed(1) : 0;
+                  const pct = baseUtilidadReal > 0 ? ((amount / baseUtilidadReal) * 100).toFixed(1) : 0;
                   return (
                     <tr key={sec}>
                       <td style={{ fontWeight: '700' }}>
