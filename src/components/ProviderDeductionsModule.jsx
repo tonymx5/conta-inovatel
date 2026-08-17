@@ -471,18 +471,46 @@ export default function ProviderDeductionsModule({ userRole }) {
                     </span>
                   </td>
                   <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
-                    <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', alignItems: 'center' }}>
                       <button
+                        type="button"
                         onClick={() => handleEdit(d)}
-                        style={{ background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
+                        style={{
+                          background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)',
+                          border: '1px solid #a5b4fc',
+                          color: '#4338ca',
+                          borderRadius: '8px',
+                          width: '34px',
+                          height: '34px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(99, 102, 241, 0.15)',
+                          transition: 'all 0.2s ease'
+                        }}
                         title="Editar Factura de Proveedor"
                       >
                         <Edit3 size={16} />
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDelete(d.id)}
-                        style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: '0.3rem', borderRadius: '6px' }}
-                        title="Eliminar Deducción"
+                        style={{
+                          background: 'linear-gradient(135deg, #ffe4e6 0%, #fecdd3 100%)',
+                          border: '1px solid #fda4af',
+                          color: '#e11d48',
+                          borderRadius: '8px',
+                          width: '34px',
+                          height: '34px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 4px rgba(244, 63, 94, 0.15)',
+                          transition: 'all 0.2s ease'
+                        }}
+                        title="Eliminar Factura de Proveedor"
                       >
                         <Trash2 size={16} />
                       </button>
