@@ -60,7 +60,17 @@ try {
     exit 1
 }
 
-# 1.3 Compilar Proyecto (Build Check)
+# 1.3 Pruebas Unitarias de Precisión Fiscal (Test Suite)
+Write-Host "Ejecutando suite de pruebas de precisión aritmética y fiscal..." -ForegroundColor Gray
+try {
+    npm test
+    Write-Success "Suite de pruebas de precisión fiscal superada con 100% de éxito."
+} catch {
+    Write-ErrorMsg "Fallaron las pruebas de cálculo fiscal. Corrige la lógica antes de desplegar."
+    exit 1
+}
+
+# 1.4 Compilar Proyecto (Build Check)
 if (-not $SkipBuild) {
     Write-Host "Compilando paquete de producción con Vite..." -ForegroundColor Gray
     try {

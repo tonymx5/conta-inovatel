@@ -1,5 +1,4 @@
 // Script de Prueba de Estrés e Integridad de Sincronización (NEXUS v2.6)
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 

@@ -151,7 +151,7 @@ export const securityService = {
       const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
       const data = await res.json();
       if (data.ip) clientIp = data.ip;
-    } catch (e) {
+    } catch {
       console.warn('IP fetch fallback to LAN');
     }
 

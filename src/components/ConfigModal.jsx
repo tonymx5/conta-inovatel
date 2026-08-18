@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, CreditCard, Plus, Trash2, Edit3, Check, X } from 'lucide-react';
+import { Settings, CreditCard, Plus, Trash2, Edit3, Check, X, Download, ShieldCheck } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
 export default function ConfigModal({ isOpen, onClose, userRole }) {
@@ -276,6 +276,35 @@ export default function ConfigModal({ isOpen, onClose, userRole }) {
               )}
             </div>
           </div>
+
+          {/* Database Backup & Disaster Recovery Section */}
+          <div style={{ marginTop: '1.25rem', background: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '20px', padding: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+              <div>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                  <ShieldCheck size={20} color="#38bdf8" /> Respaldo y Recuperación de Datos (Snapshot)
+                </h4>
+                <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.2rem', margin: 0 }}>
+                  Descarga una copia de seguridad física completa en formato JSON con todas las facturas, clientes, deducciones, depósitos y gastos.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const success = storageService.exportFullBackup();
+                  if (success) {
+                    alert('✅ Respaldo completo descargado exitosamente en tu dispositivo.');
+                  }
+                }}
+                className="btn-primary"
+                style={{ background: 'linear-gradient(135deg, #0284c7, #2563eb)', fontSize: '0.82rem', padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Download size={16} /> Descargar Respaldo Total
+              </button>
+            </div>
+          </div>
+
         </div>
 
         {/* Modal Footer */}

@@ -362,6 +362,13 @@ export const ocrService = {
         }
 
         // If digital text was extracted
+        try {
+          if (pdf.cleanup) await pdf.cleanup();
+          if (pdf.destroy) await pdf.destroy();
+        } catch {
+          // Ignore cleanup error
+        }
+
         if (fullPdfText.trim().length > 30) {
           if (onProgress) onProgress('Analizando campos fiscales (Subtotal, IVA, RFC, Folio)...');
           const parsed = parseInvoiceText(fullPdfText);

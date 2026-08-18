@@ -902,5 +902,49 @@ export const storageService = {
       approxLocation: incidentData.location || 'México (Detectado por Proxy)'
     });
     setStorageItem(STORAGE_KEYS.SECURITY_INCIDENTS, incidents);
+  },
+
+  // 1-Click Full Backup Exporter (Non-Destructive Snapshot)
+  exportFullBackup: () => {
+    try {
+      const backupData = {
+        metadata: {
+          system: 'Conta Inovatel',
+          version: '2.6',
+          exportDate: new Date().toISOString(),
+          totalInvoices: (getStorageItem(STORAGE_KEYS.INVOICES, [])).length,
+          totalClients: (getStorageItem(STORAGE_KEYS.CLIENTS, [])).length,
+          totalDeductibles: (getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, [])).length,
+          totalDeposits: (getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, [])).length
+        },
+        invoices: getStorageItem(STORAGE_KEYS.INVOICES, []),
+        clients: getStorageItem(STORAGE_KEYS.CLIENTS, []),
+        deductibles: getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, []),
+        accountDeposits: getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, []),
+        taxConfig: getStorageItem(STORAGE_KEYS.TAX_CONFIG, {}),
+        otherIncome: getStorageItem(STORAGE_KEYS.OTHER_INCOME, []),
+        otherExpenses: getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, []),
+        bankAccounts: getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, []),
+        cardExpenses: getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []),
+        investments: getStorageItem(STORAGE_KEYS.INVESTMENTS, []),
+        auditLogs: getStorageItem(STORAGE_KEYS.AUDIT_LOGS, [])
+      };
+
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const dateStr = new Date().toISOString().split('T')[0];
+      downloadAnchor.setAttribute('href', dataStr);
+      downloadAnchor.setAttribute('download', `conta_inovatel_backup_${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+
+      storageService.logAudit('ADMIN', 'EXPORTAR_RESPALDO_SISTEMA', 'Respaldo completo descargado exitosamente');
+      return true;
+    } catch (e) {
+      console.error('Export Backup Error:', e);
+      return false;
+    }
   }
 };
+
