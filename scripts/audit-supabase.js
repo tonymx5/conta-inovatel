@@ -34,46 +34,63 @@ const headers = {
   'Content-Type': 'application/json'
 };
 
-const TABLES_TO_AUDIT = [
-  'invoices',
-  'clients',
-  'deductibles',
-  'account_deposits',
-  'tax_config',
-  'audit_logs'
+const SCHEMA_AUDIT_MAP = [
+  {
+    table: 'account_deposits',
+    cols: 'id,concept,amount,date,bank_name,reference,applies_equipment_expense,equipment_expense,equipment_provider,real_utility,profile,created_at'
+  },
+  {
+    table: 'clients',
+    cols: 'id,name,rfc,email,phone,sector,notes,applies_isr,isr_rate,created_at'
+  },
+  {
+    table: 'invoices',
+    cols: 'id,folio,client_name,rfc,date,is_mixed_tax,subtotal,discount,subtotal8,subtotal16,iva_rate,iva_total,applies_isr,isr_rate,isr_retained,base_neta,total,status,created_at'
+  },
+  {
+    table: 'deductibles',
+    cols: 'id,provider_name,rfc,invoice_no,date,subtotal,discount,iva_total,total,category,file_name,file_url,created_at'
+  },
+  {
+    table: 'tax_config',
+    cols: 'id,isr_estimated_rate,last_updated'
+  },
+  {
+    table: 'audit_logs',
+    cols: 'id,timestamp,action,details,user_role,ip'
+  }
 ];
 
 async function auditSupabase() {
-  console.log(`\n🔍 Iniciando Auditoría Activa de Supabase en: ${supabaseUrl}`);
+  console.log(`\n🔍 Iniciando Auditoría Exhaustiva de Supabase en: ${supabaseUrl}`);
   let hasErrors = false;
 
-  for (const table of TABLES_TO_AUDIT) {
+  for (const item of SCHEMA_AUDIT_MAP) {
     try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/${table}?select=*&limit=1`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/${item.table}?select=${item.cols}&limit=1`, {
         headers,
         method: 'GET'
       });
 
       if (response.status >= 200 && response.status < 300) {
-        const data = await response.json();
-        const colCount = data.length > 0 ? Object.keys(data[0]).length : 'N/A';
-        console.log(`  ✓ Tabla '${table}': OK (HTTP ${response.status}) | ${data.length} reg. leídos (${colCount} cols)`);
+        const colList = item.cols.split(',');
+        console.log(`  ✓ Tabla '${item.table}': OK (HTTP ${response.status}) | Esquema validado (${colList.length} columnas activas)`);
       } else {
         const errText = await response.text();
-        console.error(`  ❌ Tabla '${table}': FALLO HTTP ${response.status} -> ${errText}`);
+        console.error(`  ❌ Tabla '${item.table}': FALLO HTTP ${response.status} -> ${errText}`);
         hasErrors = true;
       }
     } catch (err) {
-      console.error(`  ❌ Tabla '${table}': Error de Conexión ->`, err.message);
+      console.error(`  ❌ Tabla '${item.table}': Error de Conexión ->`, err.message);
       hasErrors = true;
     }
   }
 
   if (hasErrors) {
-    console.error('\n❌ AUDITORÍA FALLIDA: Existen tablas o conexiones inactivas en Supabase.\n');
+    console.error('\n❌ AUDITORÍA FALLIDA: Existen tablas o columnas faltantes en Supabase.\n');
     process.exit(1);
   } else {
-    console.log('\n✅ AUDITORÍA DE BASE DE DATOS COMPLETADA: Todas las tablas responden HTTP 200 OK en Supabase.\n');
+    console.log('\n✅ AUDITORÍA DE BASE DE DATOS COMPLETADA: 100% de tablas y columnas activas en Supabase.\n');
     process.exit(0);
   }
 }
