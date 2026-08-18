@@ -139,13 +139,13 @@ export default function Header({
             )}
           </button>
 
-          {/* Botón de Configuración Global */}
-          <button className="btn-secondary" onClick={onOpenConfig} style={{ fontSize: '0.85rem' }} title="Configuración de Tarjetas y Cuentas">
-            <Settings size={16} color="#0284c7" /> Config
-          </button>
-
           {userRole === 'admin' && (
             <>
+              {/* Botón de Configuración Global */}
+              <button className="btn-secondary" onClick={onOpenConfig} style={{ fontSize: '0.85rem' }} title="Configuración de Tarjetas y Cuentas">
+                <Settings size={16} color="#0284c7" /> Config
+              </button>
+
               <button className="btn-secondary" onClick={onOpenAuditLog} style={{ fontSize: '0.85rem' }}>
                 <History size={16} color="#10b981" /> Bitácora
               </button>

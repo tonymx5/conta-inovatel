@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
   DEDUCTIBLE_EXPENSES: 'conta_inovatel_deductibles',
   ACCOUNT_DEPOSITS: 'conta_inovatel_account_deposits',
   OTHER_INCOME: 'conta_inovatel_other_income',
+  OTHER_EXPENSES: 'conta_inovatel_other_expenses',
   CARD_EXPENSES: 'conta_inovatel_card_expenses',
   BANK_ACCOUNTS: 'conta_inovatel_bank_accounts',
   INVESTMENTS: 'conta_inovatel_investments',
@@ -763,6 +764,34 @@ export const storageService = {
     const list = getStorageItem(STORAGE_KEYS.OTHER_INCOME, []).filter(o => o.id !== id);
     setStorageItem(STORAGE_KEYS.OTHER_INCOME, list);
     storageService.logAudit(user, 'ELIMINAR_OTRO_INGRESO', `ID ${id}`);
+    notifyDataSynced();
+    return list;
+  },
+
+  // Otros Gastos (Ingresos del Mes)
+  getOtherExpenses: () => getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, []),
+  saveOtherExpense: (expense, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, []);
+    const amount = parseFloat(expense.amount) || 0;
+    const itemToSave = {
+      ...expense,
+      id: expense.id || 'oth-exp-' + Date.now(),
+      concept: (expense.concept || '').trim(),
+      amount,
+      date: expense.date || new Date().toISOString().split('T')[0]
+    };
+    const idx = list.findIndex(e => e.id === itemToSave.id);
+    if (idx >= 0) list[idx] = itemToSave; else list.push(itemToSave);
+    setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
+
+    storageService.logAudit(user, idx >= 0 ? 'EDITAR_OTRO_GASTO' : 'CREAR_OTRO_GASTO', `${itemToSave.concept} - $${itemToSave.amount}`);
+    notifyDataSynced();
+    return list;
+  },
+  deleteOtherExpense: (id, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, []).filter(e => e.id !== id);
+    setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
+    storageService.logAudit(user, 'ELIMINAR_OTRO_GASTO', `ID ${id}`);
     notifyDataSynced();
     return list;
   },

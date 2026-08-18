@@ -12,7 +12,17 @@ export default function InvoicesModule({ userRole }) {
   const [clients, setClients] = useState([]);
   const [deductibles, setDeductibles] = useState([]);
   const [deposits, setDeposits] = useState([]);
+  const [otherExpenses, setOtherExpenses] = useState([]);
   const [taxConfig, setTaxConfig] = useState({ isrEstimatedRate: 2.5 });
+
+  // Modal Otros Gastos State
+  const [showOtherExpenseModal, setShowOtherExpenseModal] = useState(false);
+  const [editingOtherExpenseId, setEditingOtherExpenseId] = useState(null);
+  const [otherExpenseFormData, setOtherExpenseFormData] = useState({
+    concept: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0]
+  });
 
   // Modal Deposit State
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -72,6 +82,7 @@ export default function InvoicesModule({ userRole }) {
     setClients(storageService.getClients());
     setDeductibles(storageService.getDeductibles());
     setDeposits(storageService.getAccountDeposits ? storageService.getAccountDeposits() : []);
+    setOtherExpenses(storageService.getOtherExpenses ? storageService.getOtherExpenses() : []);
     setTaxConfig(storageService.getTaxConfig());
   };
 
@@ -384,13 +395,71 @@ export default function InvoicesModule({ userRole }) {
       });
   }, [deposits, selectedMonth, selectedYear]);
 
+  // Filter and sort other expenses (Most recent date at the top)
+  const filteredOtherExpenses = useMemo(() => {
+    return otherExpenses
+      .filter((e) => {
+        if (!e.date) return selectedMonth === 'ALL';
+        const [year, month] = e.date.split('-');
+        const matchesYear = selectedYear === 'ALL' || year === selectedYear;
+        const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
+        return matchesYear && matchesMonth;
+      })
+      .sort((a, b) => {
+        const dateA = a.date || '';
+        const dateB = b.date || '';
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
+        return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
+      });
+  }, [otherExpenses, selectedMonth, selectedYear]);
+
+  const totalOtrosGastos = filteredOtherExpenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+
+  const resetOtherExpenseForm = () => {
+    setEditingOtherExpenseId(null);
+    const defaultDate = selectedMonth !== 'ALL' && selectedYear !== 'ALL'
+      ? `${selectedYear}-${selectedMonth}-01`
+      : new Date().toISOString().split('T')[0];
+    setOtherExpenseFormData({
+      concept: '',
+      amount: '',
+      date: defaultDate
+    });
+  };
+
+  const handleOtherExpenseSubmit = (e) => {
+    e.preventDefault();
+    const amount = parseFloat(otherExpenseFormData.amount) || 0;
+    const expenseToSave = {
+      id: editingOtherExpenseId || undefined,
+      concept: (otherExpenseFormData.concept || '').trim(),
+      amount,
+      date: otherExpenseFormData.date
+    };
+    const updated = storageService.saveOtherExpense(expenseToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+    setOtherExpenses(updated);
+    setShowOtherExpenseModal(false);
+    resetOtherExpenseForm();
+  };
+
+  const handleEditOtherExpense = (exp) => {
+    setEditingOtherExpenseId(exp.id);
+    setOtherExpenseFormData({
+      concept: exp.concept || '',
+      amount: exp.amount ? exp.amount.toString() : '',
+      date: exp.date || new Date().toISOString().split('T')[0]
+    });
+    setShowOtherExpenseModal(true);
+  };
+
+  const handleDeleteOtherExpense = (id) => {
+    if (window.confirm('¿Eliminar este registro de gasto?')) {
+      const updated = storageService.deleteOtherExpense(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+      setOtherExpenses(updated);
+    }
+  };
+
   const totalDepositosBrutos = filteredDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-  const totalGastosEquipos = filteredDeposits.reduce((sum, d) => sum + (d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0), 0);
-  const totalUtilidadRealDepositos = filteredDeposits.reduce((sum, d) => {
-    const amt = parseFloat(d.amount) || 0;
-    const eq = d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0;
-    return sum + (d.realUtility !== undefined ? d.realUtility : (amt - eq));
-  }, 0);
 
   const handleDepositSubmit = async (e) => {
     e.preventDefault();
@@ -485,8 +554,11 @@ export default function InvoicesModule({ userRole }) {
   // Retención ISR calculada con base al Ingreso Total (modificable en Liquidación Fiscal, default 2.5%)
   const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
 
-  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR
-  const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr;
+  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR menos Otros Gastos
+  const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalOtrosGastos;
+
+  // Por Depositar: Utilidad Real menos Total de Depósitos
+  const porDepositar = utilidadReal - totalDepositosBrutos;
 
   // IVA Acreditable Proveedores (para tarjeta de admin)
   const totalIvaAcreditable = filteredDeductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
@@ -884,31 +956,54 @@ export default function InvoicesModule({ userRole }) {
                 </span>
               </div>
               
-              {/* Tasa Retención ISR */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>
-                <span>ISR:</span>
-                <select
-                  value={currentIsrRate}
-                  onChange={(e) => handleGlobalRateChange(e.target.value)}
+              {/* Tasa Retención ISR y Botón Otros Gastos */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>
+                  <span>ISR:</span>
+                  <select
+                    value={currentIsrRate}
+                    onChange={(e) => handleGlobalRateChange(e.target.value)}
+                    style={{
+                      background: '#ffffff',
+                      border: '1.5px solid #10b981',
+                      color: '#047857',
+                      borderRadius: '6px',
+                      fontWeight: '800',
+                      padding: '0.2rem 0.4rem',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      fontSize: '0.78rem'
+                    }}
+                  >
+                    <option value={1.0}>1.0%</option>
+                    <option value={1.10}>1.10%</option>
+                    <option value={1.25}>1.25%</option>
+                    <option value={1.50}>1.50%</option>
+                    <option value={2.00}>2.0%</option>
+                    <option value={2.50}>2.5%</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => { resetOtherExpenseForm(); setShowOtherExpenseModal(true); }}
                   style={{
-                    background: '#ffffff',
-                    border: '1.5px solid #10b981',
-                    color: '#047857',
+                    background: '#fffbeb',
+                    border: '1.5px solid #f59e0b',
+                    color: '#b45309',
                     borderRadius: '6px',
                     fontWeight: '800',
-                    padding: '0.2rem 0.4rem',
+                    padding: '0.2rem 0.45rem',
                     cursor: 'pointer',
-                    outline: 'none',
-                    fontSize: '0.78rem'
+                    fontSize: '0.74rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem'
                   }}
+                  title="Registrar Otro Gasto"
                 >
-                  <option value={1.0}>1.0%</option>
-                  <option value={1.10}>1.10%</option>
-                  <option value={1.25}>1.25%</option>
-                  <option value={1.50}>1.50%</option>
-                  <option value={2.00}>2.0%</option>
-                  <option value={2.50}>2.5%</option>
-                </select>
+                  <Plus size={12} /> Otros Gastos
+                </button>
               </div>
             </div>
 
@@ -934,6 +1029,38 @@ export default function InvoicesModule({ userRole }) {
               <strong style={{ color: '#b45309', fontSize: '0.96rem', fontWeight: '800' }}>
                 -${totalRetencionIsr.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
+            </div>
+
+            {/* 4. Otros Gastos */}
+            <div className="excel-row" style={{ padding: '0.45rem 0', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>(-) Otros Gastos:</span>
+                <strong style={{ color: totalOtrosGastos > 0 ? '#dc2626' : '#64748b', fontSize: '0.96rem', fontWeight: '800' }}>
+                  {totalOtrosGastos > 0 ? `-$${totalOtrosGastos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+                </strong>
+              </div>
+
+              {/* Mini listado de otros gastos si existen */}
+              {filteredOtherExpenses.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', paddingLeft: '0.5rem', borderLeft: '2px solid #fed7aa', marginTop: '0.2rem' }}>
+                  {filteredOtherExpenses.map(exp => (
+                    <div key={exp.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.74rem' }}>
+                      <span style={{ color: '#78350f', fontWeight: '600' }}>
+                        {exp.concept} <span style={{ color: '#94a3b8', fontSize: '0.68rem' }}>({formatDate(exp.date)})</span>
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <strong style={{ color: '#dc2626' }}>${parseFloat(exp.amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
+                        <button onClick={() => handleEditOtherExpense(exp)} style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: 0 }}>
+                          <Edit3 size={11} />
+                        </button>
+                        <button onClick={() => handleDeleteOtherExpense(exp.id)} style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', padding: 0 }}>
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -1070,8 +1197,6 @@ export default function InvoicesModule({ userRole }) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', maxHeight: '230px', overflowY: 'auto', paddingRight: '0.2rem' }}>
                 {filteredDeposits.map((dep) => {
                   const depAmount = parseFloat(dep.amount) || 0;
-                  const eqExpense = dep.appliesEquipmentExpense ? (parseFloat(dep.equipmentExpense) || 0) : 0;
-                  const realUtil = dep.realUtility !== undefined ? dep.realUtility : (depAmount - eqExpense);
 
                   return (
                     <div
@@ -1119,37 +1244,24 @@ export default function InvoicesModule({ userRole }) {
                         </div>
                       </div>
 
-                      {/* Desglose Financiero del Depósito */}
+                      {/* Monto del Depósito limpio para usuario */}
                       <div style={{
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
                         background: '#f8fafc',
-                        padding: '0.35rem 0.55rem',
+                        padding: '0.4rem 0.6rem',
                         borderRadius: '6px',
-                        fontSize: '0.75rem',
-                        border: '1px solid #f1f5f9',
-                        flexWrap: 'wrap',
-                        gap: '0.3rem'
+                        fontSize: '0.78rem',
+                        border: '1px solid #f1f5f9'
                       }}>
-                        <span style={{ color: '#64748b' }}>
-                          Depósito: <strong style={{ color: '#334155' }}>${depAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
+                        <span style={{ color: '#64748b', fontWeight: '600' }}>
+                          Monto Depositado:
                         </span>
 
-                        {dep.appliesEquipmentExpense && eqExpense > 0 ? (
-                          <span style={{ color: '#0284c7', fontSize: '0.74rem' }}>
-                            (-) Equipos: <strong>-${eqExpense.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
-                            {dep.equipmentProvider ? ` (${dep.equipmentProvider})` : ''}
-                          </span>
-                        ) : (
-                          <span style={{ color: '#94a3b8', fontSize: '0.72rem' }}>
-                            (Sin gasto de equipos)
-                          </span>
-                        )}
-
-                        <span className="badge badge-emerald" style={{ fontSize: '0.75rem', padding: '0.15rem 0.45rem', fontWeight: '800' }}>
-                          💰 Utilidad: ${realUtil.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                        </span>
+                        <strong style={{ color: '#047857', fontSize: '0.9rem', fontWeight: '800' }}>
+                          ${depAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </strong>
                       </div>
                     </div>
                   );
@@ -1158,7 +1270,7 @@ export default function InvoicesModule({ userRole }) {
             )}
           </div>
 
-          {/* Total Box Card 3: Desglose Integral de Utilidad Real en Cuenta */}
+          {/* Total Box Card 3: Desglose Integral de Por Depositar */}
           <div style={{
             background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
             padding: '0.85rem 1rem',
@@ -1170,20 +1282,18 @@ export default function InvoicesModule({ userRole }) {
             border: '1.5px solid #86efac'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#475569' }}>
-              <span>(+) Total Depósitos Recibidos:</span>
-              <strong style={{ color: '#0f172a' }}>
-                ${totalDepositosBrutos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <span>(+) Utilidad Real (edson):</span>
+              <strong style={{ color: '#15803d', fontWeight: '800' }}>
+                ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
 
-            {totalGastosEquipos > 0 && (
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#0284c7' }}>
-                <span>(-) Total Compra de Equipos:</span>
-                <strong>
-                  -${totalGastosEquipos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </strong>
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#475569' }}>
+              <span>(-) Total Depósitos Realizados:</span>
+              <strong style={{ color: '#0f172a', fontWeight: '800' }}>
+                -${totalDepositosBrutos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
 
             <div style={{
               borderTop: '1.5px dashed #86efac',
@@ -1192,11 +1302,11 @@ export default function InvoicesModule({ userRole }) {
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <strong style={{ fontSize: '0.85rem', color: '#166534' }}>
-                💰 TOTAL UTILIDAD REAL EN CUENTA:
+              <strong style={{ fontSize: '0.88rem', color: porDepositar > 0 ? '#b45309' : '#166534', fontWeight: '800' }}>
+                {porDepositar > 0 ? '⚠️ Por de depositar:' : '✓ Por de depositar:'}
               </strong>
-              <strong style={{ fontSize: '1.2rem', color: '#15803d', fontWeight: '900' }}>
-                ${totalUtilidadRealDepositos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <strong style={{ fontSize: '1.25rem', color: porDepositar > 0 ? '#b45309' : '#15803d', fontWeight: '900' }}>
+                ${porDepositar.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
           </div>
@@ -1742,6 +1852,76 @@ export default function InvoicesModule({ userRole }) {
                 <button type="button" className="btn-secondary" onClick={() => setShowDepositModal(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg, #10b981, #059669)' }}>
                   {editingDepositId ? 'Actualizar Depósito' : 'Guardar Depósito'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Registrar / Editar Otro Gasto */}
+      {showOtherExpenseModal && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3 style={{ fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Receipt size={20} color="#b45309" /> {editingOtherExpenseId ? 'Editar Otro Gasto' : 'Registrar Otro Gasto'}
+              </h3>
+              <button onClick={() => setShowOtherExpenseModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}>✕</button>
+            </div>
+
+            <form onSubmit={handleOtherExpenseSubmit}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
+                    Concepto:
+                  </label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Ej: Fletes / Gastos Operativos"
+                    value={otherExpenseFormData.concept}
+                    onChange={(e) => setOtherExpenseFormData({ ...otherExpenseFormData, concept: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: '700', color: '#dc2626' }}>
+                      Monto Total ($):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      placeholder="$0.00"
+                      style={{ fontWeight: '800', color: '#dc2626', fontSize: '1.05rem' }}
+                      value={otherExpenseFormData.amount}
+                      onChange={(e) => setOtherExpenseFormData({ ...otherExpenseFormData, amount: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
+                      Fecha:
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={otherExpenseFormData.date}
+                      onChange={(e) => setOtherExpenseFormData({ ...otherExpenseFormData, date: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-secondary" onClick={() => setShowOtherExpenseModal(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+                  {editingOtherExpenseId ? 'Actualizar Gasto' : 'Guardar Gasto'}
                 </button>
               </div>
             </form>
