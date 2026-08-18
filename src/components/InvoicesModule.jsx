@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, ArrowDownRight, ShieldCheck, Tag, Landmark, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
 import { formatFolio } from '../utils/folioFormatter';
@@ -484,35 +484,18 @@ export default function InvoicesModule({ userRole }) {
 
   // Excel Summary Totals Math calculated on the filtered month view
   const currentIsrRate = taxConfig.isrEstimatedRate || 1.25;
-  const totalSubtotalesVentas = filteredInvoices.reduce((sum, i) => sum + (i.subtotal || 0), 0);
-  const totalDescuentosVentas = filteredInvoices.reduce((sum, i) => sum + (i.discount || 0), 0);
-  const totalBaseNetaVentas = totalSubtotalesVentas - totalDescuentosVentas;
-  const totalIvaTrasladado = filteredInvoices.reduce((sum, i) => sum + (i.ivaTotal || 0), 0);
+  const totalIngresoTotal = filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.subtotal) || 0), 0);
+  const totalSubtotalesVentas = totalIngresoTotal;
+  const totalIvaTrasladado = filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
   
-  const totalRetencionIsr = filteredInvoices.reduce((sum, i) => {
-    if (i.appliesIsr) {
-      const base = i.baseNeta || (i.subtotal - (i.discount || 0));
-      return sum + (i.isrRetained !== undefined ? i.isrRetained : (base * (currentIsrRate / 100)));
-    }
-    return sum;
-  }, 0);
+  // Retención ISR calculada con base al Ingreso Total
+  const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
 
-  // Total Ingresos Facturados Cobrados
-  const totalIngresosCobrados = filteredInvoices.reduce((sum, i) => {
-    const base = i.baseNeta || (i.subtotal - (i.discount || 0));
-    const ret = i.appliesIsr ? (i.isrRetained !== undefined ? i.isrRetained : (base * (currentIsrRate / 100))) : 0;
-    const tot = i.total !== undefined ? i.total : (base + i.ivaTotal - ret);
-    return sum + tot;
-  }, 0);
+  // Utilidad Real (edson): Ingreso Total menos Retención ISR
+  const utilidadReal = totalIngresoTotal - totalRetencionIsr;
 
-  // IVA Acreditable Proveedores
-  const totalIvaAcreditable = filteredDeductibles.reduce((sum, d) => sum + (d.ivaTotal || 0), 0);
-
-  // Liquidación IVA Real a Pagar al SAT (IVA Trasladado - IVA Acreditable)
-  const ivaRealPagarSat = Math.max(0, totalIvaTrasladado - totalIvaAcreditable);
-
-  // Utilidad Real: Base Neta de Ventas menos Retención de ISR
-  const utilidadReal = totalBaseNetaVentas - totalRetencionIsr;
+  // IVA Acreditable Proveedores (para tarjeta de admin)
+  const totalIvaAcreditable = filteredDeductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
 
   const isCurrentMonthSelected = selectedMonth === currentMonthStr && selectedYear === currentYearStr;
 
@@ -916,7 +899,7 @@ export default function InvoicesModule({ userRole }) {
       {/* Bottom Section: 3 Tarjetas Simétricas en Dashboard (Liquidación Fiscal | Fact Prov | Depósito a Cuenta) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
         
-        {/* Card 1: Resumen Fiscal & Liquidación de IVA con Utilidad Real */}
+        {/* Card 1: Resumen Fiscal con Utilidad Real */}
         <div className="excel-summary-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', margin: 0, height: '100%' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', borderBottom: '1px solid rgba(16, 185, 129, 0.2)', paddingBottom: '0.65rem' }}>
@@ -957,189 +940,133 @@ export default function InvoicesModule({ userRole }) {
               </div>
             </div>
 
-            {/* Suma de Subtotales */}
-            <div className="excel-row" style={{ padding: '0.35rem 0' }}>
-              <span style={{ color: '#64748b', fontWeight: '600', fontSize: '0.84rem' }}>Suma de Subtotales:</span>
-              <strong style={{ color: '#475569', fontSize: '0.92rem' }}>
-                ${totalSubtotalesVentas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+            {/* 1. Ingreso Total */}
+            <div className="excel-row" style={{ padding: '0.45rem 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>Ingreso Total:</span>
+              <strong style={{ color: '#047857', fontSize: '0.98rem', fontWeight: '800' }}>
+                ${totalIngresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
 
-            {/* Descuentos si existen */}
-            {totalDescuentosVentas > 0 && (
-              <div className="excel-row" style={{ color: '#dc2626', padding: '0.35rem 0' }}>
-                <span style={{ fontWeight: '600', fontSize: '0.84rem' }}>(-) Descuentos Aplicados:</span>
-                <strong style={{ fontSize: '0.92rem' }}>
-                  -${totalDescuentosVentas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                </strong>
-              </div>
-            )}
-
-            {/* IVA Trasladado (Ventas) */}
-            <div className="excel-row" style={{ padding: '0.35rem 0' }}>
-              <span style={{ color: '#64748b', fontWeight: '600', fontSize: '0.84rem' }}>(+) IVA Trasladado (Ventas):</span>
-              <strong style={{ color: '#0284c7', fontSize: '0.92rem' }}>
+            {/* 2. IVA Trasladado (ventas) */}
+            <div className="excel-row" style={{ padding: '0.45rem 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>IVA Trasladado (ventas):</span>
+              <strong style={{ color: '#0284c7', fontSize: '0.96rem', fontWeight: '800' }}>
                 ${totalIvaTrasladado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
 
-            {/* IVA Acreditable (Proveedores) */}
-            <div className="excel-row" style={{ color: '#0891b2', padding: '0.35rem 0' }}>
-              <span style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.84rem' }}>
-                <ArrowDownRight size={14} /> (-) IVA Acreditable (Proveedores):
-              </span>
-              <strong style={{ color: '#0891b2', fontSize: '0.92rem' }}>
-                -${totalIvaAcreditable.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
-            </div>
-
-            {/* IVA Real a Pagar al SAT */}
-            <div style={{
-              background: 'linear-gradient(135deg, #f0fdfa, #e0f2fe)',
-              border: '1.5px solid #67e8f9',
-              borderRadius: '10px',
-              padding: '0.55rem 0.75rem',
-              margin: '0.35rem 0',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center'
-            }}>
-              <div>
-                <span style={{ fontSize: '0.76rem', fontWeight: '800', color: '#0e7490', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <ShieldCheck size={15} color="#0891b2" /> IVA REAL A PAGAR SAT:
-                </span>
-              </div>
-              <strong style={{ fontSize: '1.02rem', fontWeight: '800', color: '#0891b2' }}>
-                ${ivaRealPagarSat.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
-            </div>
-
-            {/* Retención ISR */}
-            <div className="excel-row" style={{ padding: '0.35rem 0' }}>
-              <span style={{ color: '#64748b', fontWeight: '600', fontSize: '0.84rem' }}>(-) Retención ISR ({currentIsrRate}%):</span>
-              <strong style={{ color: '#b45309', fontSize: '0.92rem' }}>
+            {/* 3. Retención ISR */}
+            <div className="excel-row" style={{ padding: '0.45rem 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>Retención ISR ({currentIsrRate}%):</span>
+              <strong style={{ color: '#b45309', fontSize: '0.96rem', fontWeight: '800' }}>
                 -${totalRetencionIsr.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
           </div>
 
-          {/* Bloque Inferior: UTILIDAD REAL */}
+          {/* 4. Utilidad Real (edson) */}
           <div style={{
             background: 'linear-gradient(135deg, #f0fdf4, #dcfce7)',
             border: '2px solid #86efac',
             borderRadius: '12px',
             padding: '0.85rem 1rem',
-            marginTop: '0.6rem',
+            marginTop: '0.85rem',
             display: 'flex',
-            flexDirection: 'column',
-            gap: '0.4rem'
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <TrendingUp size={16} color="#15803d" /> UTILIDAD REAL (Neta):
+            <div>
+              <span style={{ fontSize: '0.84rem', fontWeight: '800', color: '#166534', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <TrendingUp size={16} color="#15803d" /> Utilidad Real (edson):
+              </span>
+            </div>
+            <strong style={{ fontSize: '1.28rem', color: '#15803d', fontWeight: '900' }}>
+              ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+            </strong>
+          </div>
+        </div>
+
+        {/* Card 2: Tarjeta Facturas Proveedores (IVA Acreditable) - Solo visible para edson / admin */}
+        {userRole === 'admin' && (
+          <div className="glass-panel" style={{ padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1.5px solid #bae6fd', background: '#f8fafc', height: '100%' }}>
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem', marginBottom: '0.75rem' }}>
+                <div>
+                  <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                    <Receipt size={17} color="#0284c7" /> Facturas Proveedores
+                  </h4>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Acreditamiento de IVA</span>
+                </div>
+                <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem', fontWeight: '700' }}>
+                  {filteredDeductibles.length} {filteredDeductibles.length === 1 ? 'factura' : 'facturas'}
                 </span>
               </div>
-              <strong style={{ fontSize: '1.25rem', color: '#15803d', fontWeight: '900' }}>
-                ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
+
+              {/* Listado de Facturas Capturadas de Proveedores */}
+              {filteredDeductibles.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                    No hay facturas de proveedores registradas para este período.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '230px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+                  {filteredDeductibles.map((ded) => (
+                    <div
+                      key={ded.id}
+                      style={{
+                        background: '#ffffff',
+                        padding: '0.55rem 0.75rem',
+                        borderRadius: '8px',
+                        border: '1px solid #e2e8f0',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        fontSize: '0.8rem'
+                      }}
+                    >
+                      <div>
+                        <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.82rem' }}>
+                          {ded.providerName}
+                        </strong>
+                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>
+                          {ded.invoiceNo || 'Sin Folio'} • {formatDate(ded.date)}
+                        </span>
+                      </div>
+
+                      <div style={{ textAlign: 'right' }}>
+                        <span style={{ fontSize: '0.66rem', color: '#64748b', display: 'block' }}>IVA Acreditable</span>
+                        <strong style={{ color: '#0891b2', fontSize: '0.86rem' }}>
+                          ${ded.ivaTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* Total Box Card 2 */}
             <div style={{
-              borderTop: '1px dashed #86efac',
-              paddingTop: '0.35rem',
+              background: '#e0f2fe',
+              padding: '0.85rem 1rem',
+              borderRadius: '12px',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              fontSize: '0.74rem',
-              color: '#64748b'
+              marginTop: '0.6rem',
+              border: '1px solid #bae6fd'
             }}>
-              <span>Ingreso Total Facturado (con IVA):</span>
-              <strong style={{ color: '#047857', fontSize: '0.88rem', fontWeight: '700' }}>
-                ${totalIngresosCobrados.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <strong style={{ fontSize: '0.82rem', color: '#0369a1' }}>
+                TOTAL IVA ACREDITABLE:
+              </strong>
+              <strong style={{ fontSize: '1.15rem', color: '#0369a1', fontWeight: '900' }}>
+                ${totalIvaAcreditable.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
           </div>
-        </div>
-
-        {/* Card 2: Tarjeta Facturas Proveedores (IVA Acreditable) */}
-        <div className="glass-panel" style={{ padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1.5px solid #bae6fd', background: '#f8fafc', height: '100%' }}>
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem', marginBottom: '0.75rem' }}>
-              <div>
-                <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                  <Receipt size={17} color="#0284c7" /> Facturas Proveedores
-                </h4>
-                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Acreditamiento de IVA</span>
-              </div>
-              <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem', fontWeight: '700' }}>
-                {filteredDeductibles.length} {filteredDeductibles.length === 1 ? 'factura' : 'facturas'}
-              </span>
-            </div>
-
-            {/* Listado de Facturas Capturadas de Proveedores */}
-            {filteredDeductibles.length === 0 ? (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', textAlign: 'center' }}>
-                <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                  No hay facturas de proveedores registradas para este período.
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '230px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-                {filteredDeductibles.map((ded) => (
-                  <div
-                    key={ded.id}
-                    style={{
-                      background: '#ffffff',
-                      padding: '0.55rem 0.75rem',
-                      borderRadius: '8px',
-                      border: '1px solid #e2e8f0',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      fontSize: '0.8rem'
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.82rem' }}>
-                        {ded.providerName}
-                      </strong>
-                      <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>
-                        {ded.invoiceNo || 'Sin Folio'} • {formatDate(ded.date)}
-                      </span>
-                    </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      <span style={{ fontSize: '0.66rem', color: '#64748b', display: 'block' }}>IVA Acreditable</span>
-                      <strong style={{ color: '#0891b2', fontSize: '0.86rem' }}>
-                        ${ded.ivaTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </strong>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Total Box Card 2 */}
-          <div style={{
-            background: '#e0f2fe',
-            padding: '0.85rem 1rem',
-            borderRadius: '12px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: '0.6rem',
-            border: '1px solid #bae6fd'
-          }}>
-            <strong style={{ fontSize: '0.82rem', color: '#0369a1' }}>
-              TOTAL IVA ACREDITABLE:
-            </strong>
-            <strong style={{ fontSize: '1.15rem', color: '#0369a1', fontWeight: '900' }}>
-              ${totalIvaAcreditable.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-            </strong>
-          </div>
-        </div>
+        )}
 
         {/* Card 3: Tarjeta Depósito a Cuenta (Transferencias Bancarias) */}
         <div className="glass-panel" style={{ padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1.5px solid #a7f3d0', background: '#f8fafc', height: '100%' }}>

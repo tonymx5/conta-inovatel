@@ -195,7 +195,7 @@ export default function App() {
         <main style={{ flex: 1, padding: '1.25rem', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
           {activeTab === 'invoices' && <InvoicesModule userRole={userRole} />}
           {activeTab === 'other_income' && <OtherIncomeModule userRole={userRole} />}
-          {activeTab === 'provider_deductions' && <ProviderDeductionsModule userRole={userRole} />}
+          {activeTab === 'provider_deductions' && userRole === 'admin' && <ProviderDeductionsModule userRole={userRole} />}
           {activeTab === 'clients' && <ClientsModule userRole={userRole} />}
           {activeTab === 'expenses' && <ExpensesModule userRole={userRole} />}
           {activeTab === 'analytics' && <AnalyticsModule userRole={userRole} />}
@@ -222,14 +222,16 @@ export default function App() {
             <span className="tooltip">Clientes</span>
           </button>
 
-          <button
-            className={`mobile-icon-btn ${activeTab === 'provider_deductions' ? 'active' : ''}`}
-            onClick={() => handleMobileNav('provider_deductions', 'Fact Prov', false)}
-            aria-label="Fact Prov"
-          >
-            <Receipt size={22} />
-            <span className="tooltip">Fact Prov</span>
-          </button>
+          {userRole === 'admin' && (
+            <button
+              className={`mobile-icon-btn ${activeTab === 'provider_deductions' ? 'active' : ''}`}
+              onClick={() => handleMobileNav('provider_deductions', 'Fact Prov', false)}
+              aria-label="Fact Prov"
+            >
+              <Receipt size={22} />
+              <span className="tooltip">Fact Prov</span>
+            </button>
+          )}
 
           <button
             className={`mobile-icon-btn ${activeTab === 'expenses' ? 'active' : ''}`}
