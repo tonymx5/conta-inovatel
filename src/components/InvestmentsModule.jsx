@@ -46,11 +46,11 @@ export default function InvestmentsModule({ userRole }) {
   }, []);
 
   const loadData = () => {
-    setInvestments(storageService.getInvestments());
-    setInvoices(storageService.getInvoices());
-    setDeductibles(storageService.getDeductibleExpenses());
-    setOtherIncome(storageService.getOtherIncome());
-    setCardExpenses(storageService.getCardExpenses());
+    setInvestments(storageService.getInvestments ? storageService.getInvestments() : []);
+    setInvoices(storageService.getInvoices ? storageService.getInvoices() : []);
+    setDeductibles(storageService.getDeductibles ? storageService.getDeductibles() : (storageService.getDeductibleExpenses ? storageService.getDeductibleExpenses() : []));
+    setOtherIncome(storageService.getOtherIncome ? storageService.getOtherIncome() : []);
+    setCardExpenses(storageService.getCardExpenses ? storageService.getCardExpenses() : []);
     setDeposits(storageService.getAccountDeposits ? storageService.getAccountDeposits() : []);
     setTaxConfig(storageService.getTaxConfig ? storageService.getTaxConfig() : { isrEstimatedRate: 1.25 });
   };

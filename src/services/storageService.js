@@ -753,6 +753,7 @@ export const storageService = {
 
   // Deductibles (Fact Prov)
   getDeductibles: () => getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles),
+  getDeductibleExpenses: () => getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles),
   saveDeductible: (item, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles);
     const itemToSave = { ...item, id: item.id || 'ded-' + Date.now() };

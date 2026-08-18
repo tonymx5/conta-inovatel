@@ -16,12 +16,12 @@ export default function BackupModal({ isOpen, onClose, userRole = 'admin' }) {
   if (!isOpen) return null;
 
   // Estadísticas actuales en el sistema
-  const invoicesCount = (storageService.getInvoices() || []).length;
-  const clientsCount = (storageService.getClients() || []).length;
-  const deductiblesCount = (storageService.getDeductibleExpenses() || []).length;
+  const invoicesCount = (storageService.getInvoices ? storageService.getInvoices() : []).length;
+  const clientsCount = (storageService.getClients ? storageService.getClients() : []).length;
+  const deductiblesCount = (storageService.getDeductibles ? storageService.getDeductibles() : (storageService.getDeductibleExpenses ? storageService.getDeductibleExpenses() : [])).length;
   const depositsCount = (storageService.getAccountDeposits ? storageService.getAccountDeposits() : []).length;
-  const cardExpensesCount = (storageService.getCardExpenses() || []).length;
-  const investmentsCount = (storageService.getInvestments() || []).length;
+  const cardExpensesCount = (storageService.getCardExpenses ? storageService.getCardExpenses() : []).length;
+  const investmentsCount = (storageService.getInvestments ? storageService.getInvestments() : []).length;
 
   const handleExport = () => {
     setIsExporting(true);
