@@ -96,6 +96,30 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     ip TEXT
 );
 
+-- 7. TABLA: GASTOS POR TARJETA (card_expenses)
+CREATE TABLE IF NOT EXISTS public.card_expenses (
+    id TEXT PRIMARY KEY,
+    date DATE NOT NULL,
+    description TEXT NOT NULL,
+    amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    bank_id TEXT,
+    bank_name TEXT,
+    sector TEXT DEFAULT 'Extras',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. TABLA: INVERSIONES Y BOT IA (investments)
+CREATE TABLE IF NOT EXISTS public.investments (
+    id TEXT PRIMARY KEY,
+    asset_name TEXT NOT NULL,
+    category TEXT DEFAULT 'CETES / Renta Fija',
+    amount_invested NUMERIC(15,2) NOT NULL DEFAULT 0,
+    expected_yield_pct NUMERIC(5,2) DEFAULT 0,
+    start_date DATE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =========================================================================
 -- DESACTIVAR RLS (Permitir lectura y escritura a la API Anon de forma inmediata)
 -- =========================================================================
@@ -105,6 +129,8 @@ ALTER TABLE public.deductibles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.account_deposits DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tax_config DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.card_expenses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.investments DISABLE ROW LEVEL SECURITY;
 
 -- =========================================================================
 -- DATOS INICIALES (SEMILLA)

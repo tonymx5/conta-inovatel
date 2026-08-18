@@ -58,6 +58,14 @@ const SCHEMA_AUDIT_MAP = [
   {
     table: 'audit_logs',
     cols: 'id,timestamp,action,details,user_role,ip'
+  },
+  {
+    table: 'card_expenses',
+    cols: 'id,date,description,amount,bank_id,bank_name,sector,created_at'
+  },
+  {
+    table: 'investments',
+    cols: 'id,asset_name,category,amount_invested,expected_yield_pct,start_date,notes,created_at'
   }
 ];
 

@@ -98,6 +98,30 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
     ip TEXT
 );
 
+-- 7. TABLA: GASTOS POR TARJETA (card_expenses)
+CREATE TABLE IF NOT EXISTS public.card_expenses (
+    id TEXT PRIMARY KEY,
+    date DATE NOT NULL,
+    description TEXT NOT NULL,
+    amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    bank_id TEXT,
+    bank_name TEXT,
+    sector TEXT DEFAULT 'Extras',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 8. TABLA: INVERSIONES Y BOT IA (investments)
+CREATE TABLE IF NOT EXISTS public.investments (
+    id TEXT PRIMARY KEY,
+    asset_name TEXT NOT NULL,
+    category TEXT DEFAULT 'CETES / Renta Fija',
+    amount_invested NUMERIC(15,2) NOT NULL DEFAULT 0,
+    expected_yield_pct NUMERIC(5,2) DEFAULT 0,
+    start_date DATE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Desactivar RLS si se usa llave anon pública directa
 ALTER TABLE public.invoices DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients DISABLE ROW LEVEL SECURITY;
@@ -105,8 +129,10 @@ ALTER TABLE public.deductibles DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.account_deposits DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tax_config DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.card_expenses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.investments DISABLE ROW LEVEL SECURITY;
 
--- 7. NORMALIZACIÓN AUTOMÁTICA DE FOLIOS A FK- Y TASAS DE IVA
+-- 9. NORMALIZACIÓN AUTOMÁTICA DE FOLIOS A FK- Y TASAS DE IVA
 UPDATE public.invoices 
 SET folio = 'FK-' || regexp_replace(UPPER(folio), '^(FK-?|F-?)', '', 'i')
 WHERE folio NOT LIKE 'FK-%';
@@ -115,17 +141,27 @@ UPDATE public.invoices
 SET iva_rate = 8.00 
 WHERE iva_rate >= 7.00 AND iva_rate <= 7.99;
 
--- 8. HABILITAR SUPABASE REALTIME MULTIDISPOSITIVO (TIEMPO REAL ENTERPRISE)
+-- 10. HABILITAR SUPABASE REALTIME MULTIDISPOSITIVO (TIEMPO REAL ENTERPRISE & REPLICA IDENTITY FULL)
 ALTER TABLE public.invoices REPLICA IDENTITY FULL;
 ALTER TABLE public.clients REPLICA IDENTITY FULL;
 ALTER TABLE public.deductibles REPLICA IDENTITY FULL;
 ALTER TABLE public.account_deposits REPLICA IDENTITY FULL;
 ALTER TABLE public.tax_config REPLICA IDENTITY FULL;
+ALTER TABLE public.audit_logs REPLICA IDENTITY FULL;
+ALTER TABLE public.card_expenses REPLICA IDENTITY FULL;
+ALTER TABLE public.investments REPLICA IDENTITY FULL;
 
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
-        ALTER PUBLICATION supabase_realtime ADD TABLE public.invoices, public.clients, public.deductibles, public.account_deposits, public.tax_config;
+        ALTER PUBLICATION supabase_realtime ADD TABLE 
+            public.invoices, 
+            public.clients, 
+            public.deductibles, 
+            public.account_deposits, 
+            public.tax_config, 
+            public.card_expenses, 
+            public.investments;
     END IF;
 EXCEPTION WHEN OTHERS THEN
     NULL;
