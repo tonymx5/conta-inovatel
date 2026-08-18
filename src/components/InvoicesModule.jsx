@@ -12,7 +12,7 @@ export default function InvoicesModule({ userRole }) {
   const [clients, setClients] = useState([]);
   const [deductibles, setDeductibles] = useState([]);
   const [deposits, setDeposits] = useState([]);
-  const [taxConfig, setTaxConfig] = useState({ isrEstimatedRate: 1.25 });
+  const [taxConfig, setTaxConfig] = useState({ isrEstimatedRate: 2.5 });
 
   // Modal Deposit State
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -83,7 +83,7 @@ export default function InvoicesModule({ userRole }) {
         clientName: selected.name,
         rfc: selected.rfc,
         appliesIsr: selected.appliesIsr,
-        isrRate: selected.appliesIsr ? (selected.isrRate || taxConfig.isrEstimatedRate || 1.25) : 0
+        isrRate: selected.appliesIsr ? 1.25 : 0
       }));
     } else {
       setFormData(prev => ({ ...prev, clientName }));
@@ -207,11 +207,10 @@ export default function InvoicesModule({ userRole }) {
     return Math.max(0, s - d);
   };
 
-  const calculateIsrRetained = (subtotal, discount, appliesIsr, isrRate) => {
+  const calculateIsrRetained = (subtotal, discount, appliesIsr) => {
     if (!appliesIsr) return 0.0;
     const baseNeta = getBaseNeta(subtotal, discount);
-    const rate = parseFloat(isrRate) || 1.25;
-    return (baseNeta * (rate / 100));
+    return (baseNeta * 0.0125);
   };
 
   const handleSubmit = (e) => {
@@ -307,7 +306,7 @@ export default function InvoicesModule({ userRole }) {
       ivaRate: 8,
       ivaTotal: '',
       appliesIsr: true,
-      isrRate: taxConfig.isrEstimatedRate || 1.25,
+      isrRate: 1.25,
       status: 'PAGADA'
     });
   };
@@ -317,19 +316,6 @@ export default function InvoicesModule({ userRole }) {
     const updatedConfig = { isrEstimatedRate: rate };
     setTaxConfig(updatedConfig);
     storageService.saveTaxConfig(updatedConfig);
-
-    const updatedInvoices = invoices.map(inv => {
-      if (inv.appliesIsr) {
-        const baseNeta = inv.baseNeta || (inv.subtotal - (inv.discount || 0));
-        const isrRetained = parseFloat((baseNeta * (rate / 100)).toFixed(2));
-        const total = parseFloat((baseNeta + inv.ivaTotal - isrRetained).toFixed(2));
-        return { ...inv, isrRate: rate, isrRetained, total };
-      }
-      return inv;
-    });
-
-    setInvoices(updatedInvoices);
-    localStorage.setItem('conta_inovatel_invoices', JSON.stringify(updatedInvoices));
   };
 
   // Filter and sort invoices by selected month & year (Most recent date at the top)
@@ -483,11 +469,20 @@ export default function InvoicesModule({ userRole }) {
   };
 
   // Excel Summary Totals Math calculated on the filtered month view
-  const currentIsrRate = taxConfig.isrEstimatedRate || 1.25;
-  const totalIngresoTotal = filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.subtotal) || 0), 0);
+  const currentIsrRate = taxConfig.isrEstimatedRate !== undefined ? taxConfig.isrEstimatedRate : 2.5;
+  
+  // Total Ingreso Total: suma exacta de Ingreso Total de todas las facturas capturadas
+  const totalIngresoTotal = filteredInvoices.reduce((sum, inv) => {
+    const base = inv.baseNeta !== undefined ? inv.baseNeta : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+    const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * 0.0125)) : 0;
+    const ivaTot = parseFloat(inv.ivaTotal) || 0;
+    const ingTot = inv.total !== undefined ? inv.total : (base + ivaTot - isrRet);
+    return sum + ingTot;
+  }, 0);
+
   const totalIvaTrasladado = filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
   
-  // Retención ISR calculada con base al Ingreso Total
+  // Retención ISR calculada con base al Ingreso Total (modificable en Liquidación Fiscal, default 2.5%)
   const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
 
   // Utilidad Real (edson): Ingreso Total menos Retención ISR
@@ -647,7 +642,7 @@ export default function InvoicesModule({ userRole }) {
             ) : (
               filteredInvoices.map((inv) => {
                 const base = inv.baseNeta !== undefined ? inv.baseNeta : (inv.subtotal - (inv.discount || 0));
-                const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * (currentIsrRate / 100))) : 0;
+                const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * 0.0125)) : 0;
                 const ingresoTotal = inv.total !== undefined ? inv.total : (base + inv.ivaTotal - isrRetained);
                 const isExpanded = expandedInvoiceId === inv.id;
 
@@ -779,7 +774,7 @@ export default function InvoicesModule({ userRole }) {
                 ) : (
                   filteredInvoices.map((inv) => {
                     const base = inv.baseNeta !== undefined ? inv.baseNeta : (inv.subtotal - (inv.discount || 0));
-                    const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * (currentIsrRate / 100))) : 0;
+                    const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * 0.0125)) : 0;
                     const ingresoTotal = inv.total !== undefined ? inv.total : (base + inv.ivaTotal - isrRetained);
                     const isMixed = inv.isMixedTax || (inv.subtotal8 > 0 && inv.subtotal16 > 0);
 
@@ -1537,20 +1532,9 @@ export default function InvoicesModule({ userRole }) {
                   {formData.appliesIsr && (
                     <div className="form-group" style={{ marginTop: '0.75rem' }}>
                       <label className="form-label">Tasa de Retención ISR:</label>
-                      <select
-                        className="form-control"
-                        value={formData.isrRate}
-                        onChange={(e) => setFormData({ ...formData, isrRate: parseFloat(e.target.value) })}
-                      >
-                        <option value={1.0}>1.0%</option>
-                        <option value={1.10}>1.10%</option>
-                        <option value={1.25}>1.25% (Default RESICO)</option>
-                        <option value={1.50}>1.50%</option>
-                        <option value={2.00}>2.0%</option>
-                        <option value={2.50}>2.5%</option>
-                      </select>
-                      <div style={{ fontSize: '0.82rem', color: '#047857', marginTop: '0.4rem', fontWeight: '700' }}>
-                        Monto Retención ISR (sobre base neta): ${currentIsrAmount.toFixed(2)}
+                      <div style={{ background: '#ffffff', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: '800', color: '#047857', fontSize: '0.88rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>1.25% (Fijo Facturas)</span>
+                        <span style={{ fontSize: '0.82rem', color: '#b45309' }}>-${currentIsrAmount.toFixed(2)}</span>
                       </div>
                     </div>
                   )}

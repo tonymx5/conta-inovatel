@@ -320,7 +320,7 @@ export const storageService = {
       }
 
       if (taxRes.data) {
-        setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 1.25 });
+        setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 2.5 });
       }
 
       notifyDataSynced();
@@ -441,7 +441,7 @@ export const storageService = {
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             if (payload.new && payload.new.isr_estimated_rate) {
-              setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(payload.new.isr_estimated_rate) || 1.25 });
+              setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(payload.new.isr_estimated_rate) || 2.5 });
               notifyDataSynced();
             }
           }
@@ -471,7 +471,7 @@ export const storageService = {
   },
 
   // Config
-  getTaxConfig: () => getStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: 1.25 }),
+  getTaxConfig: () => getStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: 2.5 }),
   saveTaxConfig: (config) => {
     setStorageItem(STORAGE_KEYS.TAX_CONFIG, config);
     Promise.resolve(supabase.from('tax_config').upsert({
