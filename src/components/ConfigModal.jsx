@@ -40,7 +40,7 @@ export default function ConfigModal({ isOpen, onClose, userRole }) {
 
     const updated = storageService.saveBankAccount(accountToSave);
     setBankAccounts(updated);
-    storageService.logAudit(userRole === 'admin' ? 'ADMIN' : 'USUARIO', editingCardId ? 'EDITAR_TARJETA_CONFIG' : 'CREAR_TARJETA_CONFIG', `${accountToSave.bankName} (${accountToSave.type} - ${accountToSave.accountNumber})`);
+    storageService.logAudit(userRole === 'admin' ? 'ADMIN' : 'KARLA', editingCardId ? 'EDITAR_TARJETA_CONFIG' : 'CREAR_TARJETA_CONFIG', `${accountToSave.bankName} (${accountToSave.type} - ${accountToSave.accountNumber})`);
     
     resetForm();
   };
@@ -60,7 +60,7 @@ export default function ConfigModal({ isOpen, onClose, userRole }) {
     if (window.confirm(`¿Estás seguro de eliminar la tarjeta "${name}"?`)) {
       const updated = storageService.deleteBankAccount(id);
       setBankAccounts(updated);
-      storageService.logAudit(userRole === 'admin' ? 'ADMIN' : 'USUARIO', 'ELIMINAR_TARJETA_CONFIG', `Tarjeta ${name} (ID ${id})`);
+      storageService.logAudit(userRole === 'admin' ? 'ADMIN' : 'KARLA', 'ELIMINAR_TARJETA_CONFIG', `Tarjeta ${name} (ID ${id})`);
     }
   };
 

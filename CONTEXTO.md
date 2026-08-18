@@ -13,7 +13,7 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 | Perfil | Rol / Permisos | Tarjeta 3 (Depósitos) | Métricas & Analíticas / Inversiones |
 | :--- | :--- | :--- | :--- |
-| **Usuario / Operador** | Captura operativa diaria. PIN: `2020` | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran las métricas ejecutivas. |
+| **Karla / Operador** | Captura operativa diaria. PIN: `2020` | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran las métricas ejecutivas. |
 | **Edson / Administrador** | Control financiero total. PIN: `0808` | Pregunta interactiva: *"¿Depósito para compra equipo/servicio?"*. Deduce el monto de compra y calcula el **Remanente Real en Cuenta**. | **Vinculado 100%**. Solo los remanentes de Edson alimentan los gráficos y recomendaciones del Bot IA. |
 
 ---
@@ -23,7 +23,7 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 1. `invoices` (Facturas Emitidas): Folios normalizados FK-, impuestos 8%/16%, retención ISR 1.25%, descuentos y estatus.
 2. `clients` (Clientes): Catálogo con RFC, contacto y configuración de retención ISR.
 3. `deductibles` (Facturas Proveedores / SYSCOM): Deducibles autorizados con desglose de IVA acreditable.
-4. `account_deposits` (Depósitos Bancarios): Incluye `profile` ('edson'|'usuario'), `applies_equipment_expense`, `equipment_expense`, `equipment_provider`, `real_utility`.
+4. `account_deposits` (Depósitos Bancarios): Incluye `profile` ('edson'|'karla'), `applies_equipment_expense`, `equipment_expense`, `equipment_provider`, `real_utility`.
 5. `tax_config` (Configuración Fiscal): Tasa ISR estimada (1.25%).
 6. `audit_logs` (Bitácora de Eventos): Registro inmutable de acciones administrativas.
 7. `card_expenses` (Gastos por Tarjeta): Estados de cuenta de tarjetas Banregio / Nu sincronizados en tiempo real.

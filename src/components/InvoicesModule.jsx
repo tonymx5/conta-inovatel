@@ -349,7 +349,7 @@ export default function InvoicesModule({ userRole }) {
       uuid: formData.uuid || undefined
     };
 
-    const updated = storageService.saveInvoice(invoiceToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+    const updated = storageService.saveInvoice(invoiceToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setInvoices(updated);
     setShowModal(false);
     resetForm();
@@ -382,7 +382,7 @@ export default function InvoicesModule({ userRole }) {
 
   const handleDelete = (id) => {
     if (window.confirm('¿Estás seguro de eliminar esta factura?')) {
-      const updated = storageService.deleteInvoice(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+      const updated = storageService.deleteInvoice(id, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
       setInvoices(updated);
     }
   };
@@ -390,7 +390,7 @@ export default function InvoicesModule({ userRole }) {
   const handleToggleStatus = (inv) => {
     const newStatus = inv.status === 'PENDIENTE' ? 'PAGADA' : 'PENDIENTE';
     const updatedInvoice = { ...inv, status: newStatus };
-    const updated = storageService.saveInvoice(updatedInvoice, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+    const updated = storageService.saveInvoice(updatedInvoice, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setInvoices(updated);
   };
 
@@ -476,7 +476,7 @@ export default function InvoicesModule({ userRole }) {
       .filter((d) => {
         // Segregación estricta por perfil
         const isEdsonDeposit = d.profile === 'edson';
-        const isUserDeposit = d.profile === 'usuario' || !d.profile;
+        const isUserDeposit = d.profile === 'karla' || d.profile === 'usuario' || !d.profile;
 
         if (userRole === 'admin') {
           if (!isEdsonDeposit) return false;
@@ -543,7 +543,7 @@ export default function InvoicesModule({ userRole }) {
       amount,
       date: otherExpenseFormData.date
     };
-    const updated = storageService.saveOtherExpense(expenseToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+    const updated = storageService.saveOtherExpense(expenseToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setOtherExpenses(updated);
     setShowOtherExpenseModal(false);
     resetOtherExpenseForm();
@@ -561,7 +561,7 @@ export default function InvoicesModule({ userRole }) {
 
   const handleDeleteOtherExpense = (id) => {
     if (window.confirm('¿Eliminar este registro de gasto?')) {
-      const updated = storageService.deleteOtherExpense(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+      const updated = storageService.deleteOtherExpense(id, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
       setOtherExpenses(updated);
     }
   };
@@ -575,7 +575,7 @@ export default function InvoicesModule({ userRole }) {
     const appliesEquipmentExpense = isEdson ? !!depositFormData.appliesEquipmentExpense : false;
     const equipmentExpense = (isEdson && appliesEquipmentExpense) ? (parseFloat(depositFormData.equipmentExpense) || 0) : 0;
     const realUtility = parseFloat((amount - equipmentExpense).toFixed(2));
-    const profile = isEdson ? 'edson' : 'usuario';
+    const profile = isEdson ? 'edson' : 'karla';
 
     const depositToSave = {
       id: editingDepositId || undefined,
@@ -591,7 +591,7 @@ export default function InvoicesModule({ userRole }) {
       profile
     };
 
-    const updated = await storageService.saveAccountDeposit(depositToSave, isEdson ? 'ADMIN' : 'OPERADOR (2020)');
+    const updated = await storageService.saveAccountDeposit(depositToSave, isEdson ? 'ADMIN' : 'KARLA (2020)');
     setDeposits(updated);
     setShowDepositModal(false);
     resetDepositForm();
@@ -624,7 +624,7 @@ export default function InvoicesModule({ userRole }) {
 
   const handleDeleteDeposit = async (id) => {
     if (window.confirm('¿Eliminar este registro de transferencia / depósito?')) {
-      const updated = await storageService.deleteAccountDeposit(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+      const updated = await storageService.deleteAccountDeposit(id, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
       setDeposits(updated);
     }
   };
@@ -1884,7 +1884,7 @@ export default function InvoicesModule({ userRole }) {
           <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
               <h3 style={{ fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Landmark size={20} color="#10b981" /> {editingDepositId ? 'Editar Depósito a Cuenta' : 'Registrar Depósito a Cuenta'} {userRole === 'admin' ? '(Perfil Edson)' : '(Perfil Usuario)'}
+                <Landmark size={20} color="#10b981" /> {editingDepositId ? 'Editar Depósito a Cuenta' : 'Registrar Depósito a Cuenta'} {userRole === 'admin' ? '(Perfil Edson)' : '(Perfil Karla)'}
               </h3>
               <button onClick={() => setShowDepositModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}>✕</button>
             </div>

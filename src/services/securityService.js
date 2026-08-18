@@ -48,11 +48,11 @@ export const securityService = {
       return { success: true, role: 'admin' };
     }
 
-    // Operator / User Access
+    // Operator / Karla Access
     if (clean === PASSWORDS.OPERATOR) {
       localStorage.removeItem('admin_failed_attempts');
       localStorage.removeItem('admin_tried_passwords');
-      storageService.logAudit('USUARIO', 'LOGIN_PORTAL', 'Acceso Usuario concedido al portal');
+      storageService.logAudit('KARLA', 'LOGIN_PORTAL', 'Acceso Karla concedido al portal');
       return { success: true, role: 'operator' };
     }
 

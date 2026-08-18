@@ -250,10 +250,10 @@ function mapDepositFromSupabase(dp, localMap = new Map()) {
     realUtility = parseFloat((amount - (appliesEquipmentExpense ? equipmentExpense : 0)).toFixed(2));
   }
 
-  // Perfil de depósito: 'edson' o 'usuario' (por defecto resguarda como usuario)
+  // Perfil de depósito: 'edson' o 'karla' (por defecto resguarda como karla)
   let profile = dp.profile || (existingLocal?.profile);
-  if (!profile) {
-    profile = 'usuario';
+  if (!profile || profile === 'usuario') {
+    profile = 'karla';
   }
 
   return {
@@ -796,7 +796,7 @@ export const storageService = {
   saveAccountDeposit: (deposit, user = 'admin') => {
     const list = storageService.getAccountDeposits();
     const amount = parseFloat(deposit.amount) || 0;
-    const profile = deposit.profile || (user === 'admin' || user === 'ADMIN' ? 'edson' : 'usuario');
+    const profile = deposit.profile || (user === 'admin' || user === 'ADMIN' ? 'edson' : 'karla');
     const appliesEquipmentExpense = profile === 'edson' ? !!deposit.appliesEquipmentExpense : false;
     const equipmentExpense = (profile === 'edson' && appliesEquipmentExpense) ? (parseFloat(deposit.equipmentExpense) || 0) : 0;
     const realUtility = parseFloat((amount - equipmentExpense).toFixed(2));
@@ -1152,7 +1152,7 @@ export const storageService = {
           equipment_expense: dp.equipmentExpense || 0,
           equipment_provider: dp.equipmentProvider || '',
           real_utility: dp.realUtility !== undefined ? dp.realUtility : (dp.amount || 0),
-          profile: dp.profile || 'usuario'
+          profile: dp.profile || 'karla'
         }))).catch(e => console.error('Restore deposits error:', e));
       }
 

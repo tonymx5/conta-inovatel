@@ -188,7 +188,7 @@ export default function ProviderDeductionsModule({ userRole }) {
       scannedWithOcr: true
     };
 
-    const updated = await storageService.saveDeductible(itemToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+    const updated = await storageService.saveDeductible(itemToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA');
     setDeductibles(updated);
     setShowModal(false);
     resetForm();
@@ -196,7 +196,7 @@ export default function ProviderDeductionsModule({ userRole }) {
 
   const handleDelete = async (id) => {
     if (window.confirm('¿Eliminar esta factura de proveedor?')) {
-      const updated = await storageService.deleteDeductible(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+      const updated = await storageService.deleteDeductible(id, userRole === 'admin' ? 'ADMIN' : 'KARLA');
       setDeductibles(updated);
     }
   };

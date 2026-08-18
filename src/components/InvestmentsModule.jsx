@@ -112,7 +112,7 @@ export default function InvestmentsModule({ userRole }) {
       startDate: formData.startDate
     };
 
-    const updated = storageService.saveInvestment(itemToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+    const updated = storageService.saveInvestment(itemToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA');
     setInvestments(updated);
     setShowModal(false);
     resetForm();
@@ -132,7 +132,7 @@ export default function InvestmentsModule({ userRole }) {
 
   const handleDelete = (id) => {
     if (window.confirm('¿Eliminar este registro de inversión?')) {
-      const updated = storageService.deleteInvestment(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+      const updated = storageService.deleteInvestment(id, userRole === 'admin' ? 'ADMIN' : 'KARLA');
       setInvestments(updated);
     }
   };

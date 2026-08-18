@@ -58,7 +58,7 @@ export default function ExpensesModule({ userRole }) {
       sector: expenseForm.sector
     };
 
-    const updated = storageService.saveCardExpense(expenseToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+    const updated = storageService.saveCardExpense(expenseToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA');
     setExpenses(updated);
     setShowExpenseModal(false);
     resetExpenseForm();
@@ -100,7 +100,7 @@ export default function ExpensesModule({ userRole }) {
 
   const handleDeleteExpense = (id) => {
     if (window.confirm('¿Eliminar este gasto de tarjeta?')) {
-      const updated = storageService.deleteCardExpense(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+      const updated = storageService.deleteCardExpense(id, userRole === 'admin' ? 'ADMIN' : 'KARLA');
       setExpenses(updated);
     }
   };

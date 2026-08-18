@@ -79,7 +79,7 @@ export default function BackupModal({ isOpen, onClose, userRole = 'admin' }) {
     setImportStatus(null);
 
     try {
-      const res = await storageService.importFullBackup(filePreview.raw, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+      const res = await storageService.importFullBackup(filePreview.raw, userRole === 'admin' ? 'ADMIN' : 'KARLA');
       setIsImporting(false);
       if (res.success) {
         setImportStatus({ success: true, message: '¡Respaldo restaurado y sincronizado con éxito!' });

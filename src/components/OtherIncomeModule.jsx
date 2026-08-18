@@ -39,7 +39,7 @@ export default function OtherIncomeModule({ userRole }) {
       paymentMethod: formData.paymentMethod
     };
 
-    const updated = storageService.saveOtherIncome(itemToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+    const updated = storageService.saveOtherIncome(itemToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA');
     setItems(updated);
     setShowModal(false);
     resetForm();
@@ -58,7 +58,7 @@ export default function OtherIncomeModule({ userRole }) {
 
   const handleDelete = (id) => {
     if (window.confirm('¿Eliminar este registro de otro ingreso?')) {
-      const updated = storageService.deleteOtherIncome(id, userRole === 'admin' ? 'ADMIN' : 'OPERADOR');
+      const updated = storageService.deleteOtherIncome(id, userRole === 'admin' ? 'ADMIN' : 'KARLA');
       setItems(updated);
     }
   };

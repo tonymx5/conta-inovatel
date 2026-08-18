@@ -1,9 +1,9 @@
 // Suite de Pruebas de Segregación de Depósitos y Dinero Real para Métricas (Conta Inovatel)
 // Valida:
-// 1. Depósitos independientes por perfil (Edson vs Usuario).
+// 1. Depósitos independientes por perfil (Edson vs Karla / Usuario).
 // 2. Deducción de compra de equipo/servicio ($20,000 - $5,000 = $15,000 remanente real).
-// 3. Desvinculación de depósitos de usuario en Métricas & Analíticas e Inversiones.
-// 4. Resguardo e integridad de datos para el perfil usuario.
+// 3. Desvinculación de depósitos de Karla en Métricas & Analíticas e Inversiones.
+// 4. Resguardo e integridad de datos para el perfil Karla (y retrocompatibilidad con registros legacy).
 
 function assertEqual(actual, expected, testName) {
   const diff = Math.abs(actual - expected);
@@ -28,9 +28,9 @@ console.log('🧪 Iniciando Suite de Pruebas: Segregación de Depósitos & Diner
 
 // Mock Data
 const sampleDeposits = [
-  // 1. Depósito capturado por perfil Usuario (Cobro a cliente, no afecta métricas)
+  // 1. Depósito capturado por perfil Karla (Cobro a cliente, no afecta métricas ejecutivas de Edson)
   {
-    id: 'dep-user-1',
+    id: 'dep-karla-1',
     concept: 'Cobro Factura FK-101 Cliente Joint',
     amount: 10000.00,
     date: '2026-08-10',
@@ -40,7 +40,7 @@ const sampleDeposits = [
     equipmentExpense: 0,
     equipmentProvider: '',
     realUtility: 10000.00,
-    profile: 'usuario'
+    profile: 'karla'
   },
   // 2. Depósito capturado por perfil Edson con deducción de compra de equipo
   {
@@ -56,27 +56,28 @@ const sampleDeposits = [
     realUtility: 15000.00,
     profile: 'edson'
   },
-  // 3. Depósito legacy (sin perfil explícito pero sin deducción -> resguardado como usuario)
+  // 3. Depósito legacy (sin perfil explícito o registrado como usuario -> resguardado para Karla)
   {
     id: 'dep-legacy-user',
-    concept: 'Transferencia Operativa',
+    concept: 'Transferencia Operativa Legacy',
     amount: 4500.00,
     date: '2026-08-12',
     bankName: 'BBVA',
     reference: 'SPEI-11002',
     appliesEquipmentExpense: false,
     equipmentExpense: 0,
-    realUtility: 4500.00
+    realUtility: 4500.00,
+    profile: 'usuario'
   }
 ];
 
-// Test 1: Filtrado de Depósitos para Perfil Usuario
+// Test 1: Filtrado de Depósitos para Perfil Karla (incluyendo retrocompatibilidad)
 {
-  const userDeposits = sampleDeposits.filter(d => d.profile === 'usuario' || !d.profile);
-  assertEqual(userDeposits.length, 2, 'Total depósitos visibles para Usuario (2 depósitos)');
-  const totalUserAmount = userDeposits.reduce((sum, d) => sum + d.amount, 0);
-  assertEqual(totalUserAmount, 14500.00, 'Suma bruta de depósitos del Usuario ($14,500.00)');
-  assertTrue(!userDeposits.some(d => d.profile === 'edson'), 'Depósito de Edson NO es visible en perfil Usuario');
+  const karlaDeposits = sampleDeposits.filter(d => d.profile === 'karla' || d.profile === 'usuario' || !d.profile);
+  assertEqual(karlaDeposits.length, 2, 'Total depósitos visibles para Karla (2 depósitos)');
+  const totalKarlaAmount = karlaDeposits.reduce((sum, d) => sum + d.amount, 0);
+  assertEqual(totalKarlaAmount, 14500.00, 'Suma bruta de depósitos de Karla ($14,500.00)');
+  assertTrue(!karlaDeposits.some(d => d.profile === 'edson'), 'Depósito de Edson NO es visible en perfil Karla');
 }
 
 // Test 2: Filtrado de Depósitos y Remanente Real para Perfil Edson
@@ -92,10 +93,10 @@ const sampleDeposits = [
   assertEqual(bruto, 20000.00, 'Depósito Bruto de Edson ($20,000.00)');
   assertEqual(gastoEquipo, 5000.00, 'Gasto deducido en Compra de Equipo ($5,000.00)');
   assertEqual(remanenteReal, 15000.00, 'Remanente Real en Cuenta de Edson ($15,000.00)');
-  assertTrue(!edsonDeposits.some(d => d.profile === 'usuario'), 'Depósitos de Usuario NO aparecen en lista de Edson');
+  assertTrue(!edsonDeposits.some(d => d.profile === 'karla' || d.profile === 'usuario'), 'Depósitos de Karla NO aparecen en lista de Edson');
 }
 
-// Test 3: Consumo en Métricas & Analíticas (Desvinculación de Usuario)
+// Test 3: Consumo en Métricas & Analíticas (Desvinculación de Karla)
 {
   // Simular la lógica exacta de AnalyticsModule
   const edsonDepositsOnly = sampleDeposits.filter(d => d.profile === 'edson');
@@ -112,9 +113,9 @@ const sampleDeposits = [
   assertEqual(totalGastosEquiposMetricas, 5000.00, 'Métricas: Total compras equipo/servicios ($5,000.00)');
   assertEqual(totalUtilidadRealEnCuenta, 15000.00, 'Métricas: Utilidad Real en Cuenta Base ($15,000.00)');
 
-  // Verificar que el depósito de usuario ($10,000 + $4,500) fue 100% ignorado
+  // Verificar que el depósito de Karla ($10,000 + $4,500) fue 100% ignorado
   const leakedAmount = totalUtilidadRealEnCuenta - 15000.00;
-  assertEqual(leakedAmount, 0.00, 'Métricas: Cero fuga o contaminación de depósitos del Usuario');
+  assertEqual(leakedAmount, 0.00, 'Métricas: Cero fuga o contaminación de depósitos de Karla');
 }
 
 // Test 4: Consumo en Inversiones & Bot IA
