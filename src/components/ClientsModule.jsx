@@ -75,12 +75,9 @@ export default function ClientsModule() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-panel" style={{ padding: '1.35rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
             <Users color="#6366f1" size={26} /> Catálogo de Clientes
           </h2>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
-            Dar de alta RFCs de clientes y configurar qué clientes aplican para retención de ISR (1.25% RESICO)
-          </p>
         </div>
 
         <button className="btn-primary" onClick={() => { resetForm(); setShowModal(true); }}>

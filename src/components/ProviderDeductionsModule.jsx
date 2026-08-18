@@ -285,12 +285,9 @@ export default function ProviderDeductionsModule({ userRole }) {
       {/* Top Banner */}
       <div className="glass-panel" style={{ padding: '1.35rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
             <Receipt color="#06b6d4" size={26} /> Fact Prov
           </h2>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
-            Control de Facturas de Proveedores, Acreditamiento de IVA & OCR Inteligente
-          </p>
         </div>
 
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>

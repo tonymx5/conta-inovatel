@@ -130,19 +130,36 @@ export default function ExpensesModule({ userRole }) {
       {/* Top Banner */}
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: '700', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
             <CreditCard color="#fbbf24" size={24} /> Control de Gastos & Bancos (Tarjetas)
           </h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Alta de instituciones bancarias (Santander, NU, Banregio, Stori, BofA) y registro de egresos por tarjeta
-          </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-          <button className="btn-secondary" onClick={() => { resetBankForm(); setShowBankModal(true); }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button 
+            className="btn-primary" 
+            onClick={() => { resetBankForm(); setShowBankModal(true); }}
+            style={{ 
+              background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 14px rgba(99, 102, 241, 0.25)'
+            }}
+          >
             <Building size={16} /> Agregar Banco / Tarjeta
           </button>
-          <button className="btn-primary" onClick={() => { resetExpenseForm(); setShowExpenseModal(true); }} style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
+          <button 
+            className="btn-primary" 
+            onClick={() => { resetExpenseForm(); setShowExpenseModal(true); }} 
+            style={{ 
+              background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.25)'
+            }}
+          >
             <Plus size={18} /> Registrar Gasto
           </button>
         </div>

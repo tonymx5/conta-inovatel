@@ -79,12 +79,9 @@ export default function OtherIncomeModule({ userRole }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-panel" style={{ padding: '1.35rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <DollarSign color="#10b981" size={26} /> Otros Ingresos (No Facturados)
+          <h2 style={{ fontSize: '1.3rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
+            <DollarSign color="#10b981" size={26} /> Otros Ingresos
           </h2>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
-            Registro de entradas en efectivo, ventas directas y servicios sin requerir factura CFDI
-          </p>
         </div>
 
         <button className="btn-primary" onClick={() => { resetForm(); setShowModal(true); }}>
