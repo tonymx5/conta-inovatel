@@ -319,9 +319,11 @@ export const storageService = {
         }))).catch(e => console.error('Seed deductibles error:', e));
       }
 
-      // 4. Account Deposits (Direct Remote-First Sync)
+      // 4. Account Deposits (Direct Remote-First Sync with Local Metadata)
+      const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, []);
+      const localMap = new Map(localDeps.map(d => [d.id, d]));
       if (depRes.data) {
-        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp));
+        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp, localMap));
         setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
       }
 
@@ -687,28 +689,38 @@ export const storageService = {
     if (idx >= 0) list[idx] = depToSave; else list.push(depToSave);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
-    // Persistir en Supabase
-    Promise.resolve(supabase.from('account_deposits').upsert({
-      id: depToSave.id,
-      concept: depToSave.concept,
-      amount: depToSave.amount,
-      date: depToSave.date,
-      bank_name: depToSave.bankName || 'Santander',
-      reference: depToSave.reference,
-      applies_equipment_expense: depToSave.appliesEquipmentExpense,
-      equipment_expense: depToSave.equipmentExpense,
-      equipment_provider: depToSave.equipmentProvider,
-      real_utility: depToSave.realUtility
-    })).catch(() => {
-      supabase.from('account_deposits').upsert({
-        id: depToSave.id,
-        concept: depToSave.concept,
-        amount: depToSave.amount,
-        date: depToSave.date,
-        bank_name: depToSave.bankName || 'Santander',
-        reference: depToSave.reference
-      }).catch(e => console.error('Supabase fallback error:', e));
-    });
+    // Persistir en Supabase de forma robusta con fallback automático
+    (async () => {
+      try {
+        const res = await supabase.from('account_deposits').upsert({
+          id: depToSave.id,
+          concept: depToSave.concept,
+          amount: depToSave.amount,
+          date: depToSave.date,
+          bank_name: depToSave.bankName || 'Santander',
+          reference: depToSave.reference,
+          applies_equipment_expense: depToSave.appliesEquipmentExpense,
+          equipment_expense: depToSave.equipmentExpense,
+          equipment_provider: depToSave.equipmentProvider,
+          real_utility: depToSave.realUtility
+        });
+        if (res?.error) {
+          const fallbackRes = await supabase.from('account_deposits').upsert({
+            id: depToSave.id,
+            concept: depToSave.concept,
+            amount: depToSave.amount,
+            date: depToSave.date,
+            bank_name: depToSave.bankName || 'Santander',
+            reference: depToSave.reference
+          });
+          if (fallbackRes?.error) {
+            console.error('Supabase deposit fallback error:', fallbackRes.error);
+          }
+        }
+      } catch (e) {
+        console.error('Supabase deposit save error:', e);
+      }
+    })();
 
     storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount}) | Utilidad Real: $${depToSave.realUtility}`);
     notifyDataSynced();
@@ -718,8 +730,13 @@ export const storageService = {
     const list = storageService.getAccountDeposits().filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
-    Promise.resolve(supabase.from('account_deposits').delete().eq('id', id))
-      .catch(err => console.error('Supabase Deposit Delete Error:', err));
+    (async () => {
+      try {
+        await supabase.from('account_deposits').delete().eq('id', id);
+      } catch (err) {
+        console.error('Supabase Deposit Delete Error:', err);
+      }
+    })();
 
     storageService.logAudit(user, 'ELIMINAR_DEPOSITO_CUENTA', `ID ${id}`);
     notifyDataSynced();
