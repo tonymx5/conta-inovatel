@@ -17,6 +17,21 @@ const STORAGE_KEYS = {
   SECURITY_INCIDENTS: 'conta_inovatel_security_incidents'
 };
 
+// Clean legacy mock deposits from client localStorage if present
+try {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    const rawLocal = localStorage.getItem(STORAGE_KEYS.ACCOUNT_DEPOSITS);
+    if (rawLocal) {
+      const parsed = JSON.parse(rawLocal);
+      if (Array.isArray(parsed) && parsed.some(d => d.id === 'dep-aug-alvarado' || d.id === 'dep1' || d.id === 'dep2' || d.id === 'dep-1')) {
+        localStorage.setItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, JSON.stringify([]));
+      }
+    }
+  }
+} catch {
+  // Ignore
+}
+
 const initialClients = [
   { id: 'c1', name: 'JOINT', rfc: 'JOI190822ABC', email: 'contacto@joint.mx', phone: '6641234567', sector: 'Tecnología', notes: 'Retención ISR 1.25% aplicada', appliesIsr: true, isrRate: 1.25 },
   { id: 'c2', name: 'MAJESTIC', rfc: 'MAJ200115DEF', email: 'finanzas@majestic.com', phone: '6642345678', sector: 'Servicios', notes: 'Retención ISR 1.25% aplicada', appliesIsr: true, isrRate: 1.25 },
@@ -51,11 +66,7 @@ const initialDeductibles = [
   { id: 'd2', providerName: 'Telmex', rfc: 'EME8903099C7', invoiceNo: 'PDF-8812', date: '2026-07-12', subtotal: 860.00, discount: 0, ivaTotal: 137.60, total: 997.60, category: 'Telecomunicaciones' }
 ];
 
-const initialAccountDeposits = [
-  { id: 'dep-aug-alvarado', concept: 'Deposito Alvarado 665', amount: 32180.05, date: '2026-08-04', bankName: 'Santander', reference: 'SPEI-99201', appliesEquipmentExpense: true, equipmentExpense: 21952.17, equipmentProvider: 'SYSCOM', realUtility: 10227.88 },
-  { id: 'dep1', concept: 'Transferencia Cobro Factura FK-101 (JOINT)', amount: 7479.41, date: '2026-07-02', bankName: 'Santander', reference: 'SPEI-88192', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 7479.41 },
-  { id: 'dep2', concept: 'Transferencia Cobro Factura FK-106 (ALVARADOS)', amount: 4270.00, date: '2026-07-12', bankName: 'Santander', reference: 'SPEI-44910', appliesEquipmentExpense: false, equipmentExpense: 0, equipmentProvider: '', realUtility: 4270.00 }
-];
+const initialAccountDeposits = [];
 
 const initialCardExpenses = [
   { id: 'exp-aug-1', date: '2026-08-17', description: 'Consumos y Alimentos', amount: 462.00, bankId: 'b5', bankName: 'Banregio (Crédito)', sector: 'Comida' },
@@ -308,25 +319,10 @@ export const storageService = {
         }))).catch(e => console.error('Seed deductibles error:', e));
       }
 
-      // 4. Account Deposits (Non-Destructive Dual Sync)
-      const localDeps = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
-      const localMap = new Map(localDeps.map(d => [d.id, d]));
-
-      if (depRes.data && depRes.data.length > 0) {
-        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp, localMap));
-        // Non-destructive merge: preserve local deposits if missing in remote
-        localDeps.forEach(ld => {
-          if (!mappedDeps.some(md => md.id === ld.id)) {
-            mappedDeps.push(ld);
-          }
-        });
+      // 4. Account Deposits (Direct Remote-First Sync)
+      if (depRes.data) {
+        const mappedDeps = depRes.data.map(dp => mapDepositFromSupabase(dp));
         setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mappedDeps);
-      } else if (localDeps && localDeps.length > 0) {
-        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, localDeps);
-        Promise.all(localDeps.map(dp => supabase.from('account_deposits').upsert({
-          id: dp.id, concept: dp.concept, amount: dp.amount, date: dp.date, bank_name: dp.bankName || 'Santander',
-          reference: dp.reference
-        }))).catch(e => console.error('Seed account_deposits error:', e));
       }
 
       if (taxRes.data) {
@@ -668,18 +664,9 @@ export const storageService = {
     return list;
   },
 
-  // Account Deposits (Depósitos a Cuenta / Transferencias - Non-Destructive Dual Sync)
-  getAccountDeposits: () => {
-    const list = getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits);
-    // Self-healing: Ensure restored initial deposits are always present
-    const map = new Map();
-    initialAccountDeposits.forEach(d => map.set(d.id, d));
-    (list || []).forEach(d => map.set(d.id, d));
-    const mergedList = Array.from(map.values());
-    setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, mergedList);
-    return mergedList;
-  },
-  saveAccountDeposit: async (deposit, user = 'admin') => {
+  // Account Deposits (Depósitos a Cuenta / Transferencias)
+  getAccountDeposits: () => getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits),
+  saveAccountDeposit: (deposit, user = 'admin') => {
     const list = storageService.getAccountDeposits();
     const amount = parseFloat(deposit.amount) || 0;
     const appliesEquipmentExpense = !!deposit.appliesEquipmentExpense;
@@ -701,47 +688,38 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
     // Persistir en Supabase
-    try {
-      const { error } = await supabase.from('account_deposits').upsert({
+    Promise.resolve(supabase.from('account_deposits').upsert({
+      id: depToSave.id,
+      concept: depToSave.concept,
+      amount: depToSave.amount,
+      date: depToSave.date,
+      bank_name: depToSave.bankName || 'Santander',
+      reference: depToSave.reference,
+      applies_equipment_expense: depToSave.appliesEquipmentExpense,
+      equipment_expense: depToSave.equipmentExpense,
+      equipment_provider: depToSave.equipmentProvider,
+      real_utility: depToSave.realUtility
+    })).catch(() => {
+      supabase.from('account_deposits').upsert({
         id: depToSave.id,
         concept: depToSave.concept,
         amount: depToSave.amount,
         date: depToSave.date,
         bank_name: depToSave.bankName || 'Santander',
-        reference: depToSave.reference,
-        applies_equipment_expense: depToSave.appliesEquipmentExpense,
-        equipment_expense: depToSave.equipmentExpense,
-        equipment_provider: depToSave.equipmentProvider,
-        real_utility: depToSave.realUtility
-      });
-      if (error) {
-        await supabase.from('account_deposits').upsert({
-          id: depToSave.id,
-          concept: depToSave.concept,
-          amount: depToSave.amount,
-          date: depToSave.date,
-          bank_name: depToSave.bankName || 'Santander',
-          reference: depToSave.reference
-        });
-      }
-    } catch (err) {
-      console.error('Supabase Deposit Save Exception:', err);
-    }
+        reference: depToSave.reference
+      }).catch(e => console.error('Supabase fallback error:', e));
+    });
 
     storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount}) | Utilidad Real: $${depToSave.realUtility}`);
     notifyDataSynced();
     return list;
   },
-  deleteAccountDeposit: async (id, user = 'admin') => {
+  deleteAccountDeposit: (id, user = 'admin') => {
     const list = storageService.getAccountDeposits().filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
-    try {
-      const { error } = await supabase.from('account_deposits').delete().eq('id', id);
-      if (error) console.error('Supabase Deposit Delete Error:', error);
-    } catch (err) {
-      console.error('Supabase Deposit Delete Exception:', err);
-    }
+    Promise.resolve(supabase.from('account_deposits').delete().eq('id', id))
+      .catch(err => console.error('Supabase Deposit Delete Error:', err));
 
     storageService.logAudit(user, 'ELIMINAR_DEPOSITO_CUENTA', `ID ${id}`);
     notifyDataSynced();

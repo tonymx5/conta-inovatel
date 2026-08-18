@@ -147,8 +147,3 @@ INSERT INTO public.deductibles (id, provider_name, rfc, invoice_no, date, subtot
 ('ded-1', 'Telmex / Infinitum', 'TEL840315-123', 'F-88912', '2026-07-04', 1200.00, 0, 192.00, 1392.00, 'Telecomunicaciones'),
 ('ded-2', 'CFE Suministrador de Servicios Básicos', 'CFE370814-456', 'CFE-00923', '2026-07-15', 910.00, 0, 145.60, 1055.60, 'Servicios Básicos')
 ON CONFLICT (id) DO NOTHING;
-
--- Depósitos a Cuenta Iniciales
-INSERT INTO public.account_deposits (id, concept, amount, date, bank_name, reference, applies_equipment_expense, equipment_expense, equipment_provider, real_utility) VALUES
-('dep-1', 'Transferencia Cobro Factura FK-665 (ALVARADOS)', 36224.54, '2026-08-05', 'Santander', 'SPEI-99201', true, 21952.94, 'SYSCOM (Equipos)', 14271.60)
-ON CONFLICT (id) DO NOTHING;
