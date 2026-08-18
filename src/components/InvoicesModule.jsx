@@ -485,7 +485,6 @@ export default function InvoicesModule({ userRole }) {
   // Excel Summary Totals Math calculated on the filtered month view
   const currentIsrRate = taxConfig.isrEstimatedRate || 1.25;
   const totalIngresoTotal = filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.subtotal) || 0), 0);
-  const totalSubtotalesVentas = totalIngresoTotal;
   const totalIvaTrasladado = filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
   
   // Retención ISR calculada con base al Ingreso Total
@@ -612,9 +611,9 @@ export default function InvoicesModule({ userRole }) {
           {/* Quick Metrics Bar on top of table */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
             <div>
-              <span style={{ color: '#64748b' }}>Subtotal Base: </span>
+              <span style={{ color: '#64748b' }}>Ingreso Total: </span>
               <strong style={{ color: '#334155', fontWeight: '800' }}>
-                ${totalSubtotalesVentas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${totalIngresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
             <div>
@@ -624,9 +623,15 @@ export default function InvoicesModule({ userRole }) {
               </strong>
             </div>
             <div>
-              <span style={{ color: '#64748b' }}>Total Cobrado: </span>
-              <strong style={{ color: '#047857', fontWeight: '800' }}>
-                ${totalIngresosCobrados.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              <span style={{ color: '#64748b' }}>Retención ISR: </span>
+              <strong style={{ color: '#b45309', fontWeight: '800' }}>
+                -${totalRetencionIsr.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b' }}>Utilidad Real: </span>
+              <strong style={{ color: '#15803d', fontWeight: '800' }}>
+                ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
           </div>
