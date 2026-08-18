@@ -129,6 +129,8 @@ export default function App() {
       role: 'admin',
       lastActivity: Date.now()
     }));
+    // Sincronización inmediata al desbloquear perfil
+    storageService.syncFromSupabase();
     if (pendingTabAfterUnlock) {
       setActiveTab(pendingTabAfterUnlock);
       setPendingTabAfterUnlock(null);
@@ -142,6 +144,8 @@ export default function App() {
       role,
       lastActivity: Date.now()
     }));
+    // Sincronización inmediata con Supabase para actualizar datos en vivo sin F5
+    storageService.syncFromSupabase();
   };
 
   const handleLockSession = () => {

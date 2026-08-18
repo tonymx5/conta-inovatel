@@ -675,14 +675,11 @@ export default function InvoicesModule({ userRole }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Top Banner */}
-      <div className="glass-panel" style={{ padding: '1.35rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="glass-panel" style={{ padding: '1.25rem 1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
-          <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.6rem', margin: 0 }}>
             <FileText color="#10b981" size={26} /> Facturas
           </h2>
-          <p style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '500' }}>
-            Cálculo exacto de Subtotal, Descuentos, Base Gravable, IVA (8%/16%), Retención ISR (1.25%) e Ingreso Total
-          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -707,7 +704,17 @@ export default function InvoicesModule({ userRole }) {
               style={{ display: 'none' }} 
             />
           </label>
-          <button className="btn-secondary" onClick={() => { resetForm(); setShowModal(true); }}>
+          <button 
+            className="btn-primary" 
+            onClick={() => { resetForm(); setShowModal(true); }}
+            style={{
+              background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              boxShadow: '0 4px 14px rgba(37, 99, 235, 0.25)'
+            }}
+          >
             <Plus size={18} /> Nueva Factura
           </button>
         </div>
@@ -1421,7 +1428,7 @@ export default function InvoicesModule({ userRole }) {
               alignItems: 'center'
             }}>
               <strong style={{ fontSize: '0.88rem', color: porDepositar > 0 ? '#b45309' : '#166534', fontWeight: '800' }}>
-                {porDepositar > 0 ? '⚠️ Por de depositar:' : '✓ Por de depositar:'}
+                {porDepositar > 0 ? '⚠️ Por depositar:' : '✓ Por depositar:'}
               </strong>
               <strong style={{ fontSize: '1.25rem', color: porDepositar > 0 ? '#b45309' : '#15803d', fontWeight: '900' }}>
                 ${porDepositar.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
