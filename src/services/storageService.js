@@ -117,24 +117,33 @@ function setSyncStatus(status) {
 
 function mapInvoiceFromSupabase(i, localMap = new Map()) {
   const local = localMap.get(i.id);
+  const subtotal = parseFloat(i.subtotal) || 0;
+  const discount = parseFloat(i.discount) || 0;
+  const baseNeta = parseFloat(i.base_neta) || Math.max(0, subtotal - discount);
+  const ivaTotal = parseFloat(i.iva_total) || 0;
+  const appliesIsr = i.applies_isr !== undefined && i.applies_isr !== null ? !!i.applies_isr : (local?.appliesIsr !== undefined ? !!local.appliesIsr : true);
+  const isrRate = 1.25;
+  const isrRetained = appliesIsr ? parseFloat((baseNeta * 0.0125).toFixed(2)) : 0;
+  const total = parseFloat((baseNeta + ivaTotal - isrRetained).toFixed(2));
+
   return {
-    id: i.id,
+    id: i.id || local?.id || 'inv-' + Date.now(),
     folio: formatFolio(i.folio || local?.folio),
     clientName: i.client_name || i.clientName || local?.clientName || '',
     rfc: i.rfc || local?.rfc || '',
     date: i.date || local?.date || '',
     isMixedTax: i.is_mixed_tax !== undefined && i.is_mixed_tax !== null ? !!i.is_mixed_tax : (local?.isMixedTax || false),
-    subtotal: parseFloat(i.subtotal) || 0,
-    discount: parseFloat(i.discount) || 0,
+    subtotal,
+    discount,
     subtotal8: parseFloat(i.subtotal8) || 0,
     subtotal16: parseFloat(i.subtotal16) || 0,
     ivaRate: parseFloat(i.iva_rate) || 8,
-    ivaTotal: parseFloat(i.iva_total) || 0,
-    appliesIsr: i.applies_isr !== undefined && i.applies_isr !== null ? !!i.applies_isr : (local?.appliesIsr !== undefined ? !!local.appliesIsr : true),
-    isrRate: i.isr_rate !== undefined && i.isr_rate !== null ? (parseFloat(i.isr_rate) || 1.25) : (local?.isrRate || 1.25),
-    isrRetained: parseFloat(i.isr_retained) || 0,
-    baseNeta: parseFloat(i.base_neta) || 0,
-    total: parseFloat(i.total) || 0,
+    ivaTotal,
+    appliesIsr,
+    isrRate,
+    isrRetained,
+    baseNeta,
+    total,
     status: i.status || 'PAGADA'
   };
 }
@@ -550,7 +559,23 @@ export const storageService = {
   // Invoices
   getInvoices: () => {
     const list = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
-    return list.map(inv => ({ ...inv, folio: formatFolio(inv.folio) }));
+    return list.map(inv => {
+      const subtotal = parseFloat(inv.subtotal) || 0;
+      const discount = parseFloat(inv.discount) || 0;
+      const baseNeta = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : Math.max(0, subtotal - discount);
+      const ivaTotal = parseFloat(inv.ivaTotal) || 0;
+      const appliesIsr = inv.appliesIsr !== false;
+      const isrRetained = appliesIsr ? parseFloat((baseNeta * 0.0125).toFixed(2)) : 0;
+      const total = parseFloat((baseNeta + ivaTotal - isrRetained).toFixed(2));
+      return {
+        ...inv,
+        folio: formatFolio(inv.folio),
+        baseNeta,
+        isrRate: 1.25,
+        isrRetained,
+        total
+      };
+    });
   },
   saveInvoice: (invoice, user = 'admin') => {
     const invoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);

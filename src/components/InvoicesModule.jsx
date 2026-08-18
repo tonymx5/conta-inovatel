@@ -473,10 +473,10 @@ export default function InvoicesModule({ userRole }) {
   
   // Total Ingreso Total: suma exacta de Ingreso Total de todas las facturas capturadas
   const totalIngresoTotal = filteredInvoices.reduce((sum, inv) => {
-    const base = inv.baseNeta !== undefined ? inv.baseNeta : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-    const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * 0.0125)) : 0;
+    const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+    const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
     const ivaTot = parseFloat(inv.ivaTotal) || 0;
-    const ingTot = inv.total !== undefined ? inv.total : (base + ivaTot - isrRet);
+    const ingTot = parseFloat((base + ivaTot - isrRet).toFixed(2));
     return sum + ingTot;
   }, 0);
 
@@ -641,9 +641,9 @@ export default function InvoicesModule({ userRole }) {
               </div>
             ) : (
               filteredInvoices.map((inv) => {
-                const base = inv.baseNeta !== undefined ? inv.baseNeta : (inv.subtotal - (inv.discount || 0));
-                const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * 0.0125)) : 0;
-                const ingresoTotal = inv.total !== undefined ? inv.total : (base + inv.ivaTotal - isrRetained);
+                const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+                const isrRetained = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
+                const ingresoTotal = parseFloat((base + (parseFloat(inv.ivaTotal) || 0) - isrRetained).toFixed(2));
                 const isExpanded = expandedInvoiceId === inv.id;
 
                 return (
@@ -773,9 +773,9 @@ export default function InvoicesModule({ userRole }) {
                   </tr>
                 ) : (
                   filteredInvoices.map((inv) => {
-                    const base = inv.baseNeta !== undefined ? inv.baseNeta : (inv.subtotal - (inv.discount || 0));
-                    const isrRetained = inv.appliesIsr ? (inv.isrRetained !== undefined ? inv.isrRetained : (base * 0.0125)) : 0;
-                    const ingresoTotal = inv.total !== undefined ? inv.total : (base + inv.ivaTotal - isrRetained);
+                    const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+                    const isrRetained = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
+                    const ingresoTotal = parseFloat((base + (parseFloat(inv.ivaTotal) || 0) - isrRetained).toFixed(2));
                     const isMixed = inv.isMixedTax || (inv.subtotal8 > 0 && inv.subtotal16 > 0);
 
                     return (
