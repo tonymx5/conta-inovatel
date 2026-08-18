@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node scripts/test-tax-calculations.js",
+    "test": "node scripts/test-tax-calculations.js && node scripts/test-deposit-segregation.js",
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",

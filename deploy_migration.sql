@@ -79,6 +79,7 @@ ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS applies_equipment_e
 ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS equipment_expense NUMERIC(15,2) DEFAULT 0;
 ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS equipment_provider TEXT;
 ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS real_utility NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS profile TEXT DEFAULT 'usuario';
 
 -- 5. TABLA: CONFIGURACIÓN FISCAL (tax_config)
 CREATE TABLE IF NOT EXISTS public.tax_config (

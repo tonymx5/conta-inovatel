@@ -73,8 +73,11 @@ CREATE TABLE IF NOT EXISTS public.account_deposits (
     equipment_expense NUMERIC(15,2) DEFAULT 0,
     equipment_provider TEXT,
     real_utility NUMERIC(15,2) DEFAULT 0,
+    profile TEXT DEFAULT 'usuario',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.account_deposits ADD COLUMN IF NOT EXISTS profile TEXT DEFAULT 'usuario';
 
 -- 5. TABLA: CONFIGURACIÓN FISCAL (tax_config)
 CREATE TABLE IF NOT EXISTS public.tax_config (

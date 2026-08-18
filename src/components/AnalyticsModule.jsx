@@ -86,7 +86,7 @@ export default function AnalyticsModule() {
     addDateYears(invoices);
     addDateYears(cardExpenses);
     addDateYears(otherIncome);
-    addDateYears(deposits);
+    addDateYears(deposits.filter(d => d.profile === 'edson'));
 
     return Array.from(yearsSet).sort((a, b) => b.localeCompare(a));
   }, [invoices, cardExpenses, otherIncome, deposits, currentYearStr]);
@@ -109,18 +109,19 @@ export default function AnalyticsModule() {
     });
   }, [filterType, selectedYear, selectedMonth]);
 
-  // Filtered Datasets
+  // Filtered Datasets (Depósitos vinculados EXCLUSIVAMENTE al perfil Edson)
+  const edsonDeposits = useMemo(() => deposits.filter(d => d.profile === 'edson'), [deposits]);
   const filteredInvoices = useMemo(() => filterByPeriod(invoices), [invoices, filterByPeriod]);
   const filteredCardExpenses = useMemo(() => filterByPeriod(cardExpenses), [cardExpenses, filterByPeriod]);
   const filteredOtherIncome = useMemo(() => filterByPeriod(otherIncome), [otherIncome, filterByPeriod]);
-  const filteredDeposits = useMemo(() => filterByPeriod(deposits), [deposits, filterByPeriod]);
+  const filteredDeposits = useMemo(() => filterByPeriod(edsonDeposits), [edsonDeposits, filterByPeriod]);
 
   // Calculations on Filtered Data
   const totalIngresoFacturado = filteredInvoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
   const totalOtroIngreso = filteredOtherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresoGlobal = totalIngresoFacturado + totalOtroIngreso;
 
-  // Depósitos y Utilidad Real en Banco
+  // Depósitos y Utilidad Real en Banco (Exclusivo Edson / Dinero Real)
   const totalDepositos = filteredDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
   const totalGastosEquipos = filteredDeposits.reduce((sum, d) => sum + (d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0), 0);
   const totalUtilidadRealEnCuenta = filteredDeposits.reduce((sum, d) => {

@@ -470,10 +470,20 @@ export default function InvoicesModule({ userRole }) {
       });
   }, [deductibles, selectedMonth, selectedYear]);
 
-  // Filter and sort account deposits (Most recent date at the top)
+  // Filter and sort account deposits by active profile and date (Most recent date at the top)
   const filteredDeposits = useMemo(() => {
     return deposits
       .filter((d) => {
+        // Segregación estricta por perfil
+        const isEdsonDeposit = d.profile === 'edson';
+        const isUserDeposit = d.profile === 'usuario' || !d.profile;
+
+        if (userRole === 'admin') {
+          if (!isEdsonDeposit) return false;
+        } else {
+          if (!isUserDeposit) return false;
+        }
+
         if (!d.date) return selectedMonth === 'ALL';
         const [year, month] = d.date.split('-');
         
@@ -490,7 +500,7 @@ export default function InvoicesModule({ userRole }) {
         }
         return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
       });
-  }, [deposits, selectedMonth, selectedYear]);
+  }, [deposits, selectedMonth, selectedYear, userRole]);
 
   // Filter and sort other expenses (Most recent date at the top)
   const filteredOtherExpenses = useMemo(() => {
@@ -561,9 +571,11 @@ export default function InvoicesModule({ userRole }) {
   const handleDepositSubmit = async (e) => {
     e.preventDefault();
     const amount = parseFloat(depositFormData.amount) || 0;
-    const appliesEquipmentExpense = !!depositFormData.appliesEquipmentExpense;
-    const equipmentExpense = appliesEquipmentExpense ? (parseFloat(depositFormData.equipmentExpense) || 0) : 0;
+    const isEdson = userRole === 'admin';
+    const appliesEquipmentExpense = isEdson ? !!depositFormData.appliesEquipmentExpense : false;
+    const equipmentExpense = (isEdson && appliesEquipmentExpense) ? (parseFloat(depositFormData.equipmentExpense) || 0) : 0;
     const realUtility = parseFloat((amount - equipmentExpense).toFixed(2));
+    const profile = isEdson ? 'edson' : 'usuario';
 
     const depositToSave = {
       id: editingDepositId || undefined,
@@ -574,11 +586,12 @@ export default function InvoicesModule({ userRole }) {
       reference: depositFormData.reference.trim() || 'SPEI-' + Math.floor(10000 + Math.random() * 90000),
       appliesEquipmentExpense,
       equipmentExpense,
-      equipmentProvider: (depositFormData.equipmentProvider || '').trim(),
-      realUtility
+      equipmentProvider: isEdson ? (depositFormData.equipmentProvider || '').trim() : '',
+      realUtility,
+      profile
     };
 
-    const updated = await storageService.saveAccountDeposit(depositToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
+    const updated = await storageService.saveAccountDeposit(depositToSave, isEdson ? 'ADMIN' : 'OPERADOR (2020)');
     setDeposits(updated);
     setShowDepositModal(false);
     resetDepositForm();
@@ -1298,9 +1311,11 @@ export default function InvoicesModule({ userRole }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem', marginBottom: '0.75rem' }}>
               <div>
                 <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                  <Landmark size={17} color="#10b981" /> Depósito a Cuenta
+                  <Landmark size={17} color="#10b981" /> Depósito a Cuenta {userRole === 'admin' ? '(Edson)' : ''}
                 </h4>
-                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Transferencias Bancarias</span>
+                <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                  {userRole === 'admin' ? 'Transferencias Ejecutivas & Dinero Real' : 'Transferencias Bancarias'}
+                </span>
               </div>
               <button
                 onClick={() => { resetDepositForm(); setShowDepositModal(true); }}
@@ -1369,25 +1384,57 @@ export default function InvoicesModule({ userRole }) {
                         </div>
                       </div>
 
-                      {/* Monto del Depósito limpio para usuario */}
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        background: '#f8fafc',
-                        padding: '0.4rem 0.6rem',
-                        borderRadius: '6px',
-                        fontSize: '0.78rem',
-                        border: '1px solid #f1f5f9'
-                      }}>
-                        <span style={{ color: '#64748b', fontWeight: '600' }}>
-                          Monto Depositado:
-                        </span>
+                      {/* Desglose de Monto según perfil */}
+                      {userRole === 'admin' && dep.appliesEquipmentExpense && (parseFloat(dep.equipmentExpense) || 0) > 0 ? (
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.25rem',
+                          background: '#f0fdf4',
+                          padding: '0.45rem 0.65rem',
+                          borderRadius: '6px',
+                          fontSize: '0.76rem',
+                          border: '1px solid #bbf7d0'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: '#64748b' }}>Depósito Bruto:</span>
+                            <span style={{ color: '#0f172a', fontWeight: '600' }}>
+                              ${depAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#0284c7' }}>
+                            <span>(-) Compra Equipo/Servicio {dep.equipmentProvider ? `(${dep.equipmentProvider})` : ''}:</span>
+                            <span style={{ fontWeight: '700' }}>
+                              -${(parseFloat(dep.equipmentExpense) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed #86efac', paddingTop: '0.2rem' }}>
+                            <strong style={{ color: '#166534', fontWeight: '800' }}>Dinero Real en Cuenta:</strong>
+                            <strong style={{ color: '#15803d', fontSize: '0.92rem', fontWeight: '900' }}>
+                              ${(dep.realUtility !== undefined ? dep.realUtility : (depAmount - (parseFloat(dep.equipmentExpense) || 0))).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            </strong>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          background: '#f8fafc',
+                          padding: '0.4rem 0.6rem',
+                          borderRadius: '6px',
+                          fontSize: '0.78rem',
+                          border: '1px solid #f1f5f9'
+                        }}>
+                          <span style={{ color: '#64748b', fontWeight: '600' }}>
+                            Monto Depositado:
+                          </span>
 
-                        <strong style={{ color: '#047857', fontSize: '0.9rem', fontWeight: '800' }}>
-                          ${depAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                        </strong>
-                      </div>
+                          <strong style={{ color: '#047857', fontSize: '0.9rem', fontWeight: '800' }}>
+                            ${depAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </strong>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1407,9 +1454,9 @@ export default function InvoicesModule({ userRole }) {
             border: '1.5px solid #86efac'
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#475569' }}>
-              <span>(+) Utilidad Real (edson):</span>
+              <span>{userRole === 'admin' ? '(+) Utilidad Real (edson):' : '(+) Total Facturas Cobradas:'}</span>
               <strong style={{ color: '#15803d', fontWeight: '800' }}>
-                ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${(userRole === 'admin' ? utilidadReal : totalIngresoTotal).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
               </strong>
             </div>
 
@@ -1840,7 +1887,7 @@ export default function InvoicesModule({ userRole }) {
           <div className="modal-content" style={{ maxWidth: '520px' }}>
             <div className="modal-header">
               <h3 style={{ fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Landmark size={20} color="#10b981" /> {editingDepositId ? 'Editar Depósito a Cuenta' : 'Registrar Depósito a Cuenta'}
+                <Landmark size={20} color="#10b981" /> {editingDepositId ? 'Editar Depósito a Cuenta' : 'Registrar Depósito a Cuenta'} {userRole === 'admin' ? '(Perfil Edson)' : '(Perfil Usuario)'}
               </h3>
               <button onClick={() => setShowDepositModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}>✕</button>
             </div>
@@ -1912,7 +1959,7 @@ export default function InvoicesModule({ userRole }) {
                   </div>
                 </div>
 
-                {/* Sección de Gastos para Compra de Equipos / Materiales (Solo visible para Admin) */}
+                {/* Sección de Gastos para Compra de Equipos / Servicios (Exclusivo para Edson / Admin) */}
                 {userRole === 'admin' && (
                   <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                     <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', userSelect: 'none' }}>
@@ -1924,10 +1971,10 @@ export default function InvoicesModule({ userRole }) {
                       />
                       <div>
                         <strong style={{ color: '#0f172a', fontSize: '0.86rem', display: 'block' }}>
-                          ¿Se utilizó parte de este depósito para compra de equipos / materiales?
+                          ¿Depósito para compra de equipo / servicio?
                         </strong>
                         <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                          Resta el costo pagado a proveedores para calcular tu Utilidad Real en cuenta
+                          Resta el costo pagado a proveedores para calcular tu dinero real en cuenta ($15,000 en métricas)
                         </span>
                       </div>
                     </label>
@@ -1937,7 +1984,7 @@ export default function InvoicesModule({ userRole }) {
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                           <div className="form-group">
                             <label className="form-label" style={{ fontWeight: '700', color: '#0284c7', fontSize: '0.8rem' }}>
-                              Monto para Compra de Equipos ($):
+                              Monto Compra Equipo / Servicio ($):
                             </label>
                             <input
                               type="number"
@@ -1953,7 +2000,7 @@ export default function InvoicesModule({ userRole }) {
 
                           <div className="form-group">
                             <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.8rem' }}>
-                              Proveedor / Detalle Equipos:
+                              Proveedor / Detalle:
                             </label>
                             <input
                               type="text"
@@ -1968,7 +2015,7 @@ export default function InvoicesModule({ userRole }) {
                         {/* Live preview banner */}
                         <div style={{ background: '#ecfdf5', border: '1px solid #86efac', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#166534' }}>
-                            Utilidad Real Estimada de este Depósito:
+                            Dinero Real en Cuenta (para Métricas):
                           </span>
                           <strong style={{ fontSize: '1.05rem', color: '#15803d', fontWeight: '800' }}>
                             ${Math.max(0, (parseFloat(depositFormData.amount) || 0) - (parseFloat(depositFormData.equipmentExpense) || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}

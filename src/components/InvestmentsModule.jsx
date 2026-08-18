@@ -52,8 +52,9 @@ export default function InvestmentsModule({ userRole }) {
   const totalOtroIngreso = otherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresos = totalIngresoFacturado + totalOtroIngreso;
 
-  // Utilidad Real en Cuenta Bancaria (Depósitos menos compra de equipos)
-  const totalUtilidadRealDepositos = deposits.reduce((sum, d) => {
+  // Utilidad Real en Cuenta Bancaria (Exclusivo Edson / Depósitos menos compra de equipos)
+  const edsonDeposits = deposits.filter(d => d.profile === 'edson');
+  const totalUtilidadRealDepositos = edsonDeposits.reduce((sum, d) => {
     const amt = parseFloat(d.amount) || 0;
     const eq = d.appliesEquipmentExpense ? (parseFloat(d.equipmentExpense) || 0) : 0;
     return sum + (d.realUtility !== undefined ? d.realUtility : (amt - eq));

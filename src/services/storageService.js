@@ -23,8 +23,17 @@ try {
     const rawLocal = localStorage.getItem(STORAGE_KEYS.ACCOUNT_DEPOSITS);
     if (rawLocal) {
       const parsed = JSON.parse(rawLocal);
-      if (Array.isArray(parsed) && parsed.some(d => d.id === 'dep-aug-alvarado' || d.id === 'dep1' || d.id === 'dep2' || d.id === 'dep-1')) {
-        localStorage.setItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, JSON.stringify([]));
+      if (Array.isArray(parsed)) {
+        // Filtrar y eliminar depósitos fantasmas o mocks de prueba para que Edson inicie 100% limpio
+        const cleaned = parsed.filter(d => {
+          if (!d) return false;
+          if (d.id === 'dep-aug-alvarado' || d.id === 'dep1' || d.id === 'dep2' || d.id === 'dep-1') return false;
+          if (d.id && (d.id.startsWith('mock-') || d.id.startsWith('test-'))) return false;
+          return true;
+        });
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, JSON.stringify(cleaned));
+        }
       }
     }
   }
@@ -241,6 +250,12 @@ function mapDepositFromSupabase(dp, localMap = new Map()) {
     realUtility = parseFloat((amount - (appliesEquipmentExpense ? equipmentExpense : 0)).toFixed(2));
   }
 
+  // Perfil de depósito: 'edson' o 'usuario' (por defecto resguarda como usuario)
+  let profile = dp.profile || (existingLocal?.profile);
+  if (!profile) {
+    profile = 'usuario';
+  }
+
   return {
     id: dp.id,
     concept: dp.concept || (existingLocal?.concept || ''),
@@ -251,7 +266,8 @@ function mapDepositFromSupabase(dp, localMap = new Map()) {
     appliesEquipmentExpense,
     equipmentExpense,
     equipmentProvider,
-    realUtility
+    realUtility,
+    profile
   };
 }
 
@@ -671,8 +687,9 @@ export const storageService = {
   saveAccountDeposit: (deposit, user = 'admin') => {
     const list = storageService.getAccountDeposits();
     const amount = parseFloat(deposit.amount) || 0;
-    const appliesEquipmentExpense = !!deposit.appliesEquipmentExpense;
-    const equipmentExpense = appliesEquipmentExpense ? (parseFloat(deposit.equipmentExpense) || 0) : 0;
+    const profile = deposit.profile || (user === 'admin' || user === 'ADMIN' ? 'edson' : 'usuario');
+    const appliesEquipmentExpense = profile === 'edson' ? !!deposit.appliesEquipmentExpense : false;
+    const equipmentExpense = (profile === 'edson' && appliesEquipmentExpense) ? (parseFloat(deposit.equipmentExpense) || 0) : 0;
     const realUtility = parseFloat((amount - equipmentExpense).toFixed(2));
 
     const depToSave = {
@@ -681,8 +698,9 @@ export const storageService = {
       amount,
       appliesEquipmentExpense,
       equipmentExpense,
-      equipmentProvider: (deposit.equipmentProvider || '').trim(),
-      realUtility
+      equipmentProvider: profile === 'edson' ? (deposit.equipmentProvider || '').trim() : '',
+      realUtility,
+      profile
     };
 
     const idx = list.findIndex(d => d.id === depToSave.id);
@@ -702,16 +720,22 @@ export const storageService = {
           applies_equipment_expense: depToSave.appliesEquipmentExpense,
           equipment_expense: depToSave.equipmentExpense,
           equipment_provider: depToSave.equipmentProvider,
-          real_utility: depToSave.realUtility
+          real_utility: depToSave.realUtility,
+          profile: depToSave.profile
         });
         if (res?.error) {
+          // Fallback por si la columna profile aún no se ha ejecutado en Supabase
           const fallbackRes = await supabase.from('account_deposits').upsert({
             id: depToSave.id,
             concept: depToSave.concept,
             amount: depToSave.amount,
             date: depToSave.date,
             bank_name: depToSave.bankName || 'Santander',
-            reference: depToSave.reference
+            reference: depToSave.reference,
+            applies_equipment_expense: depToSave.appliesEquipmentExpense,
+            equipment_expense: depToSave.equipmentExpense,
+            equipment_provider: depToSave.equipmentProvider,
+            real_utility: depToSave.realUtility
           });
           if (fallbackRes?.error) {
             console.error('Supabase deposit fallback error:', fallbackRes.error);
@@ -722,7 +746,7 @@ export const storageService = {
       }
     })();
 
-    storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `${depToSave.concept} ($${depToSave.amount}) | Utilidad Real: $${depToSave.realUtility}`);
+    storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `[${profile.toUpperCase()}] ${depToSave.concept} ($${depToSave.amount}) | Utilidad Real: $${depToSave.realUtility}`);
     notifyDataSynced();
     return list;
   },
