@@ -485,8 +485,8 @@ export default function InvoicesModule({ userRole }) {
   // Retención ISR calculada con base al Ingreso Total (modificable en Liquidación Fiscal, default 2.5%)
   const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
 
-  // Utilidad Real (edson): Ingreso Total menos Retención ISR
-  const utilidadReal = totalIngresoTotal - totalRetencionIsr;
+  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR
+  const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr;
 
   // IVA Acreditable Proveedores (para tarjeta de admin)
   const totalIvaAcreditable = filteredDeductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
@@ -593,42 +593,14 @@ export default function InvoicesModule({ userRole }) {
 
       {/* Top Full-Width Card: Tabla Completa de Facturas Emitidas */}
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.45rem', margin: '0 0 0.2rem 0' }}>
               <FileText size={20} color="#10b981" /> Facturas Emitidas (Ventas)
             </h3>
             <span className="badge badge-emerald" style={{ fontSize: '0.75rem' }}>
               {filteredInvoices.length} {filteredInvoices.length === 1 ? 'factura registrada' : 'facturas registradas'}
             </span>
-          </div>
-
-          {/* Quick Metrics Bar on top of table */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
-            <div>
-              <span style={{ color: '#64748b' }}>Ingreso Total: </span>
-              <strong style={{ color: '#334155', fontWeight: '800' }}>
-                ${totalIngresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
-            </div>
-            <div>
-              <span style={{ color: '#64748b' }}>IVA Trasladado: </span>
-              <strong style={{ color: '#0284c7', fontWeight: '800' }}>
-                ${totalIvaTrasladado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
-            </div>
-            <div>
-              <span style={{ color: '#64748b' }}>Retención ISR: </span>
-              <strong style={{ color: '#b45309', fontWeight: '800' }}>
-                -${totalRetencionIsr.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
-            </div>
-            <div>
-              <span style={{ color: '#64748b' }}>Utilidad Real: </span>
-              <strong style={{ color: '#15803d', fontWeight: '800' }}>
-                ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
-            </div>
           </div>
         </div>
 
@@ -899,13 +871,13 @@ export default function InvoicesModule({ userRole }) {
       {/* Bottom Section: 3 Tarjetas Simétricas en Dashboard (Liquidación Fiscal | Fact Prov | Depósito a Cuenta) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: '1.25rem', alignItems: 'stretch' }}>
         
-        {/* Card 1: Resumen Fiscal con Utilidad Real */}
+        {/* Card 1: Ingresos del Mes con Utilidad Real */}
         <div className="excel-summary-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', margin: 0, height: '100%' }}>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', borderBottom: '1px solid rgba(16, 185, 129, 0.2)', paddingBottom: '0.65rem' }}>
               <div>
                 <h3 style={{ fontSize: '0.98rem', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
-                  <Calculator size={18} /> Liquidación Fiscal
+                  <Calculator size={18} /> Ingresos del Mes
                 </h3>
                 <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
                   {selectedMonth === 'ALL' ? 'Todos los Meses' : MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} {selectedYear}
@@ -1635,53 +1607,38 @@ export default function InvoicesModule({ userRole }) {
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
-                    Concepto / Motivo de la Transferencia:
+                    Concepto de transferencia:
                   </label>
                   <input
                     type="text"
                     className="form-control"
-                    placeholder="Ej: Transferencia Cobro Factura FK-665"
+                    placeholder="Ej: Cobro Factura FK-665"
                     value={depositFormData.concept}
                     onChange={(e) => setDepositFormData({ ...depositFormData, concept: e.target.value })}
                     required
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700', color: '#047857' }}>
-                      Monto Total Depositado ($):
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      className="form-control"
-                      placeholder="$0.00"
-                      style={{ fontWeight: '800', color: '#047857', fontSize: '1.05rem' }}
-                      value={depositFormData.amount}
-                      onChange={(e) => setDepositFormData({ ...depositFormData, amount: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
-                      Fecha del Depósito:
-                    </label>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={depositFormData.date}
-                      onChange={(e) => setDepositFormData({ ...depositFormData, date: e.target.value })}
-                      required
-                    />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: '700', color: '#047857' }}>
+                    Total a depositar ($):
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="form-control"
+                    placeholder="$0.00"
+                    style={{ fontWeight: '800', color: '#047857', fontSize: '1.05rem' }}
+                    value={depositFormData.amount}
+                    onChange={(e) => setDepositFormData({ ...depositFormData, amount: e.target.value })}
+                    required
+                  />
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
                     <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
-                      Banco / Cuenta Destino:
+                      Banco / Cuenta:
                     </label>
                     <select
                       className="form-control"
@@ -1701,7 +1658,7 @@ export default function InvoicesModule({ userRole }) {
 
                   <div className="form-group">
                     <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
-                      Folio / Referencia SPEI:
+                      Referencia:
                     </label>
                     <input
                       type="text"
@@ -1713,70 +1670,72 @@ export default function InvoicesModule({ userRole }) {
                   </div>
                 </div>
 
-                {/* Sección de Gastos para Compra de Equipos / Materiales */}
-                <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', userSelect: 'none' }}>
-                    <input
-                      type="checkbox"
-                      checked={depositFormData.appliesEquipmentExpense}
-                      onChange={(e) => setDepositFormData({ ...depositFormData, appliesEquipmentExpense: e.target.checked })}
-                      style={{ width: '18px', height: '18px', accentColor: '#0284c7', marginTop: '2px' }}
-                    />
-                    <div>
-                      <strong style={{ color: '#0f172a', fontSize: '0.86rem', display: 'block' }}>
-                        ¿Se utilizó parte de este depósito para compra de equipos / materiales?
-                      </strong>
-                      <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
-                        Resta el costo pagado a proveedores para calcular tu Utilidad Real en cuenta
-                      </span>
-                    </div>
-                  </label>
-
-                  {depositFormData.appliesEquipmentExpense && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px dashed #cbd5e1' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontWeight: '700', color: '#0284c7', fontSize: '0.8rem' }}>
-                            Monto para Compra de Equipos ($):
-                          </label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            className="form-control"
-                            placeholder="$0.00"
-                            style={{ fontWeight: '700', color: '#0284c7', borderColor: '#38bdf8' }}
-                            value={depositFormData.equipmentExpense}
-                            onChange={(e) => setDepositFormData({ ...depositFormData, equipmentExpense: e.target.value })}
-                            required={depositFormData.appliesEquipmentExpense}
-                          />
-                        </div>
-
-                        <div className="form-group">
-                          <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.8rem' }}>
-                            Proveedor / Detalle Equipos:
-                          </label>
-                          <input
-                            type="text"
-                            className="form-control"
-                            placeholder="Ej: SYSCOM (Cámaras)"
-                            value={depositFormData.equipmentProvider}
-                            onChange={(e) => setDepositFormData({ ...depositFormData, equipmentProvider: e.target.value })}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Live preview banner */}
-                      <div style={{ background: '#ecfdf5', border: '1px solid #86efac', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#166534' }}>
-                          Utilidad Real Estimada de este Depósito:
-                        </span>
-                        <strong style={{ fontSize: '1.05rem', color: '#15803d', fontWeight: '800' }}>
-                          ${Math.max(0, (parseFloat(depositFormData.amount) || 0) - (parseFloat(depositFormData.equipmentExpense) || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                {/* Sección de Gastos para Compra de Equipos / Materiales (Solo visible para Admin) */}
+                {userRole === 'admin' && (
+                  <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '12px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={depositFormData.appliesEquipmentExpense}
+                        onChange={(e) => setDepositFormData({ ...depositFormData, appliesEquipmentExpense: e.target.checked })}
+                        style={{ width: '18px', height: '18px', accentColor: '#0284c7', marginTop: '2px' }}
+                      />
+                      <div>
+                        <strong style={{ color: '#0f172a', fontSize: '0.86rem', display: 'block' }}>
+                          ¿Se utilizó parte de este depósito para compra de equipos / materiales?
                         </strong>
+                        <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                          Resta el costo pagado a proveedores para calcular tu Utilidad Real en cuenta
+                        </span>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    </label>
+
+                    {depositFormData.appliesEquipmentExpense && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px dashed #cbd5e1' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontWeight: '700', color: '#0284c7', fontSize: '0.8rem' }}>
+                              Monto para Compra de Equipos ($):
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="form-control"
+                              placeholder="$0.00"
+                              style={{ fontWeight: '700', color: '#0284c7', borderColor: '#38bdf8' }}
+                              value={depositFormData.equipmentExpense}
+                              onChange={(e) => setDepositFormData({ ...depositFormData, equipmentExpense: e.target.value })}
+                              required={depositFormData.appliesEquipmentExpense}
+                            />
+                          </div>
+
+                          <div className="form-group">
+                            <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.8rem' }}>
+                              Proveedor / Detalle Equipos:
+                            </label>
+                            <input
+                              type="text"
+                              className="form-control"
+                              placeholder="Ej: SYSCOM (Cámaras)"
+                              value={depositFormData.equipmentProvider}
+                              onChange={(e) => setDepositFormData({ ...depositFormData, equipmentProvider: e.target.value })}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Live preview banner */}
+                        <div style={{ background: '#ecfdf5', border: '1px solid #86efac', borderRadius: '8px', padding: '0.6rem 0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#166534' }}>
+                            Utilidad Real Estimada de este Depósito:
+                          </span>
+                          <strong style={{ fontSize: '1.05rem', color: '#15803d', fontWeight: '800' }}>
+                            ${Math.max(0, (parseFloat(depositFormData.amount) || 0) - (parseFloat(depositFormData.equipmentExpense) || 0)).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="modal-footer">
