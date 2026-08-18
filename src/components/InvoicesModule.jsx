@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp, UploadCloud } from 'lucide-react';
 import { storageService } from '../services/storageService';
+import { ocrService } from '../services/ocrService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
 import { formatFolio } from '../utils/folioFormatter';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -50,6 +51,7 @@ export default function InvoicesModule({ userRole }) {
   // Form State (comienza siempre completamente limpio)
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [isScanningXml, setIsScanningXml] = useState(false);
   const [formData, setFormData] = useState({
     folio: '',
     clientName: '',
@@ -64,7 +66,9 @@ export default function InvoicesModule({ userRole }) {
     ivaTotal: '',
     appliesIsr: true,
     isrRate: 1.25,
-    status: 'PAGADA'
+    status: 'PAGADA',
+    fileName: '',
+    uuid: ''
   });
 
   useEffect(() => {
@@ -84,6 +88,95 @@ export default function InvoicesModule({ userRole }) {
     setDeposits(storageService.getAccountDeposits ? storageService.getAccountDeposits() : []);
     setOtherExpenses(storageService.getOtherExpenses ? storageService.getOtherExpenses() : []);
     setTaxConfig(storageService.getTaxConfig());
+  };
+
+  const handleXmlUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanningXml(true);
+
+    try {
+      const xmlText = await file.text();
+      const result = ocrService.parseXmlEmittedInvoice(xmlText);
+
+      if (!result.success) {
+        alert(result.error || 'Error al procesar el archivo XML.');
+        setIsScanningXml(false);
+        e.target.value = '';
+        return;
+      }
+
+      // Check if folio or UUID already exists
+      const existingInv = invoices.find(inv => 
+        (inv.folio && formatFolio(inv.folio) === formatFolio(result.folio)) ||
+        (result.uuid && inv.uuid && inv.uuid.toLowerCase() === result.uuid.toLowerCase())
+      );
+
+      if (existingInv) {
+        const confirmOverwrite = window.confirm(
+          `⚠️ La factura con folio "${formatFolio(result.folio)}" ya está registrada en el sistema.\n¿Deseas abrirla en el formulario para editarla/actualizarla?`
+        );
+        if (!confirmOverwrite) {
+          setIsScanningXml(false);
+          e.target.value = '';
+          return;
+        }
+        setEditingId(existingInv.id);
+      } else {
+        setEditingId(null);
+      }
+
+      // Match client with existing catalogue
+      const matchedClient = clients.find(c => 
+        (c.rfc && result.rfc && c.rfc.toUpperCase().trim() === result.rfc.toUpperCase().trim()) ||
+        (c.name && result.clientName && c.name.trim().toLowerCase() === result.clientName.trim().toLowerCase())
+      );
+
+      const clientName = matchedClient ? matchedClient.name : result.clientName;
+      const rfc = matchedClient ? matchedClient.rfc : result.rfc;
+      const appliesIsr = matchedClient ? matchedClient.appliesIsr : result.appliesIsr;
+      const isrRate = matchedClient ? (matchedClient.appliesIsr ? 1.25 : 0) : result.isrRate;
+
+      // Status is set to 'PENDIENTE' by default as required
+      setFormData({
+        folio: formatFolio(result.folio),
+        clientName,
+        rfc,
+        date: result.date || new Date().toISOString().split('T')[0],
+        isMixedTax: result.isMixedTax,
+        subtotal: result.subtotal ? result.subtotal.toString() : '',
+        discount: result.discount ? result.discount.toString() : '',
+        subtotal8: result.subtotal8 ? result.subtotal8.toString() : '',
+        subtotal16: result.subtotal16 ? result.subtotal16.toString() : '',
+        ivaRate: result.ivaRate || 8,
+        ivaTotal: result.ivaTotal ? result.ivaTotal.toString() : '',
+        appliesIsr,
+        isrRate: isrRate || 1.25,
+        status: 'PENDIENTE',
+        fileName: file.name,
+        uuid: result.uuid || ''
+      });
+
+      // Synchronize period selector if needed
+      if (result.date) {
+        const [invYear, invMonth] = result.date.split('-');
+        if (selectedMonth !== 'ALL' && selectedMonth !== invMonth) {
+          setSelectedMonth(invMonth);
+        }
+        if (selectedYear !== 'ALL' && selectedYear !== invYear) {
+          setSelectedYear(invYear);
+        }
+      }
+
+      setShowModal(true);
+    } catch (err) {
+      console.error('Error al procesar XML de factura emitidas:', err);
+      alert('Ocurrió un error al leer el archivo XML.');
+    } finally {
+      setIsScanningXml(false);
+      e.target.value = '';
+    }
   };
 
   const handleClientSelect = (clientName) => {
@@ -251,7 +344,9 @@ export default function InvoicesModule({ userRole }) {
       isrRate: formData.isrRate,
       isrRetained: parseFloat(isrRetained.toFixed(2)),
       total: parseFloat(total.toFixed(2)),
-      status: formData.status
+      status: formData.status,
+      fileName: formData.fileName || undefined,
+      uuid: formData.uuid || undefined
     };
 
     const updated = storageService.saveInvoice(invoiceToSave, userRole === 'admin' ? 'ADMIN' : 'OPERADOR (2020)');
@@ -318,7 +413,9 @@ export default function InvoicesModule({ userRole }) {
       ivaTotal: '',
       appliesIsr: true,
       isrRate: 1.25,
-      status: 'PAGADA'
+      status: 'PAGADA',
+      fileName: '',
+      uuid: ''
     });
   };
 
@@ -589,7 +686,28 @@ export default function InvoicesModule({ userRole }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn-primary" onClick={() => { resetForm(); setShowModal(true); }}>
+          <label 
+            className="btn-primary" 
+            style={{ 
+              background: 'linear-gradient(135deg, #059669, #10b981)', 
+              cursor: isScanningXml ? 'wait' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              opacity: isScanningXml ? 0.75 : 1,
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)'
+            }}
+          >
+            <UploadCloud size={18} /> {isScanningXml ? 'Leyendo XML...' : 'Agregar XML'}
+            <input 
+              type="file" 
+              accept=".xml" 
+              onChange={handleXmlUpload} 
+              disabled={isScanningXml} 
+              style={{ display: 'none' }} 
+            />
+          </label>
+          <button className="btn-secondary" onClick={() => { resetForm(); setShowModal(true); }}>
             <Plus size={18} /> Nueva Factura
           </button>
         </div>
@@ -1319,9 +1437,16 @@ export default function InvoicesModule({ userRole }) {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '580px' }}>
             <div className="modal-header">
-              <h3 style={{ fontWeight: '800', color: '#0f172a' }}>
-                {editingId ? 'Editar Factura' : 'Nueva Factura de Ingreso'}
-              </h3>
+              <div>
+                <h3 style={{ fontWeight: '800', color: '#0f172a' }}>
+                  {editingId ? 'Editar Factura' : 'Nueva Factura de Ingreso'}
+                </h3>
+                {formData.fileName && (
+                  <span style={{ fontSize: '0.75rem', color: '#059669', background: '#ecfdf5', padding: '0.15rem 0.5rem', borderRadius: '6px', border: '1px solid #a7f3d0', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem', fontWeight: '600' }}>
+                    <UploadCloud size={13} /> XML: {formData.fileName} (Pendiente por defecto)
+                  </span>
+                )}
+              </div>
               <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}>✕</button>
             </div>
 

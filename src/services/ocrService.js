@@ -174,7 +174,127 @@ function parseInvoiceText(text) {
 }
 
 export const ocrService = {
-  // Process XML File (CFDI 4.0 / 3.3) with 100% exact SAT precision
+  // Process Emitted Invoice XML File (CFDI 4.0 / 3.3 for Conta Inovatel Revenue)
+  parseXmlEmittedInvoice: (xmlText) => {
+    try {
+      const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
+      const jsonObj = parser.parse(xmlText);
+      const comprobante = jsonObj['cfdi:Comprobante'] || jsonObj['Comprobante'] || {};
+      
+      const emisor = comprobante['cfdi:Emisor'] || comprobante['Emisor'] || {};
+      const receptor = comprobante['cfdi:Receptor'] || comprobante['Receptor'] || {};
+      const impuestos = comprobante['cfdi:Impuestos'] || comprobante['Impuestos'] || {};
+      const traslados = impuestos['cfdi:Traslados']?.['cfdi:Traslado'] || impuestos['Traslados']?.['Traslado'] || [];
+      const retenciones = impuestos['cfdi:Retenciones']?.['cfdi:Retencion'] || impuestos['Retenciones']?.['Retencion'] || [];
+      
+      const serie = (comprobante['@_Serie'] || '').trim();
+      const folioNum = (comprobante['@_Folio'] || '').trim();
+      let folio = '';
+      if (serie && folioNum) {
+        folio = `${serie}-${folioNum}`;
+      } else if (folioNum) {
+        folio = folioNum.startsWith('FK') || folioNum.startsWith('F') ? folioNum : `FK-${folioNum}`;
+      } else if (serie) {
+        folio = serie;
+      } else {
+        folio = 'FK-XML-' + Math.floor(100 + Math.random() * 900);
+      }
+
+      const subtotal = parseFloat(comprobante['@_SubTotal'] || '0');
+      const discount = parseFloat(comprobante['@_Descuento'] || '0');
+      const total = parseFloat(comprobante['@_Total'] || '0');
+      const baseNeta = Math.max(0, subtotal - discount);
+
+      let iva8Total = 0;
+      let iva16Total = 0;
+      let subtotal8 = 0;
+      let subtotal16 = 0;
+      let ivaTotal = 0;
+
+      const trasladosList = Array.isArray(traslados) ? traslados : (traslados ? [traslados] : []);
+      trasladosList.forEach(t => {
+        const imp = t['@_Impuesto'];
+        if (imp === '002' || imp === '2') {
+          const tasa = parseFloat(t['@_TasaOCuota'] || '0');
+          const importe = parseFloat(t['@_Importe'] || '0');
+          const base = parseFloat(t['@_Base'] || '0');
+          ivaTotal += importe;
+
+          if (Math.abs(tasa - 0.08) < 0.015 || (tasa === 0 && base > 0 && Math.abs((importe / base) - 0.08) < 0.015)) {
+            iva8Total += importe;
+            subtotal8 += (base || (importe / 0.08));
+          } else if (Math.abs(tasa - 0.16) < 0.015 || (tasa === 0 && base > 0 && Math.abs((importe / base) - 0.16) < 0.015)) {
+            iva16Total += importe;
+            subtotal16 += (base || (importe / 0.16));
+          }
+        }
+      });
+
+      // Si no desglosó por tasa pero hay ivaTotal
+      if (ivaTotal === 0 && comprobante['@_Total']) {
+        ivaTotal = Math.max(0, total - baseNeta);
+      }
+
+      const isMixedTax = iva8Total > 0 && iva16Total > 0;
+      let ivaRate = 8;
+      if (isMixedTax) {
+        ivaRate = 8;
+      } else if (iva16Total > 0 || (baseNeta > 0 && (ivaTotal / baseNeta) > 0.12)) {
+        ivaRate = 16;
+      } else {
+        ivaRate = 8;
+      }
+
+      // Retenciones (ISR)
+      let isrRetained = 0;
+      const retencionesList = Array.isArray(retenciones) ? retenciones : (retenciones ? [retenciones] : []);
+      retencionesList.forEach(r => {
+        const imp = r['@_Impuesto'];
+        if (imp === '001' || imp === '1') { // 001 = ISR
+          isrRetained += parseFloat(r['@_Importe'] || '0');
+        }
+      });
+
+      const rfcReceptor = (receptor['@_Rfc'] || '').toUpperCase().trim();
+      const isPersonaMoral = rfcReceptor.length === 12;
+      const appliesIsr = isrRetained > 0 || isPersonaMoral;
+      const isrRate = isrRetained > 0 && baseNeta > 0 ? parseFloat(((isrRetained / baseNeta) * 100).toFixed(2)) : (appliesIsr ? 1.25 : 0);
+
+      // UUID
+      const complemento = comprobante['cfdi:Complemento'] || comprobante['Complemento'] || {};
+      const tfd = complemento['tfd:TimbreFiscalDigital'] || complemento['TimbreFiscalDigital'] || {};
+      const uuid = tfd['@_UUID'] || '';
+
+      return {
+        success: true,
+        type: 'xml',
+        emisorName: emisor['@_Nombre'] || '',
+        emisorRfc: emisor['@_Rfc'] || '',
+        clientName: receptor['@_Nombre'] || 'CLIENTE SAT',
+        rfc: rfcReceptor || 'XAXX010101000',
+        folio,
+        date: (comprobante['@_Fecha'] || '').split('T')[0] || new Date().toISOString().split('T')[0],
+        subtotal: parseFloat(subtotal.toFixed(2)),
+        discount: parseFloat(discount.toFixed(2)),
+        baseNeta: parseFloat(baseNeta.toFixed(2)),
+        isMixedTax,
+        subtotal8: subtotal8 > 0 ? parseFloat(subtotal8.toFixed(2)) : '',
+        subtotal16: subtotal16 > 0 ? parseFloat(subtotal16.toFixed(2)) : '',
+        ivaRate,
+        ivaTotal: parseFloat(ivaTotal.toFixed(2)),
+        appliesIsr,
+        isrRate: isrRate || 1.25,
+        isrRetained: parseFloat(isrRetained.toFixed(2)),
+        total: parseFloat(total.toFixed(2)),
+        uuid
+      };
+    } catch (e) {
+      console.error('XML Emitted Invoice Parse Error:', e);
+      return { success: false, error: 'No se pudo leer la estructura del archivo XML CFDI emitido.' };
+    }
+  },
+
+  // Process XML File (CFDI 4.0 / 3.3) for Provider Deductions
   parseXmlInvoice: (xmlText) => {
     try {
       const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_' });
