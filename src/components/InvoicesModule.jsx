@@ -664,8 +664,15 @@ export default function InvoicesModule({ userRole }) {
   // Retención ISR calculada con base al Ingreso Total (modificable en Liquidación Fiscal, default 2.5%)
   const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
 
-  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR menos Otros Gastos
-  const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalOtrosGastos;
+  // Suma de Retención ISR 1.25% de todas las facturas capturadas del período seleccionado
+  const totalIsrFacturas = filteredInvoices.reduce((sum, inv) => {
+    const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+    const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
+    return sum + isrRet;
+  }, 0);
+
+  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR menos ISR Facturas (1.25%) menos Otros Gastos
+  const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos;
 
   // Por Depositar: Utilidad Real menos Total de Depósitos
   const porDepositar = utilidadReal - totalDepositosBrutos;
@@ -1166,7 +1173,15 @@ export default function InvoicesModule({ userRole }) {
               </strong>
             </div>
 
-            {/* 4. Otros Gastos */}
+            {/* 4. ISR Facturas (1.25%) */}
+            <div className="excel-row" style={{ padding: '0.45rem 0' }}>
+              <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>ISR Facturas (1.25%):</span>
+              <strong style={{ color: '#b45309', fontSize: '0.96rem', fontWeight: '800' }}>
+                -${totalIsrFacturas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+
+            {/* 5. Otros Gastos */}
             <div className="excel-row" style={{ padding: '0.45rem 0', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                 <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>(-) Otros Gastos:</span>

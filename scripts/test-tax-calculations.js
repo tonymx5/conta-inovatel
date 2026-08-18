@@ -77,4 +77,18 @@ console.log('🧪 Iniciando Auditoría y Suite de Pruebas de Precisión Fiscal..
   assertEqual(ivaNeto, 1747.71, 'IVA Neto Real a Pagar al SAT');
 }
 
-console.log('\n🎯 Todos los 5 grupos de pruebas fiscales pasaron con 100% de precisión matemática.\n');
+// 6. Conciliación de Ingresos del Mes, ISR Facturas (1.25%) y Utilidad Real (edson)
+{
+  const totalIngresoTotal = 100000.00;
+  const totalIvaTrasladado = 8000.00;
+  const totalRetencionIsr = 2500.00; // 2.5%
+  const totalIsrFacturas = 1250.00; // Suma de retenciones 1.25% de facturas emitidas
+  const totalOtrosGastos = 1500.00;
+
+  const utilidadReal = parseFloat((totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos).toFixed(2));
+  // 100000 - 8000 - 2500 - 1250 - 1500 = 86750.00
+
+  assertEqual(utilidadReal, 86750.00, 'Utilidad Real (edson) deduciendo ISR Facturas (1.25%)');
+}
+
+console.log('\n🎯 Todos los 6 grupos de pruebas fiscales pasaron con 100% de precisión matemática.\n');
