@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, DollarSign, Receipt, Users, CreditCard, BarChart3, TrendingUp, 
-  ShieldAlert, History, Lock, Wifi, WifiOff, RefreshCw, Settings
+  ShieldAlert, History, Lock, Wifi, WifiOff, RefreshCw, Settings, Database
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
@@ -12,6 +12,7 @@ export default function Header({
   onOpenAuditLog, 
   onOpenSecurityReport,
   onOpenConfig,
+  onOpenBackup,
   onRestrictedClick,
   onLock
 }) {
@@ -144,6 +145,11 @@ export default function Header({
               {/* Botón de Configuración Global */}
               <button className="btn-secondary" onClick={onOpenConfig} style={{ fontSize: '0.85rem' }} title="Configuración de Tarjetas y Cuentas">
                 <Settings size={16} color="#0284c7" /> Config
+              </button>
+
+              {/* Botón de Respaldo & Disaster Recovery */}
+              <button className="btn-secondary" onClick={onOpenBackup} style={{ fontSize: '0.85rem' }} title="Copia de Seguridad y Snapshot 1-Clic">
+                <Database size={16} color="#0284c7" /> Respaldo
               </button>
 
               <button className="btn-secondary" onClick={onOpenAuditLog} style={{ fontSize: '0.85rem' }}>

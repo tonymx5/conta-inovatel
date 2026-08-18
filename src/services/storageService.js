@@ -1105,6 +1105,101 @@ export const storageService = {
       console.error('Export Backup Error:', e);
       return false;
     }
+  },
+
+  // 1-Click Backup Importer & Restorer (Safe Cloud Sync)
+  importFullBackup: async (backupData, user = 'admin') => {
+    try {
+      if (!backupData || typeof backupData !== 'object') {
+        throw new Error('Formato de archivo de respaldo inválido.');
+      }
+
+      if (Array.isArray(backupData.invoices)) {
+        setStorageItem(STORAGE_KEYS.INVOICES, backupData.invoices);
+        Promise.all(backupData.invoices.map(inv => supabase.from('invoices').upsert({
+          id: inv.id, folio: inv.folio, client_name: inv.clientName, rfc: inv.rfc, date: inv.date,
+          is_mixed_tax: !!inv.isMixedTax, subtotal: inv.subtotal || 0, discount: inv.discount || 0,
+          subtotal8: inv.subtotal8 || 0, subtotal16: inv.subtotal16 || 0, iva_rate: inv.ivaRate || 8,
+          iva_total: inv.ivaTotal || 0, applies_isr: !!inv.appliesIsr, isr_rate: inv.isrRate || 1.25,
+          isr_retained: inv.isrRetained || 0, base_neta: inv.baseNeta || 0, total: inv.total || 0, status: inv.status || 'PAGADA'
+        }))).catch(e => console.error('Restore invoices error:', e));
+      }
+
+      if (Array.isArray(backupData.clients)) {
+        setStorageItem(STORAGE_KEYS.CLIENTS, backupData.clients);
+        Promise.all(backupData.clients.map(c => supabase.from('clients').upsert({
+          id: c.id, name: c.name, rfc: c.rfc, email: c.email || null, phone: c.phone || null,
+          sector: c.sector || null, notes: c.notes || null, applies_isr: c.appliesIsr, isr_rate: c.isrRate
+        }))).catch(e => console.error('Restore clients error:', e));
+      }
+
+      if (Array.isArray(backupData.deductibles)) {
+        setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, backupData.deductibles);
+        Promise.all(backupData.deductibles.map(d => supabase.from('deductibles').upsert({
+          id: d.id, provider_name: d.providerName, rfc: d.rfc, invoice_no: d.invoiceNo, date: d.date,
+          subtotal: d.subtotal || 0, discount: d.discount || 0, iva_total: d.ivaTotal || 0, total: d.total || 0,
+          category: d.category || 'Telecomunicaciones', file_name: d.fileName, file_url: d.fileUrl
+        }))).catch(e => console.error('Restore deductibles error:', e));
+      }
+
+      if (Array.isArray(backupData.accountDeposits)) {
+        setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, backupData.accountDeposits);
+        Promise.all(backupData.accountDeposits.map(dp => supabase.from('account_deposits').upsert({
+          id: dp.id, concept: dp.concept, amount: dp.amount || 0, date: dp.date,
+          bank_name: dp.bankName || 'Santander', reference: dp.reference || '',
+          applies_equipment_expense: !!dp.appliesEquipmentExpense,
+          equipment_expense: dp.equipmentExpense || 0,
+          equipment_provider: dp.equipmentProvider || '',
+          real_utility: dp.realUtility !== undefined ? dp.realUtility : (dp.amount || 0),
+          profile: dp.profile || 'usuario'
+        }))).catch(e => console.error('Restore deposits error:', e));
+      }
+
+      if (Array.isArray(backupData.cardExpenses)) {
+        setStorageItem(STORAGE_KEYS.CARD_EXPENSES, backupData.cardExpenses);
+        Promise.all(backupData.cardExpenses.map(ce => supabase.from('card_expenses').upsert({
+          id: ce.id, date: ce.date, description: ce.description, amount: ce.amount || 0,
+          bank_id: ce.bankId, bank_name: ce.bankName, sector: ce.sector || 'Extras'
+        }))).catch(e => console.error('Restore card_expenses error:', e));
+      }
+
+      if (Array.isArray(backupData.investments)) {
+        setStorageItem(STORAGE_KEYS.INVESTMENTS, backupData.investments);
+        Promise.all(backupData.investments.map(inv => supabase.from('investments').upsert({
+          id: inv.id, asset_name: inv.assetName, category: inv.category,
+          amount_invested: inv.amountInvested || 0, expected_yield_pct: inv.expectedYieldPct || 0,
+          start_date: inv.startDate, notes: inv.notes || ''
+        }))).catch(e => console.error('Restore investments error:', e));
+      }
+
+      if (backupData.taxConfig) {
+        setStorageItem(STORAGE_KEYS.TAX_CONFIG, backupData.taxConfig);
+        if (backupData.taxConfig.isrEstimatedRate) {
+          supabase.from('tax_config').upsert({
+            id: 'default',
+            isr_estimated_rate: backupData.taxConfig.isrEstimatedRate,
+            last_updated: new Date().toISOString()
+          }).catch(e => console.error('Restore tax_config error:', e));
+        }
+      }
+
+      if (Array.isArray(backupData.otherIncome)) {
+        setStorageItem(STORAGE_KEYS.OTHER_INCOME, backupData.otherIncome);
+      }
+      if (Array.isArray(backupData.otherExpenses)) {
+        setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, backupData.otherExpenses);
+      }
+      if (Array.isArray(backupData.bankAccounts)) {
+        setStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, backupData.bankAccounts);
+      }
+
+      storageService.logAudit(user, 'RESTAURAR_RESPALDO_SISTEMA', `Respaldo restaurado (${backupData.metadata?.exportDate || 'fecha desconocida'})`);
+      notifyDataSynced();
+      return { success: true };
+    } catch (e) {
+      console.error('Import Backup Error:', e);
+      return { success: false, error: e.message };
+    }
   }
 };
 

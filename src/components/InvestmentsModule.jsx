@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Bot, Plus, Trash2, Edit3, Send, Lightbulb } from 'lucide-react';
+import { 
+  TrendingUp, Bot, Plus, Trash2, Edit3, Send, Lightbulb, 
+  ShieldCheck, Zap, ExternalLink, AlertTriangle 
+} from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate } from '../utils/dateFormatter';
 
 export default function InvestmentsModule({ userRole }) {
   const [investments, setInvestments] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [deductibles, setDeductibles] = useState([]);
   const [otherIncome, setOtherIncome] = useState([]);
   const [cardExpenses, setCardExpenses] = useState([]);
   const [deposits, setDeposits] = useState([]);
+  const [taxConfig, setTaxConfig] = useState({ isrEstimatedRate: 1.25 });
   const [editingId, setEditingId] = useState(null);
 
   // Bot Chat State
@@ -43,9 +48,11 @@ export default function InvestmentsModule({ userRole }) {
   const loadData = () => {
     setInvestments(storageService.getInvestments());
     setInvoices(storageService.getInvoices());
+    setDeductibles(storageService.getDeductibleExpenses());
     setOtherIncome(storageService.getOtherIncome());
     setCardExpenses(storageService.getCardExpenses());
     setDeposits(storageService.getAccountDeposits ? storageService.getAccountDeposits() : []);
+    setTaxConfig(storageService.getTaxConfig ? storageService.getTaxConfig() : { isrEstimatedRate: 1.25 });
   };
 
   const totalIngresoFacturado = invoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
@@ -64,10 +71,35 @@ export default function InvestmentsModule({ userRole }) {
   const totalGastos = cardExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
   const flujoLibre = Math.max(0, baseCalculoUtilidad - totalGastos);
 
+  // Cálculo de Reserva SAT (Día 17)
+  const totalIvaFacturado = invoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  const totalIvaDeducible = deductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
+  const ivaNetoSat = Math.max(0, totalIvaFacturado - totalIvaDeducible);
+
+  const totalSubtotal = invoices.reduce((sum, i) => sum + (parseFloat(i.subtotal) || 0), 0);
+  const totalIsrRetenido = invoices.reduce((sum, i) => sum + (parseFloat(i.isrRetained) || 0), 0);
+  const isrEstimadoBruto = totalSubtotal * ((parseFloat(taxConfig.isrEstimatedRate) || 1.25) / 100);
+  const isrEstimadoSat = Math.max(0, isrEstimadoBruto - totalIsrRetenido);
+  const totalReservaSat = parseFloat((ivaNetoSat + isrEstimadoSat).toFixed(2));
+  const isReservaSatCubierta = baseCalculoUtilidad >= totalReservaSat;
+
   const recomendacionInversionMin = flujoLibre * 0.10;
   const recomendacionInversionMax = flujoLibre * 0.20;
 
   const totalInvertidoActual = investments.reduce((sum, i) => sum + (i.amountInvested || 0), 0);
+
+  const handleQuickInvest = (pct, suggestedName, suggestedRate) => {
+    const amt = (flujoLibre * (pct / 100)).toFixed(2);
+    setEditingId(null);
+    setFormData({
+      assetName: suggestedName,
+      category: 'Renta Fija',
+      amountInvested: amt > 0 ? amt : '1000',
+      expectedYieldPct: suggestedRate || '11.0',
+      startDate: new Date().toISOString().split('T')[0]
+    });
+    setShowModal(true);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -168,39 +200,162 @@ Te aconsejo destinar entre $${recomendacionInversionMin.toFixed(2)} y $${recomen
         </button>
       </div>
 
-      {/* Recommended Investment Surplus Cards */}
+      {/* Recommended Investment Surplus & SAT Reserve Cards */}
       <div className="tile-card tile-card-mint" style={{ padding: '1.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-          <Lightbulb size={26} color="#10b981" />
-          <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#047857' }}>
-            Recomendación Automática de Separación para Inversión
-          </h3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.8rem', marginBottom: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <Lightbulb size={26} color="#10b981" />
+            <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#047857', margin: 0 }}>
+              Oportunidad de Inversión & Protección Fiscal
+            </h3>
+          </div>
+
+          {/* Badge de Reserva SAT */}
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            background: isReservaSatCubierta ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+            border: `1px solid ${isReservaSatCubierta ? '#10b981' : '#f59e0b'}`,
+            color: isReservaSatCubierta ? '#065f46' : '#b45309',
+            padding: '0.35rem 0.8rem',
+            borderRadius: '9999px',
+            fontSize: '0.78rem',
+            fontWeight: '700'
+          }}>
+            {isReservaSatCubierta ? <ShieldCheck size={15} color="#10b981" /> : <AlertTriangle size={15} color="#f59e0b" />}
+            <span>
+              {isReservaSatCubierta 
+                ? `🛡️ Reserva SAT Día 17 Cubierta ($${totalReservaSat.toLocaleString('es-MX', { minimumFractionDigits: 2 })})`
+                : `⚠️ Reserva SAT Estimada: $${totalReservaSat.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
+            </span>
+          </div>
         </div>
+
         <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1.2rem', fontWeight: '500' }}>
-          Con base en tu Utilidad Real en cuenta ($${baseCalculoUtilidad.toLocaleString('es-MX', { minimumFractionDigits: 2 })}) y tu flujo libre ($${flujoLibre.toLocaleString('es-MX', { minimumFractionDigits: 2 })}), el sistema sugiere separar:
+          Con base en tu Utilidad Real en cuenta (<b>${baseCalculoUtilidad.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</b>) y tu flujo libre (<b>${flujoLibre.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</b>), el Bot IA detecta oportunidad de separación para rendimientos pasivos:
         </p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
-          <div className="glass-card" style={{ background: '#ffffff', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '700', display: 'block' }}>10% SUGERIDO (CONSERVADOR):</span>
-            <strong style={{ fontSize: '1.45rem', color: '#047857', fontWeight: '800' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.15rem', marginBottom: '1.25rem' }}>
+          {/* 10% Conservador */}
+          <div className="glass-card" style={{ background: '#ffffff', border: '1px solid rgba(16, 185, 129, 0.25)', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>10% SUGERIDO (CONSERVADOR):</span>
+              <span className="badge badge-emerald" style={{ fontSize: '0.7rem' }}>CETES / Nu</span>
+            </div>
+            <strong style={{ fontSize: '1.45rem', color: '#047857', fontWeight: '800', display: 'block', margin: '0.3rem 0 0.6rem 0' }}>
               ${recomendacionInversionMin.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </strong>
+            <button
+              onClick={() => handleQuickInvest(10, 'CETES Directo / Renta Fija', '11.0')}
+              style={{
+                width: '100%',
+                background: 'rgba(16, 185, 129, 0.1)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                color: '#047857',
+                padding: '0.4rem 0.6rem',
+                borderRadius: '8px',
+                fontSize: '0.76rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <Zap size={13} /> <span>Separar 10% en 1-Clic</span>
+            </button>
           </div>
 
-          <div className="glass-card" style={{ background: '#ffffff', border: '1px solid rgba(6, 182, 212, 0.2)' }}>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '700', display: 'block' }}>20% SUGERIDO (ACELERACIÓN 5%):</span>
-            <strong style={{ fontSize: '1.45rem', color: '#0369a1', fontWeight: '800' }}>
+          {/* 20% Aceleración */}
+          <div className="glass-card" style={{ background: '#ffffff', border: '1px solid rgba(6, 182, 212, 0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700' }}>20% (ACELERACIÓN 5%):</span>
+              <span className="badge badge-indigo" style={{ fontSize: '0.7rem' }}>Crecimiento</span>
+            </div>
+            <strong style={{ fontSize: '1.45rem', color: '#0369a1', fontWeight: '800', display: 'block', margin: '0.3rem 0 0.6rem 0' }}>
               ${recomendacionInversionMax.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </strong>
+            <button
+              onClick={() => handleQuickInvest(20, 'Fondo de Crecimiento 5%', '12.5')}
+              style={{
+                width: '100%',
+                background: 'rgba(2, 132, 199, 0.1)',
+                border: '1px solid rgba(2, 132, 199, 0.3)',
+                color: '#0284c7',
+                padding: '0.4rem 0.6rem',
+                borderRadius: '8px',
+                fontSize: '0.76rem',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.35rem'
+              }}
+            >
+              <Zap size={13} /> <span>Separar 20% en 1-Clic</span>
+            </button>
           </div>
 
-          <div className="glass-card" style={{ background: '#ffffff', border: '1px solid rgba(245, 158, 11, 0.2)' }}>
-            <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '700', display: 'block' }}>TOTAL INVERTIDO ACTUALMENTE:</span>
-            <strong style={{ fontSize: '1.45rem', color: '#b45309', fontWeight: '800' }}>
+          {/* Total Invertido */}
+          <div className="glass-card" style={{ background: '#ffffff', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '700', display: 'block' }}>TOTAL INVERTIDO ACTUALMENTE:</span>
+            <strong style={{ fontSize: '1.45rem', color: '#b45309', fontWeight: '800', display: 'block', margin: '0.3rem 0 0.6rem 0' }}>
               ${totalInvertidoActual.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </strong>
+            <div style={{ fontSize: '0.74rem', color: '#78350f', background: 'rgba(245, 158, 11, 0.1)', padding: '0.35rem 0.6rem', borderRadius: '6px', textAlign: 'center', fontWeight: '600' }}>
+              {investments.length} activo(s) en cartera
+            </div>
           </div>
+        </div>
+
+        {/* Portales de Inversión Rápidos */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', paddingTop: '0.4rem', borderTop: '1px dashed rgba(16, 185, 129, 0.3)' }}>
+          <span style={{ fontSize: '0.78rem', color: '#047857', fontWeight: '700' }}>Acceso a Portales Oficiales de Renta Fija:</span>
+          <a
+            href="https://www.cetesdirecto.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: '0.76rem',
+              fontWeight: '700',
+              color: '#0369a1',
+              background: '#ffffff',
+              border: '1px solid #bae6fd',
+              padding: '0.3rem 0.7rem',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+            }}
+          >
+            <span>CETES Directo (~11.0% Anual)</span> <ExternalLink size={12} />
+          </a>
+          <a
+            href="https://nu.com.mx"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: '0.76rem',
+              fontWeight: '700',
+              color: '#7c3aed',
+              background: '#ffffff',
+              border: '1px solid #ddd6fe',
+              padding: '0.3rem 0.7rem',
+              borderRadius: '6px',
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+            }}
+          >
+            <span>Cajitas Nu (~13.0% Anual)</span> <ExternalLink size={12} />
+          </a>
         </div>
       </div>
 

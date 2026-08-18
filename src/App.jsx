@@ -5,6 +5,7 @@ import AuditLogModal from './components/AuditLogModal';
 import SecurityReportModal from './components/SecurityReportModal';
 import LoginGateModal from './components/LoginGateModal';
 import ConfigModal from './components/ConfigModal';
+import BackupModal from './components/BackupModal';
 import { FileText, BarChart3, TrendingUp, CreditCard, Users, Settings, Receipt } from 'lucide-react';
 import { storageService } from './services/storageService';
 
@@ -115,6 +116,7 @@ export default function App() {
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showSecurityModal, setShowSecurityModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [showBackupModal, setShowBackupModal] = useState(false);
 
   const handleRestrictedClick = (moduleName, targetTabId = null) => {
     setRestrictedTargetName(moduleName);
@@ -191,6 +193,7 @@ export default function App() {
           onOpenAuditLog={() => setShowAuditModal(true)}
           onOpenSecurityReport={() => setShowSecurityModal(true)}
           onOpenConfig={() => setShowConfigModal(true)}
+          onOpenBackup={() => setShowBackupModal(true)}
           onRestrictedClick={(name) => handleRestrictedClick(name)}
           onLock={handleLockSession}
         />
@@ -295,6 +298,12 @@ export default function App() {
         <ConfigModal
           isOpen={showConfigModal}
           onClose={() => setShowConfigModal(false)}
+          userRole={userRole}
+        />
+
+        <BackupModal
+          isOpen={showBackupModal}
+          onClose={() => setShowBackupModal(false)}
           userRole={userRole}
         />
       </div>
