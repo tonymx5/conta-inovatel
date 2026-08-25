@@ -91,4 +91,33 @@ console.log('🧪 Iniciando Auditoría y Suite de Pruebas de Precisión Fiscal..
   assertEqual(utilidadReal, 86750.00, 'Utilidad Real (edson) deduciendo ISR Facturas (1.25%)');
 }
 
-console.log('\n🎯 Todos los 6 grupos de pruebas fiscales pasaron con 100% de precisión matemática.\n');
+// 7. Segregación de Facturas PAGADAS vs PENDIENTES en Ingresos del Mes (Flujo de Efectivo RESICO)
+{
+  const invoicesList = [
+    { folio: 'FK-101', subtotal: 10000.00, discount: 0, ivaTotal: 800.00, appliesIsr: true, isrRetained: 125.00, total: 10675.00, status: 'PAGADA' },
+    { folio: 'FK-102', subtotal: 20000.00, discount: 0, ivaTotal: 1600.00, appliesIsr: true, isrRetained: 250.00, total: 21350.00, status: 'PENDIENTE' },
+    { folio: 'FK-103', subtotal: 5000.00, discount: 0, ivaTotal: 400.00, appliesIsr: false, isrRetained: 0.00, total: 5400.00, status: 'PAGADA' }
+  ];
+
+  const paidOnly = invoicesList.filter(inv => inv.status === 'PAGADA');
+  const pendingOnly = invoicesList.filter(inv => inv.status === 'PENDIENTE');
+
+  const totalIngresoCobrado = paidOnly.reduce((sum, inv) => sum + inv.total, 0); // 10675 + 5400 = 16075.00
+  const totalPendienteCobro = pendingOnly.reduce((sum, inv) => sum + inv.total, 0); // 21350.00
+  const totalIvaCobrado = paidOnly.reduce((sum, inv) => sum + inv.ivaTotal, 0); // 800 + 400 = 1200.00
+  const totalIsrRetenidoCobrado = paidOnly.reduce((sum, inv) => sum + inv.isrRetained, 0); // 125 + 0 = 125.00
+
+  assertEqual(totalIngresoCobrado, 16075.00, 'Ingreso Total Cobrado (solo facturas PAGADAS)');
+  assertEqual(totalPendienteCobro, 21350.00, 'Total de Facturas Pendientes de Cobro (excluidas del mes)');
+  assertEqual(totalIvaCobrado, 1200.00, 'IVA Trasladado efectivo de facturas cobradas');
+  assertEqual(totalIsrRetenidoCobrado, 125.00, 'Retención ISR 1.25% de facturas cobradas');
+
+  // Simulación: Al pasar FK-102 a PAGADA, se computa automáticamente
+  invoicesList[1].status = 'PAGADA';
+  const updatedPaidOnly = invoicesList.filter(inv => inv.status === 'PAGADA');
+  const updatedIngresoCobrado = updatedPaidOnly.reduce((sum, inv) => sum + inv.total, 0); // 16075 + 21350 = 37425.00
+
+  assertEqual(updatedIngresoCobrado, 37425.00, 'Ingreso Total actualizado tras confirmar pago de FK-102');
+}
+
+console.log('\n🎯 Todos los 7 grupos de pruebas fiscales pasaron con 100% de precisión matemática.\n');

@@ -39,6 +39,13 @@ export default function InvoicesModule({ userRole }) {
     equipmentProvider: ''
   });
 
+  // Modal Pop-up Confirmación de Estado de Factura (PAGADA / PENDIENTE)
+  const [statusConfirmModal, setStatusConfirmModal] = useState({
+    isOpen: false,
+    invoice: null,
+    targetStatus: 'PAGADA'
+  });
+
   // Real dynamic current system date (Agosto)
   const now = new Date();
   const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0'); // e.g. '08' (Agosto)
@@ -387,11 +394,21 @@ export default function InvoicesModule({ userRole }) {
     }
   };
 
-  const handleToggleStatus = (inv) => {
-    const newStatus = inv.status === 'PENDIENTE' ? 'PAGADA' : 'PENDIENTE';
-    const updatedInvoice = { ...inv, status: newStatus };
+  const handleRequestToggleStatus = (inv) => {
+    const nextStatus = inv.status === 'PENDIENTE' ? 'PAGADA' : 'PENDIENTE';
+    setStatusConfirmModal({
+      isOpen: true,
+      invoice: inv,
+      targetStatus: nextStatus
+    });
+  };
+
+  const handleConfirmToggleStatus = () => {
+    if (!statusConfirmModal.invoice) return;
+    const updatedInvoice = { ...statusConfirmModal.invoice, status: statusConfirmModal.targetStatus };
     const updated = storageService.saveInvoice(updatedInvoice, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setInvoices(updated);
+    setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA' });
   };
 
   const resetForm = () => {
@@ -650,28 +667,52 @@ export default function InvoicesModule({ userRole }) {
   // Excel Summary Totals Math calculated on the filtered month view
   const currentIsrRate = taxConfig.isrEstimatedRate !== undefined ? taxConfig.isrEstimatedRate : 2.5;
   
-  // Total Ingreso Total: suma exacta de Ingreso Total de todas las facturas capturadas
-  const totalIngresoTotal = filteredInvoices.reduce((sum, inv) => {
-    const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-    const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
-    const ivaTot = parseFloat(inv.ivaTotal) || 0;
-    const ingTot = parseFloat((base + ivaTot - isrRet).toFixed(2));
-    return sum + ingTot;
-  }, 0);
+  // Segregación estricta de facturas: PAGADAS (flujo de efectivo computable) vs PENDIENTES (por cobrar)
+  const paidInvoices = useMemo(() => {
+    return filteredInvoices.filter(inv => inv.status === 'PAGADA');
+  }, [filteredInvoices]);
 
-  const totalIvaTrasladado = filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  const pendingInvoices = useMemo(() => {
+    return filteredInvoices.filter(inv => inv.status === 'PENDIENTE');
+  }, [filteredInvoices]);
+
+  // Monto total acumulado de facturas efectivamente cobradas (PAGADAS)
+  const totalCobradoMonto = useMemo(() => {
+    return paidInvoices.reduce((sum, inv) => {
+      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+      const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
+      const ivaTot = parseFloat(inv.ivaTotal) || 0;
+      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
+    }, 0);
+  }, [paidInvoices]);
+
+  // Monto total de facturas pendientes de cobro
+  const totalPendienteMonto = useMemo(() => {
+    return pendingInvoices.reduce((sum, inv) => {
+      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+      const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
+      const ivaTot = parseFloat(inv.ivaTotal) || 0;
+      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
+    }, 0);
+  }, [pendingInvoices]);
+
+  // Total Ingreso Total: suma exacta de Ingreso Total ÚNICAMENTE de las facturas con status PAGADA
+  const totalIngresoTotal = totalCobradoMonto;
+
+  // IVA Trasladado de facturas efectivamente pagadas
+  const totalIvaTrasladado = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
   
-  // Retención ISR calculada con base al Ingreso Total (modificable en Liquidación Fiscal, default 2.5%)
+  // Retención ISR calculada con base al Ingreso Total efectivamente cobrado (modificable en Liquidación Fiscal, default 2.5%)
   const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
 
-  // Suma de Retención ISR 1.25% de todas las facturas capturadas del período seleccionado
-  const totalIsrFacturas = filteredInvoices.reduce((sum, inv) => {
+  // Suma de Retención ISR 1.25% de todas las facturas pagadas del período seleccionado
+  const totalIsrFacturas = paidInvoices.reduce((sum, inv) => {
     const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
     const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
     return sum + isrRet;
   }, 0);
 
-  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR menos ISR Facturas (1.25%) menos Otros Gastos
+  // Utilidad Real (edson): Ingreso Total Pagado menos IVA Trasladado Pagado menos Retención ISR menos ISR Facturas Pagadas (1.25%) menos Otros Gastos
   const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos;
 
   // Por Depositar: Utilidad Real menos Total de Depósitos
@@ -803,8 +844,18 @@ export default function InvoicesModule({ userRole }) {
           )}
         </div>
 
-        <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}>
-          Mostrando <strong style={{ color: '#047857' }}>{filteredInvoices.length}</strong> {filteredInvoices.length === 1 ? 'factura' : 'facturas'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
+          <span style={{ color: '#64748b', fontWeight: '600' }}>
+            Total: <strong style={{ color: '#0f172a' }}>{filteredInvoices.length}</strong> {filteredInvoices.length === 1 ? 'factura' : 'facturas'}
+          </span>
+          <span className="badge badge-emerald" style={{ fontSize: '0.74rem', fontWeight: '700' }}>
+            ✓ {paidInvoices.length} Pagadas (${totalCobradoMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
+          </span>
+          {pendingInvoices.length > 0 && (
+            <span className="badge badge-amber" style={{ fontSize: '0.74rem', fontWeight: '700' }}>
+              ⏳ {pendingInvoices.length} Pendientes (${totalPendienteMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
+            </span>
+          )}
         </div>
       </div>
 
@@ -847,7 +898,7 @@ export default function InvoicesModule({ userRole }) {
 
                       <button
                         type="button"
-                        onClick={() => handleToggleStatus(inv)}
+                        onClick={() => handleRequestToggleStatus(inv)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                       >
                         {inv.status === 'PENDIENTE' ? (
@@ -1033,11 +1084,11 @@ export default function InvoicesModule({ userRole }) {
                           ${ingresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </td>
 
-                        {/* Estado (Clickeable con opción PAGADA y PENDIENTE) */}
+                        {/* Estado (Clickeable con opción PAGADA y PENDIENTE con Pop-up de Confirmación) */}
                         <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <button
                             type="button"
-                            onClick={() => handleToggleStatus(inv)}
+                            onClick={() => handleRequestToggleStatus(inv)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                             title="Clic para cambiar estado (PAGADA / PENDIENTE)"
                           >
@@ -1093,9 +1144,14 @@ export default function InvoicesModule({ userRole }) {
                 <h3 style={{ fontSize: '0.98rem', fontWeight: '800', color: '#047857', display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
                   <Calculator size={18} /> Ingresos del Mes
                 </h3>
-                <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
-                  {selectedMonth === 'ALL' ? 'Todos los Meses' : MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} {selectedYear}
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.15rem' }}>
+                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
+                    {selectedMonth === 'ALL' ? 'Todos los Meses' : MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} {selectedYear}
+                  </span>
+                  <span style={{ fontSize: '0.68rem', color: '#047857', background: '#ecfdf5', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700', border: '1px solid #a7f3d0' }}>
+                    ✓ Solo Facturas Pagadas
+                  </span>
+                </div>
               </div>
               
               {/* Tasa Retención ISR y Botón Otros Gastos */}
@@ -1234,6 +1290,28 @@ export default function InvoicesModule({ userRole }) {
               ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </strong>
           </div>
+
+          {/* Aviso informativo de facturas pendientes del período */}
+          {pendingInvoices.length > 0 && (
+            <div style={{
+              background: '#fffbeb',
+              border: '1px solid #fde68a',
+              borderRadius: '8px',
+              padding: '0.45rem 0.75rem',
+              marginTop: '0.65rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.74rem'
+            }}>
+              <span style={{ color: '#b45309', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Clock size={12} /> {pendingInvoices.length} {pendingInvoices.length === 1 ? 'factura pendiente' : 'facturas pendientes'} de cobro:
+              </span>
+              <strong style={{ color: '#d97706', fontWeight: '800' }}>
+                ${totalPendienteMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              </strong>
+            </div>
+          )}
         </div>
 
         {/* Card 2: Tarjeta Facturas Proveedores (IVA Acreditable) - Solo visible para edson / admin */}
@@ -2116,6 +2194,172 @@ export default function InvoicesModule({ userRole }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal / Pop-up de Confirmación de Cambio de Estado (PAGADA / PENDIENTE) */}
+      {statusConfirmModal.isOpen && statusConfirmModal.invoice && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content" style={{ maxWidth: '480px', borderRadius: '18px', border: '1.5px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <div style={{
+                  width: '38px',
+                  height: '38px',
+                  borderRadius: '10px',
+                  background: statusConfirmModal.targetStatus === 'PAGADA' ? '#ecfdf5' : '#fffbeb',
+                  border: `1.5px solid ${statusConfirmModal.targetStatus === 'PAGADA' ? '#a7f3d0' : '#fde68a'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: statusConfirmModal.targetStatus === 'PAGADA' ? '#059669' : '#d97706'
+                }}>
+                  {statusConfirmModal.targetStatus === 'PAGADA' ? <CheckCircle size={22} /> : <Clock size={22} />}
+                </div>
+                <div>
+                  <h3 style={{ fontWeight: '800', color: '#0f172a', margin: 0, fontSize: '1.15rem' }}>
+                    Confirmar Cambio de Estado
+                  </h3>
+                  <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                    Factura {formatFolio(statusConfirmModal.invoice.folio)}
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA' })}
+                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              {/* Status Transition Badge Pill */}
+              <div style={{
+                background: '#f8fafc',
+                padding: '0.75rem 1rem',
+                borderRadius: '12px',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+              }}>
+                <div style={{ textAlign: 'center', flex: 1 }}>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Estado Actual</span>
+                  {statusConfirmModal.invoice.status === 'PENDIENTE' ? (
+                    <span className="badge badge-amber" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <Clock size={12} /> PENDIENTE
+                    </span>
+                  ) : (
+                    <span className="badge badge-emerald" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <CheckCircle size={12} /> PAGADA
+                    </span>
+                  )}
+                </div>
+
+                <span style={{ fontSize: '1.2rem', color: '#94a3b8', fontWeight: 'bold' }}>➔</span>
+
+                <div style={{ textAlign: 'center', flex: 1 }}>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Nuevo Estado</span>
+                  {statusConfirmModal.targetStatus === 'PAGADA' ? (
+                    <span className="badge badge-emerald" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)' }}>
+                      <CheckCircle size={12} /> PAGADA
+                    </span>
+                  ) : (
+                    <span className="badge badge-amber" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)' }}>
+                      <Clock size={12} /> PENDIENTE
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Invoice Summary Card */}
+              {(() => {
+                const inv = statusConfirmModal.invoice;
+                const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+                const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
+                const totalAmt = parseFloat((base + (parseFloat(inv.ivaTotal) || 0) - isrRet).toFixed(2));
+                return (
+                  <div style={{
+                    background: statusConfirmModal.targetStatus === 'PAGADA' ? '#f0fdf4' : '#fffbeb',
+                    border: `1.5px solid ${statusConfirmModal.targetStatus === 'PAGADA' ? '#bbf7d0' : '#fde68a'}`,
+                    borderRadius: '12px',
+                    padding: '0.9rem 1.1rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.4rem'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ color: '#0f172a', fontSize: '0.95rem' }}>{inv.clientName}</strong>
+                      <span style={{ fontSize: '0.76rem', color: '#64748b', fontFamily: 'monospace' }}>{inv.rfc}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#64748b' }}>
+                      <span>Fecha: {formatDate(inv.date)}</span>
+                      <span>Folio: <strong style={{ color: '#047857' }}>{formatFolio(inv.folio)}</strong></span>
+                    </div>
+                    <div style={{ borderTop: `1px dashed ${statusConfirmModal.targetStatus === 'PAGADA' ? '#86efac' : '#fcd34d'}`, paddingTop: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>Total Comprobante:</span>
+                      <strong style={{ fontSize: '1.2rem', fontWeight: '900', color: statusConfirmModal.targetStatus === 'PAGADA' ? '#15803d' : '#b45309' }}>
+                        ${totalAmt.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Explanatory Message about Financial/Fiscal Impact */}
+              <div style={{
+                background: '#f8fafc',
+                padding: '0.75rem 0.95rem',
+                borderRadius: '10px',
+                border: '1px solid #e2e8f0',
+                fontSize: '0.82rem',
+                color: '#475569',
+                lineHeight: '1.45'
+              }}>
+                {statusConfirmModal.targetStatus === 'PAGADA' ? (
+                  <span>
+                    💡 <strong>Impacto Financiero:</strong> Al marcarla como <strong>PAGADA</strong>, el importe total se sumará automáticamente a la tarjeta <strong>Ingresos del Mes</strong> y a la <strong>Utilidad Real</strong>.
+                  </span>
+                ) : (
+                  <span>
+                    ⚠️ <strong>Impacto Financiero:</strong> Al marcarla como <strong>PENDIENTE</strong>, el importe se excluirá de la tarjeta <strong>Ingresos del Mes</strong> hasta que se confirme su pago efectivo.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button 
+                type="button" 
+                className="btn-secondary" 
+                onClick={() => setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA' })}
+                style={{ padding: '0.5rem 1rem' }}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                className="btn-primary" 
+                onClick={handleConfirmToggleStatus}
+                style={{
+                  background: statusConfirmModal.targetStatus === 'PAGADA' 
+                    ? 'linear-gradient(135deg, #059669, #10b981)' 
+                    : 'linear-gradient(135deg, #d97706, #f59e0b)',
+                  boxShadow: statusConfirmModal.targetStatus === 'PAGADA'
+                    ? '0 4px 14px rgba(16, 185, 129, 0.3)'
+                    : '0 4px 14px rgba(245, 158, 11, 0.3)',
+                  padding: '0.5rem 1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                {statusConfirmModal.targetStatus === 'PAGADA' ? <CheckCircle size={16} /> : <Clock size={16} />}
+                Confirmar como {statusConfirmModal.targetStatus}
+              </button>
+            </div>
           </div>
         </div>
       )}
