@@ -677,6 +677,33 @@ export default function InvoicesModule({ userRole }) {
     }, 0);
   }, [filteredInvoices]);
 
+  // Segregación informativa de facturas para la barra de estado
+  const paidInvoices = useMemo(() => {
+    return filteredInvoices.filter(inv => inv.status === 'PAGADA');
+  }, [filteredInvoices]);
+
+  const pendingInvoices = useMemo(() => {
+    return filteredInvoices.filter(inv => inv.status === 'PENDIENTE');
+  }, [filteredInvoices]);
+
+  const totalCobradoMonto = useMemo(() => {
+    return paidInvoices.reduce((sum, inv) => {
+      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
+      const ivaTot = parseFloat(inv.ivaTotal) || 0;
+      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
+    }, 0);
+  }, [paidInvoices]);
+
+  const totalPendienteMonto = useMemo(() => {
+    return pendingInvoices.reduce((sum, inv) => {
+      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
+      const ivaTot = parseFloat(inv.ivaTotal) || 0;
+      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
+    }, 0);
+  }, [pendingInvoices]);
+
   // IVA Trasladado de facturas del período
   const totalIvaTrasladado = useMemo(() => {
     return filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
