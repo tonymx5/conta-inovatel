@@ -1998,20 +1998,35 @@ export default function InvoicesModule({ userRole }) {
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: '700', color: '#047857' }}>
-                    Total a depositar ($):
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="form-control"
-                    placeholder="$0.00"
-                    style={{ fontWeight: '800', color: '#047857', fontSize: '1.05rem' }}
-                    value={depositFormData.amount}
-                    onChange={(e) => setDepositFormData({ ...depositFormData, amount: e.target.value })}
-                    required
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: '700', color: '#047857' }}>
+                      Total a depositar ($):
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      className="form-control"
+                      placeholder="$0.00"
+                      style={{ fontWeight: '800', color: '#047857', fontSize: '1.05rem' }}
+                      value={depositFormData.amount}
+                      onChange={(e) => setDepositFormData({ ...depositFormData, amount: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
+                      Fecha:
+                    </label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={depositFormData.date}
+                      onChange={(e) => setDepositFormData({ ...depositFormData, date: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
