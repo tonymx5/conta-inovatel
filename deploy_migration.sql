@@ -132,6 +132,20 @@ CREATE TABLE IF NOT EXISTS public.other_expenses (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 10. TABLA: AGENDA Y CALENDARIO (agenda_events)
+CREATE TABLE IF NOT EXISTS public.agenda_events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    date DATE NOT NULL,
+    time TEXT,
+    category TEXT DEFAULT 'general',
+    color_theme TEXT DEFAULT 'blue',
+    completed BOOLEAN DEFAULT FALSE,
+    created_by TEXT DEFAULT 'usuario',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Desactivar RLS si se usa llave anon pública directa
 ALTER TABLE public.invoices DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clients DISABLE ROW LEVEL SECURITY;
@@ -142,8 +156,9 @@ ALTER TABLE public.audit_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.card_expenses DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.investments DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.other_expenses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agenda_events DISABLE ROW LEVEL SECURITY;
 
--- 10. NORMALIZACIÓN AUTOMÁTICA DE FOLIOS A FK- Y TASAS DE IVA
+-- 11. NORMALIZACIÓN AUTOMÁTICA DE FOLIOS A FK- Y TASAS DE IVA
 UPDATE public.invoices 
 SET folio = 'FK-' || regexp_replace(UPPER(folio), '^(FK-?|F-?)', '', 'i')
 WHERE folio NOT LIKE 'FK-%';
@@ -152,7 +167,7 @@ UPDATE public.invoices
 SET iva_rate = 8.00 
 WHERE iva_rate >= 7.00 AND iva_rate <= 7.99;
 
--- 10. HABILITAR SUPABASE REALTIME MULTIDISPOSITIVO (TIEMPO REAL ENTERPRISE & REPLICA IDENTITY FULL)
+-- 12. HABILITAR SUPABASE REALTIME MULTIDISPOSITIVO (TIEMPO REAL ENTERPRISE & REPLICA IDENTITY FULL)
 ALTER TABLE public.invoices REPLICA IDENTITY FULL;
 ALTER TABLE public.clients REPLICA IDENTITY FULL;
 ALTER TABLE public.deductibles REPLICA IDENTITY FULL;
@@ -161,6 +176,7 @@ ALTER TABLE public.tax_config REPLICA IDENTITY FULL;
 ALTER TABLE public.audit_logs REPLICA IDENTITY FULL;
 ALTER TABLE public.card_expenses REPLICA IDENTITY FULL;
 ALTER TABLE public.investments REPLICA IDENTITY FULL;
+ALTER TABLE public.agenda_events REPLICA IDENTITY FULL;
 
 DO $$
 BEGIN
@@ -172,10 +188,12 @@ BEGIN
             public.account_deposits, 
             public.tax_config, 
             public.card_expenses, 
-            public.investments;
+            public.investments,
+            public.agenda_events;
     END IF;
 EXCEPTION WHEN OTHERS THEN
     NULL;
 END $$;
+
 
 

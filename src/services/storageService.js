@@ -14,7 +14,8 @@ const STORAGE_KEYS = {
   BANK_ACCOUNTS: 'conta_inovatel_bank_accounts',
   INVESTMENTS: 'conta_inovatel_investments',
   AUDIT_LOGS: 'conta_inovatel_audit_logs',
-  SECURITY_INCIDENTS: 'conta_inovatel_security_incidents'
+  SECURITY_INCIDENTS: 'conta_inovatel_security_incidents',
+  AGENDA_EVENTS: 'conta_inovatel_agenda_events'
 };
 
 // Clean legacy mock deposits from client localStorage if present
@@ -95,6 +96,64 @@ const initialBankAccounts = [
   { id: 'b4', bankName: 'Banregio', type: 'Débito', accountNumber: '**** 7699', balance: 0 },
   { id: 'b5', bankName: 'Banregio', type: 'Crédito', accountNumber: '**** 7699', balance: 0 },
   { id: 'b6', bankName: 'NU', type: 'Débito', accountNumber: '**** 6195', balance: 0 }
+];
+
+const initialAgendaEvents = [
+  {
+    id: 'evt-sat-mensual',
+    title: 'Declaración Mensual SAT - Pago Provisional ISR / IVA',
+    description: 'Presentación y pago de obligaciones fiscales correspondientes al mes vencido antes del día 17.',
+    date: '2026-08-17',
+    time: '12:00 PM',
+    category: 'fiscal',
+    colorTheme: 'red',
+    completed: true,
+    createdBy: 'edson'
+  },
+  {
+    id: 'evt-syscom-pago',
+    title: 'Pago Proveedor SYSCOM (Telecomunicaciones)',
+    description: 'Liquidación de factura FA26/1441633 por equipos de cómputo y redes.',
+    date: '2026-08-15',
+    time: '01:30 PM',
+    category: 'pago',
+    colorTheme: 'blue',
+    completed: true,
+    createdBy: 'edson'
+  },
+  {
+    id: 'evt-revision-cobranza',
+    title: 'Revisión y Conciliación de Cobranza Clientes',
+    description: 'Seguimiento de facturas FK-659 (Joint) y FK-665 (Alvarados) emitidas en el período.',
+    date: '2026-08-20',
+    time: '03:00 PM',
+    category: 'general',
+    colorTheme: 'yellow',
+    completed: true,
+    createdBy: 'karla'
+  },
+  {
+    id: 'evt-cierre-nomina',
+    title: 'Cierre de Quincena y Depósitos Operativos',
+    description: 'Conciliación de depósitos bancarios brutos y registro de remanentes reales.',
+    date: '2026-08-28',
+    time: '03:45 PM',
+    category: 'pago',
+    colorTheme: 'green',
+    completed: false,
+    createdBy: 'edson'
+  },
+  {
+    id: 'evt-estrategia-inversiones',
+    title: 'Reunión de Estrategia Fiscal y Rendimientos IA',
+    description: 'Evaluación de flujo libre para reinversión en CETES / Renta Fija y análisis de utilidades.',
+    date: '2026-08-31',
+    time: '04:30 PM',
+    category: 'reunion',
+    colorTheme: 'pink',
+    completed: false,
+    createdBy: 'edson'
+  }
 ];
 
 function getStorageItem(key, defaultValue) {
@@ -312,11 +371,25 @@ function mapOtherExpenseFromSupabase(oe) {
   };
 }
 
+function mapAgendaEventFromSupabase(evt) {
+  return {
+    id: evt.id,
+    title: evt.title || '',
+    description: evt.description || '',
+    date: evt.date || new Date().toISOString().split('T')[0],
+    time: evt.time || '12:00 PM',
+    category: evt.category || 'general',
+    colorTheme: evt.color_theme || evt.colorTheme || 'blue',
+    completed: !!evt.completed,
+    createdBy: evt.created_by || evt.createdBy || 'usuario'
+  };
+}
+
 export const storageService = {
   // Sync on startup from Supabase (Non-Destructive Protection)
   syncFromSupabase: async () => {
     try {
-      const [invRes, cliRes, dedRes, depRes, taxRes, cardRes, investRes, otherExpRes] = await Promise.all([
+      const [invRes, cliRes, dedRes, depRes, taxRes, cardRes, investRes, otherExpRes, agendaRes] = await Promise.all([
         supabase.from('invoices').select('*'),
         supabase.from('clients').select('*'),
         supabase.from('deductibles').select('*'),
@@ -324,7 +397,8 @@ export const storageService = {
         supabase.from('tax_config').select('*').limit(1).single(),
         supabase.from('card_expenses').select('*'),
         supabase.from('investments').select('*'),
-        supabase.from('other_expenses').select('*')
+        supabase.from('other_expenses').select('*'),
+        supabase.from('agenda_events').select('*').then(r => r).catch(() => ({ data: null }))
       ]);
 
       // 1. Invoices
@@ -455,6 +529,26 @@ export const storageService = {
           sector: oe.userRole || 'ADMIN'
         });
       })).catch(e => console.error('Seed other_expenses error:', e));
+
+      // 8. Agenda Events (Calendario & Agenda)
+      const localAgenda = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents);
+      if (agendaRes && agendaRes.data && agendaRes.data.length > 0) {
+        const mappedAgenda = agendaRes.data.map(mapAgendaEventFromSupabase);
+        setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, mappedAgenda);
+      } else if (localAgenda && localAgenda.length > 0) {
+        setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, localAgenda);
+        Promise.all(localAgenda.map(evt => supabase.from('agenda_events').upsert({
+          id: evt.id,
+          title: evt.title,
+          description: evt.description || '',
+          date: evt.date,
+          time: evt.time || '',
+          category: evt.category || 'general',
+          color_theme: evt.colorTheme || 'blue',
+          completed: !!evt.completed,
+          created_by: evt.createdBy || 'usuario'
+        }))).catch(() => {});
+      }
 
       if (taxRes && taxRes.data) {
         setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 2.5 });
@@ -672,6 +766,23 @@ export const storageService = {
             const idx = list.findIndex(oe => oe.id === mapped.id);
             if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
             setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
+          }
+          notifyDataSynced();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agenda_events' },
+        (payload) => {
+          const list = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents);
+          if (payload.eventType === 'DELETE') {
+            const newList = list.filter(item => item.id !== payload.old.id);
+            setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, newList);
+          } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const mapped = mapAgendaEventFromSupabase(payload.new);
+            const idx = list.findIndex(e => e.id === mapped.id);
+            if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+            setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, list);
           }
           notifyDataSynced();
         }
@@ -1152,6 +1263,68 @@ export const storageService = {
     return list;
   },
 
+  // Agenda & Calendar Events
+  getAgendaEvents: () => getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents),
+  saveAgendaEvent: (eventData, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents);
+    const evtToSave = {
+      id: eventData.id || 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
+      title: eventData.title || '',
+      description: eventData.description || '',
+      date: eventData.date || new Date().toISOString().split('T')[0],
+      time: eventData.time || '12:00 PM',
+      category: eventData.category || 'general',
+      colorTheme: eventData.colorTheme || 'blue',
+      completed: !!eventData.completed,
+      createdBy: eventData.createdBy || (user === 'admin' ? 'edson' : 'karla')
+    };
+
+    const idx = list.findIndex(e => e.id === evtToSave.id);
+    if (idx >= 0) list[idx] = evtToSave; else list.unshift(evtToSave);
+    setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, list);
+
+    Promise.resolve(supabase.from('agenda_events').upsert({
+      id: evtToSave.id,
+      title: evtToSave.title,
+      description: evtToSave.description,
+      date: evtToSave.date,
+      time: evtToSave.time,
+      category: evtToSave.category,
+      color_theme: evtToSave.colorTheme,
+      completed: evtToSave.completed,
+      created_by: evtToSave.createdBy
+    })).catch(err => console.warn('Supabase agenda save warning:', err.message));
+
+    storageService.logAudit(user, idx >= 0 ? 'ACTUALIZAR_EVENTO_AGENDA' : 'REGISTRAR_EVENTO_AGENDA', `${evtToSave.title} (${evtToSave.date})`);
+    notifyDataSynced();
+    return list;
+  },
+  deleteAgendaEvent: (id, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents).filter(e => e.id !== id);
+    setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, list);
+
+    Promise.resolve(supabase.from('agenda_events').delete().eq('id', id)).catch(err => console.warn('Supabase agenda delete warning:', err.message));
+
+    storageService.logAudit(user, 'ELIMINAR_EVENTO_AGENDA', `ID ${id}`);
+    notifyDataSynced();
+    return list;
+  },
+  toggleAgendaEventStatus: (id, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents);
+    const item = list.find(e => e.id === id);
+    if (item) {
+      item.completed = !item.completed;
+      setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, list);
+
+      Promise.resolve(supabase.from('agenda_events').update({ completed: item.completed }).eq('id', id))
+        .catch(err => console.warn('Supabase agenda status update warning:', err.message));
+
+      storageService.logAudit(user, item.completed ? 'COMPLETAR_EVENTO_AGENDA' : 'REABRIR_EVENTO_AGENDA', item.title);
+      notifyDataSynced();
+    }
+    return list;
+  },
+
   // Audit Logs
   getAuditLogs: () => getStorageItem(STORAGE_KEYS.AUDIT_LOGS, []),
   logAudit: (username, action, details) => {
@@ -1204,7 +1377,8 @@ export const storageService = {
           totalInvoices: (getStorageItem(STORAGE_KEYS.INVOICES, [])).length,
           totalClients: (getStorageItem(STORAGE_KEYS.CLIENTS, [])).length,
           totalDeductibles: (getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, [])).length,
-          totalDeposits: (getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, [])).length
+          totalDeposits: (getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, [])).length,
+          totalAgendaEvents: (getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, [])).length
         },
         invoices: getStorageItem(STORAGE_KEYS.INVOICES, []),
         clients: getStorageItem(STORAGE_KEYS.CLIENTS, []),
@@ -1216,6 +1390,7 @@ export const storageService = {
         bankAccounts: getStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, []),
         cardExpenses: getStorageItem(STORAGE_KEYS.CARD_EXPENSES, []),
         investments: getStorageItem(STORAGE_KEYS.INVESTMENTS, []),
+        agendaEvents: getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, []),
         auditLogs: getStorageItem(STORAGE_KEYS.AUDIT_LOGS, [])
       };
 
@@ -1299,6 +1474,21 @@ export const storageService = {
           amount_invested: inv.amountInvested || 0, expected_yield_pct: inv.expectedYieldPct || 0,
           start_date: inv.startDate, notes: inv.notes || ''
         }))).catch(e => console.error('Restore investments error:', e));
+      }
+
+      if (Array.isArray(backupData.agendaEvents)) {
+        setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, backupData.agendaEvents);
+        Promise.all(backupData.agendaEvents.map(evt => supabase.from('agenda_events').upsert({
+          id: evt.id,
+          title: evt.title,
+          description: evt.description || '',
+          date: evt.date,
+          time: evt.time || '',
+          category: evt.category || 'general',
+          color_theme: evt.colorTheme || 'blue',
+          completed: !!evt.completed,
+          created_by: evt.createdBy || 'usuario'
+        }))).catch(e => console.error('Restore agenda error:', e));
       }
 
       if (backupData.taxConfig) {

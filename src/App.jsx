@@ -6,10 +6,10 @@ import SecurityReportModal from './components/SecurityReportModal';
 import LoginGateModal from './components/LoginGateModal';
 import ConfigModal from './components/ConfigModal';
 import BackupModal from './components/BackupModal';
-import { FileText, BarChart3, TrendingUp, CreditCard, Users, Settings, Receipt } from 'lucide-react';
+import { FileText, BarChart3, TrendingUp, CreditCard, Users, Settings, Receipt, Calendar } from 'lucide-react';
 import { storageService } from './services/storageService';
 
-// 7 Application Modules
+// Application Modules
 import InvoicesModule from './components/InvoicesModule';
 import OtherIncomeModule from './components/OtherIncomeModule';
 import ProviderDeductionsModule from './components/ProviderDeductionsModule';
@@ -17,6 +17,7 @@ import ClientsModule from './components/ClientsModule';
 import ExpensesModule from './components/ExpensesModule';
 import AnalyticsModule from './components/AnalyticsModule';
 import InvestmentsModule from './components/InvestmentsModule';
+import AgendaModule from './components/AgendaModule';
 
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 Minutos
 const SESSION_STORAGE_KEY = 'conta_active_session';
@@ -201,6 +202,7 @@ export default function App() {
         {/* Main Module Content */}
         <main style={{ flex: 1, padding: '1.25rem', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
           {activeTab === 'invoices' && <InvoicesModule userRole={userRole} />}
+          {activeTab === 'agenda' && <AgendaModule userRole={userRole} />}
           {activeTab === 'other_income' && <OtherIncomeModule userRole={userRole} />}
           {activeTab === 'provider_deductions' && userRole === 'admin' && <ProviderDeductionsModule userRole={userRole} />}
           {activeTab === 'clients' && <ClientsModule userRole={userRole} />}
@@ -227,6 +229,15 @@ export default function App() {
           >
             <Users size={22} />
             <span className="tooltip">Clientes</span>
+          </button>
+
+          <button
+            className={`mobile-icon-btn ${activeTab === 'agenda' ? 'active' : ''}`}
+            onClick={() => handleMobileNav('agenda', 'Agenda', false)}
+            aria-label="Agenda"
+          >
+            <Calendar size={22} />
+            <span className="tooltip">Agenda</span>
           </button>
 
           {userRole === 'admin' && (

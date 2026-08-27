@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FileText, DollarSign, Receipt, Users, CreditCard, BarChart3, TrendingUp, 
-  ShieldAlert, History, Lock, Wifi, WifiOff, RefreshCw, Settings, Database
+  ShieldAlert, History, Lock, Wifi, WifiOff, RefreshCw, Settings, Database, Calendar
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
@@ -28,6 +28,7 @@ export default function Header({
   const allTabs = [
     { id: 'invoices', label: 'Facturas', icon: FileText, restricted: false },
     { id: 'clients', label: 'Clientes', icon: Users, restricted: false },
+    { id: 'agenda', label: 'Agenda', icon: Calendar, restricted: false },
     { id: 'other_income', label: 'Otros Ingresos', icon: DollarSign, restricted: true },
     { id: 'provider_deductions', label: 'Fact Prov', icon: Receipt, restricted: false, adminOnly: true },
     { id: 'expenses', label: 'Gastos & Bancos', icon: CreditCard, restricted: true },

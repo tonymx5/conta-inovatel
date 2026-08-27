@@ -1,0 +1,244 @@
+<!DOCTYPE html><html class="h-full" lang="es" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Calendario - Vista Semanal</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#0053db",
+                        "secondary-container": "#d0e1fb",
+                        "outline-variant": "#c3c6d7",
+                        "primary-fixed-dim": "#b4c5ff",
+                        "surface-container-low": "#f2f3ff",
+                        "on-tertiary-fixed": "#171c1f",
+                        "on-primary-fixed-variant": "#003ea8",
+                        "inverse-on-surface": "#eef0ff",
+                        "on-tertiary-container": "#edf1f5",
+                        "inverse-surface": "#283044",
+                        "error": "#ba1a1a",
+                        "on-secondary": "#ffffff",
+                        "on-tertiary": "#ffffff",
+                        "primary-container": "#2563eb",
+                        "on-primary-fixed": "#00174b",
+                        "on-background": "#131b2e",
+                        "tertiary": "#515659",
+                        "on-surface-variant": "#434655",
+                        "surface-container-highest": "#dae2fd",
+                        "surface-variant": "#dae2fd",
+                        "on-secondary-fixed": "#0b1c30",
+                        "surface-container": "#eaedff",
+                        "secondary-fixed-dim": "#b7c8e1",
+                        "background": "#faf8ff",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed": "#dfe3e7",
+                        "on-primary": "#ffffff",
+                        "outline": "#737686",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#d2d9f4",
+                        "error-container": "#ffdad6",
+                        "on-surface": "#131b2e",
+                        "on-secondary-container": "#54647a",
+                        "surface-container-high": "#e2e7ff",
+                        "on-primary-container": "#eeefff",
+                        "secondary-fixed": "#d3e4fe",
+                        "on-secondary-fixed-variant": "#38485d",
+                        "tertiary-fixed-dim": "#c3c7cb",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-primary": "#b4c5ff",
+                        "primary-fixed": "#dbe1ff",
+                        "tertiary-container": "#696e71",
+                        "secondary": "#505f76",
+                        "surface-bright": "#faf8ff",
+                        "primary": "#004ac6",
+                        "surface": "#faf8ff",
+                        "on-tertiary-fixed-variant": "#43474b"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "gutter": "1px",
+                        "calendar-cell-min-height": "48px",
+                        "sm": "8px",
+                        "lg": "16px",
+                        "xs": "4px",
+                        "xl": "24px",
+                        "md": "12px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "headline-sm": ["Inter"],
+                        "label-xs": ["Inter"],
+                        "label-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-sm": ["13px", { "lineHeight": "18px", "fontWeight": "400" }],
+                        "display-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "headline-sm": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "label-xs": ["10px", { "lineHeight": "12px", "fontWeight": "600" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-background h-full flex flex-col font-body-md overflow-hidden relative">
+<!-- TopAppBar -->
+
+<!-- Main Content -->
+<main class="flex-1 overflow-y-auto hide-scrollbar py-lg">
+<!-- Contextual Header Area (like the original image) -->
+<div class="px-lg py-sm flex justify-between items-center bg-surface sticky top-0 z-40">
+<button class="p-2 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<button class="bg-primary text-on-primary font-label-md text-label-md px-lg py-sm rounded-full flex items-center gap-xs shadow-sm hover:opacity-90 px-xl"><span class="material-symbols-outlined text-[18px]">add</span> Agregar</button>
+</div>
+<!-- 7-Day Horizontal Scroll -->
+<div class="flex overflow-x-auto hide-scrollbar px-lg py-sm gap-lg border-b border-outline-variant bg-surface sticky top-[60px] z-30">
+<div class="flex flex-col items-center gap-xs text-on-surface-variant min-w-[40px]">
+<span class="font-label-xs text-label-xs uppercase">Lun</span>
+<span class="font-headline-sm text-headline-sm">11</span>
+</div>
+<div class="flex flex-col items-center gap-xs text-on-surface-variant min-w-[40px]">
+<span class="font-label-xs text-label-xs uppercase">Mar</span>
+<span class="font-headline-sm text-headline-sm">12</span>
+</div>
+<div class="flex flex-col items-center gap-xs text-on-surface-variant min-w-[40px]">
+<span class="font-label-xs text-label-xs uppercase">Mié</span>
+<span class="font-headline-sm text-headline-sm">13</span>
+</div>
+<div class="flex flex-col items-center gap-xs text-primary min-w-[40px] font-bold">
+<span class="font-label-xs text-label-xs uppercase">Jue</span>
+<span class="font-headline-sm text-headline-sm text-[20px]">14</span>
+<div class="w-1 h-1 bg-primary rounded-full"></div>
+</div>
+<div class="flex flex-col items-center gap-xs text-on-surface-variant min-w-[40px]">
+<span class="font-label-xs text-label-xs uppercase">Vie</span>
+<span class="font-headline-sm text-headline-sm">15</span>
+</div>
+<div class="flex flex-col items-center gap-xs text-on-surface-variant min-w-[40px]">
+<span class="font-label-xs text-label-xs uppercase">Sáb</span>
+<span class="font-headline-sm text-headline-sm">16</span>
+</div>
+<div class="flex flex-col items-center gap-xs text-on-surface-variant min-w-[40px]">
+<span class="font-label-xs text-label-xs uppercase">Dom</span>
+<span class="font-headline-sm text-headline-sm">17</span>
+</div>
+</div>
+<!-- Timeline / Agenda -->
+<div class="px-lg py-lg relative mt-4">
+<!-- Timeline vertical line -->
+<div class="absolute left-[36px] top-4 bottom-4 w-px bg-error/30 z-0"></div>
+<div class="flex flex-col gap-lg gap-xl">
+<!-- Task 1 -->
+<div class="relative flex gap-md pl-12 z-10">
+<div class="absolute left-[-4px] top-2 w-4 h-4 rounded-full border-2 border-error bg-surface flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-error"></div>
+</div>
+<div class="bg-[#de526a] text-white rounded-xl p-md w-full shadow-sm relative overflow-hidden group hover:translate-y-[-2px] transition-transform">
+<div class="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-sm text-headline-sm font-bold">Creación de Wireframes</h3>
+<span class="font-label-md text-label-md opacity-90">12:00 PM</span>
+</div>
+<p class="font-body-sm text-body-sm opacity-90">Idear a partir de bocetos y wireframes.</p>
+</div>
+</div>
+<!-- Task 2 -->
+<div class="relative flex gap-md pl-12 z-10">
+<div class="absolute left-[0px] top-2 w-2 h-2 rounded-full border-2 border-error bg-surface"></div>
+<div class="bg-surface-container-low text-on-surface rounded-xl p-md w-full shadow-sm relative overflow-hidden group hover:translate-y-[-2px] transition-transform">
+<div class="absolute inset-0 bg-black/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-sm text-headline-sm font-bold text-[#2d3758]">Diseño UI</h3>
+<span class="font-label-md text-label-md text-[#2d3758]">1:30 PM</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Diseño visual a partir del wireframe y crear sistema de diseño.</p>
+</div>
+</div>
+<!-- Task 3 -->
+<div class="relative flex gap-md pl-12 z-10">
+<div class="absolute left-[0px] top-2 w-2 h-2 rounded-full border-2 border-error bg-surface"></div>
+<div class="bg-[#fef9eb] text-on-surface rounded-xl p-md w-full shadow-sm relative overflow-hidden group hover:translate-y-[-2px] transition-transform">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-sm text-headline-sm font-bold text-[#2d3758]">Prototipado</h3>
+<span class="font-label-md text-label-md text-[#2d3758]">3:00 PM</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Hacer el prototipo interactivo para pruebas e interesados.</p>
+</div>
+</div>
+<!-- Task 4 -->
+<div class="relative flex gap-md pl-12 z-10">
+<div class="absolute left-[0px] top-2 w-2 h-2 rounded-full border-2 border-error bg-surface"></div>
+<div class="bg-[#f2fdf7] text-on-surface rounded-xl p-md w-full shadow-sm relative overflow-hidden group hover:translate-y-[-2px] transition-transform">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-sm text-headline-sm font-bold text-[#2d3758]">Pruebas de Usabilidad</h3>
+<span class="font-label-md text-label-md text-[#2d3758]">3:45 PM</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Pruebas de usuario primario y pruebas de usabilidad del prototipo.</p>
+</div>
+</div>
+<!-- Task 5 -->
+<div class="relative flex gap-md pl-12 z-10">
+<div class="absolute left-[0px] top-2 w-2 h-2 rounded-full border-2 border-error bg-surface"></div>
+<div class="bg-[#fdf3f4] text-on-surface rounded-xl p-md w-full shadow-sm relative overflow-hidden group hover:translate-y-[-2px] transition-transform">
+<div class="flex justify-between items-start mb-1">
+<h3 class="font-headline-sm text-headline-sm font-bold text-[#2d3758]">Reunión</h3>
+<span class="font-label-md text-label-md text-[#2d3758]">4:30 PM</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Resumir la discusión para el nuevo producto con los interesados.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Image embedded as requested via prompt -->
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 bg-surface-container dark:bg-surface-container-low flat no shadows flex justify-around items-center h-16 pb-safe px-md md:hidden bg-surface-container-low">
+<!-- Month (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline p-2 hover:text-primary dark:hover:text-primary-fixed-dim scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[24px] mb-1" data-icon="calendar_month">calendar_month</span>
+<span class="font-label-md text-label-md">Mes</span>
+</button>
+<!-- Week (Active) -->
+<button class="flex flex-col items-center justify-center bg-secondary-container dark:bg-secondary-fixed-dim text-on-secondary-container dark:text-on-secondary-fixed-variant rounded-full px-sm py-xs hover:text-primary dark:hover:text-primary-fixed-dim scale-95 active:scale-90 transition-transform w-[64px] bg-primary-container text-on-primary-container">
+<span class="material-symbols-outlined text-[24px] mb-1" data-icon="view_week" data-weight="fill" style="font-variation-settings: 'FILL' 1;">view_week</span>
+<span class="font-label-md text-label-md">Semana</span>
+</button>
+<!-- Day (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline p-2 hover:text-primary dark:hover:text-primary-fixed-dim scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[24px] mb-1" data-icon="view_day">view_day</span>
+<span class="font-label-md text-label-md">Día</span>
+</button>
+<!-- Agenda (Inactive) -->
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline p-2 hover:text-primary dark:hover:text-primary-fixed-dim scale-95 active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-[24px] mb-1" data-icon="view_agenda">view_agenda</span>
+<span class="font-label-md text-label-md">Agenda</span>
+</button>
+</nav>
+
+
+</body></html>

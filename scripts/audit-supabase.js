@@ -66,6 +66,10 @@ const SCHEMA_AUDIT_MAP = [
   {
     table: 'investments',
     cols: 'id,asset_name,category,amount_invested,expected_yield_pct,start_date,notes,created_at'
+  },
+  {
+    table: 'agenda_events',
+    cols: 'id,title,description,date,time,category,color_theme,completed,created_by,created_at'
   }
 ];
 
@@ -83,14 +87,20 @@ async function auditSupabase() {
       if (response.status >= 200 && response.status < 300) {
         const colList = item.cols.split(',');
         console.log(`  ✓ Tabla '${item.table}': OK (HTTP ${response.status}) | Esquema validado (${colList.length} columnas activas)`);
+      } else if (item.optional) {
+        console.log(`  ⚠️ Tabla '${item.table}': Pendiente de migración en Supabase (HTTP ${response.status}) | Sincronización LocalStorage activa`);
       } else {
         const errText = await response.text();
         console.error(`  ❌ Tabla '${item.table}': FALLO HTTP ${response.status} -> ${errText}`);
         hasErrors = true;
       }
     } catch (err) {
-      console.error(`  ❌ Tabla '${item.table}': Error de Conexión ->`, err.message);
-      hasErrors = true;
+      if (item.optional) {
+        console.log(`  ⚠️ Tabla '${item.table}': Pendiente de migración -> ${err.message}`);
+      } else {
+        console.error(`  ❌ Tabla '${item.table}': Error de Conexión ->`, err.message);
+        hasErrors = true;
+      }
     }
   }
 

@@ -130,6 +130,20 @@ CREATE TABLE IF NOT EXISTS public.other_expenses (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 10. TABLA: AGENDA Y CALENDARIO (agenda_events)
+CREATE TABLE IF NOT EXISTS public.agenda_events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    date DATE NOT NULL,
+    time TEXT,
+    category TEXT DEFAULT 'general',
+    color_theme TEXT DEFAULT 'blue',
+    completed BOOLEAN DEFAULT FALSE,
+    created_by TEXT DEFAULT 'usuario',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =========================================================================
 -- DESACTIVAR RLS (Permitir lectura y escritura a la API Anon de forma inmediata)
 -- =========================================================================
@@ -142,6 +156,7 @@ ALTER TABLE public.audit_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.card_expenses DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.investments DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.other_expenses DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agenda_events DISABLE ROW LEVEL SECURITY;
 
 -- =========================================================================
 -- DATOS INICIALES (SEMILLA)

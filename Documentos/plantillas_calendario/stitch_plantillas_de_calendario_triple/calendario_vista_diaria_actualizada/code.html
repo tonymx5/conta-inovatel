@@ -1,0 +1,322 @@
+<!DOCTYPE html><html class="light" lang="es"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Vista Diaria - Calendario</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-tint": "#0053db",
+                    "secondary-container": "#d0e1fb",
+                    "outline-variant": "#c3c6d7",
+                    "primary-fixed-dim": "#b4c5ff",
+                    "surface-container-low": "#f2f3ff",
+                    "on-tertiary-fixed": "#171c1f",
+                    "on-primary-fixed-variant": "#003ea8",
+                    "inverse-on-surface": "#eef0ff",
+                    "on-tertiary-container": "#edf1f5",
+                    "inverse-surface": "#283044",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary": "#ffffff",
+                    "primary-container": "#2563eb",
+                    "on-primary-fixed": "#00174b",
+                    "on-background": "#131b2e",
+                    "tertiary": "#515659",
+                    "on-surface-variant": "#434655",
+                    "surface-container-highest": "#dae2fd",
+                    "surface-variant": "#dae2fd",
+                    "on-secondary-fixed": "#0b1c30",
+                    "surface-container": "#eaedff",
+                    "secondary-fixed-dim": "#b7c8e1",
+                    "background": "#faf8ff",
+                    "on-error-container": "#93000a",
+                    "tertiary-fixed": "#dfe3e7",
+                    "on-primary": "#ffffff",
+                    "outline": "#737686",
+                    "on-error": "#ffffff",
+                    "surface-dim": "#d2d9f4",
+                    "error-container": "#ffdad6",
+                    "on-surface": "#131b2e",
+                    "on-secondary-container": "#54647a",
+                    "surface-container-high": "#e2e7ff",
+                    "on-primary-container": "#eeefff",
+                    "secondary-fixed": "#d3e4fe",
+                    "on-secondary-fixed-variant": "#38485d",
+                    "tertiary-fixed-dim": "#c3c7cb",
+                    "surface-container-lowest": "#ffffff",
+                    "inverse-primary": "#b4c5ff",
+                    "primary-fixed": "#dbe1ff",
+                    "tertiary-container": "#696e71",
+                    "secondary": "#505f76",
+                    "surface-bright": "#faf8ff",
+                    "primary": "#004ac6",
+                    "surface": "#faf8ff",
+                    "on-tertiary-fixed-variant": "#43474b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "gutter": "1px",
+                    "calendar-cell-min-height": "48px",
+                    "sm": "8px",
+                    "lg": "16px",
+                    "xs": "4px",
+                    "xl": "24px",
+                    "md": "12px"
+            },
+            "fontFamily": {
+                    "body-sm": ["Inter"],
+                    "display-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "headline-md": ["Inter"],
+                    "headline-sm": ["Inter"],
+                    "label-xs": ["Inter"],
+                    "label-md": ["Inter"]
+            },
+            "fontSize": {
+                    "body-sm": ["13px", {"lineHeight": "18px", "fontWeight": "400"}],
+                    "display-lg": ["30px", {"lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "headline-sm": ["16px", {"lineHeight": "24px", "fontWeight": "600"}],
+                    "label-xs": ["10px", {"lineHeight": "12px", "fontWeight": "600"}],
+                    "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.02em", "fontWeight": "500"}]
+            }
+          }
+        }
+      }
+    </script>
+<style>.timeline-line {
+    width: 2px;
+    background-color: #fca5a5;
+    /* Using a generic red for the timeline based on image */
+    position: absolute;
+    left: 23px;
+    /* Center with the circle */
+    top: 24px;
+    bottom: -24px;
+    /* Extend to next item */
+    z-index: 0
+    }
+.timeline-circle {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #fca5a5;
+    background-color: #fff;
+    position: relative;
+    z-index: 1
+    }
+@keyframes pulse-ring {
+    0% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+.timeline-circle.active {
+    border: 2px solid #ef4444;
+    background-color: #ef4444;
+    animation: pulse-ring 2s infinite;
+    }
+/* Custom colors matching the image for cards */
+.bg-card-red {
+    background-color: #f43f5e;
+    color: white
+    }
+.bg-card-blue {
+    background-color: #e0e7ff;
+    color: #1e1b4b
+    }
+.bg-card-yellow {
+    background-color: #fef9c3;
+    color: #1e1b4b
+    }
+.bg-card-green {
+    background-color: #dcfce3;
+    color: #1e1b4b
+    }
+.bg-card-pink {
+    background-color: #fce7f3;
+    color: #1e1b4b
+    }
+.card-bg-pattern {
+    background-image: url(https://lh3.googleusercontent.com/aida-public/AB6AXuDHQbsmD-ZEUKXQuBr0ajPbDUcMKtQFWqp-O3i4_4kHrn_4i7sT5J8vYS0m3FGqwUYiIdJ9OgbU1WDjEGpVD1oiQ9jtZgTGtXJWmtMgiZpJRn8sPQWypuCsCar8UaA43ZN74L7Ft4gUyioYSFG5BSnLf4lsWdCw1XzvHhOvCOKcunVUtcQTjdOOE6apMVBsW0S5fK-syGuo2OaY6RjF9Qcji7L_ZNYGOYhfbpd4JvgNKZ356USNE1oD0A);
+    background-size: cover;
+    background-position: center;
+    opacity: 0.1;
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none
+    }</style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased min-h-screen flex flex-col max-w-md mx-auto relative shadow-2xl overflow-hidden">
+<!-- Top App Bar -->
+<header class="bg-surface sticky top-0 z-50 flex items-center justify-between px-lg h-14 w-full flat no shadows transition-colors duration-200">
+<button class="w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-low text-primary hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<button class="bg-primary text-on-primary font-headline-sm text-headline-sm flex items-center gap-xs px-lg py-xs rounded-full shadow-sm active:scale-95 transition-transform font-bold">
+<span class="material-symbols-outlined text-[20px]">add</span>
+            Agregar
+        </button>
+</header>
+<!-- Date Strip -->
+<div class="px-md py-sm bg-surface sticky top-14 z-40 border-b border-surface-container-high">
+<div class="flex justify-between items-center w-full gap-xs">
+<div class="flex flex-col items-center flex-1 cursor-pointer hover:bg-surface-container-low rounded-lg p-xs transition-colors">
+<span class="font-label-md text-label-md text-on-surface-variant">Lun</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-xs">11</span>
+</div>
+<div class="flex flex-col items-center flex-1 cursor-pointer hover:bg-surface-container-low rounded-lg p-xs transition-colors">
+<span class="font-label-md text-label-md text-on-surface-variant">Mar</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-xs">12</span>
+</div>
+<div class="flex flex-col items-center flex-1 cursor-pointer hover:bg-surface-container-low rounded-lg p-xs transition-colors">
+<span class="font-label-md text-label-md text-on-surface-variant">Mié</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-xs">13</span>
+</div>
+<div class="flex flex-col items-center flex-1 cursor-pointer relative bg-surface-container rounded-lg p-xs transition-colors">
+<span class="font-label-md text-label-md text-primary">Jue</span>
+<span class="font-headline-sm text-[21px] font-bold text-primary mt-xs">14</span>
+<div class="w-1 h-1 bg-primary rounded-full absolute bottom-0 mb-1"></div>
+</div>
+<div class="flex flex-col items-center flex-1 cursor-pointer hover:bg-surface-container-low rounded-lg p-xs transition-colors">
+<span class="font-label-md text-label-md text-on-surface-variant">Vie</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-xs">15</span>
+</div>
+<div class="flex flex-col items-center flex-1 cursor-pointer hover:bg-surface-container-low rounded-lg p-xs transition-colors">
+<span class="font-label-md text-label-md text-on-surface-variant">Sáb</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-xs">16</span>
+</div>
+<div class="flex flex-col items-center flex-1 cursor-pointer hover:bg-surface-container-low rounded-lg p-xs transition-colors">
+<span class="font-label-md text-label-md text-on-surface-variant">Dom</span>
+<span class="font-headline-sm text-headline-sm text-on-surface mt-xs">17</span>
+</div>
+</div>
+</div>
+<!-- Main Content: Agenda/Timeline -->
+<main class="flex-1 overflow-y-auto px-md py-lg pb-24 relative">
+<!-- Background Map Image -->
+<div class="absolute inset-0 z-0 opacity-10 pointer-events-none" data-alt="A faint, subtle topographic map background pattern in light gray, adding a slight texture to a clean, bright, minimalist modern calendar interface. Light mode aesthetic, professional and unobtrusive." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCn2a7Rz54rWifSMCNFifvqdRS756VzQsnxtfMwKMkfdrjMwyVApLqCWl8yMvLrPoHj8cmrO1iis2Ag1Ay3wD5D_XspovbdKUaIhmVT2zHNpmzUdb5kEM1Nn22exrNJxDVoDvsQGNtq9V5mAim86lVvjE66A4JYnuaAlTQdQyMeMvuVtpWUeAHQ1BJf2RhEEAXRdLrHLd9kqKHhsWafIda4mggkOQFFn00O-rL3aXQp9jlMwTgjfYMShA')"></div>
+<div class="relative z-10 flex flex-col gap-lg">
+<!-- Timeline Item 1 -->
+<div class="flex relative">
+<div class="w-12 flex-shrink-0 flex justify-center pt-md relative">
+<div class="timeline-circle active"></div>
+<div class="timeline-line"></div>
+</div>
+<div class="flex-1 bg-card-red rounded-3xl p-md relative overflow-hidden shadow-sm hover:scale-[1.02] transition-transform">
+<div class="card-bg-pattern" data-alt="Subtle topographic contour lines pattern overlay, barely visible, adding texture to a vibrant red UI card. Modern, clean vector aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAsJOgVes32VqBKa2zmWClbXvubzLLfCol6z8pn7ToIGWuw-Ts5Sp40E4Aaqcw2dxROLlC8izWrMZjRGNl5y_6yFPjNmAJM-5NQ4E5k08-kyGt-FcF-bf-RxD4nTL0O3lY_5qTH56inEYDr8piO1_dFgzdrJsuTiNeY4Xf7q-w21eo4lIClU_lAym0iyi-G2RmoRHLnhFmwTZTUzcQDv3ZeleRr0T3yiGXYBJyBW9UShHeTwPNbPiLROw')"></div>
+<div class="flex justify-between items-start relative z-10">
+<h3 class="font-headline-sm text-headline-sm font-bold">Wireframing</h3>
+<span class="font-label-md text-label-md opacity-90">12:00 PM</span>
+</div>
+<p class="font-body-sm text-body-sm mt-sm opacity-90 leading-tight">Idear a partir de bocetos y wireframes.</p>
+</div>
+</div>
+<!-- Timeline Item 2 -->
+<div class="flex relative">
+<div class="w-12 flex-shrink-0 flex justify-center pt-md relative">
+<div class="timeline-circle"></div>
+<div class="timeline-line"></div>
+</div>
+<div class="flex-1 bg-card-blue rounded-3xl p-md relative overflow-hidden shadow-sm hover:scale-[1.02] transition-transform">
+<div class="card-bg-pattern" data-alt="Subtle topographic contour lines pattern overlay, barely visible, adding texture to a pale blue UI card. Modern, clean vector aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAmloI7vlMtsxsPIO243gplqnE5mA-Lz9g9lGqR2eahjNAPwWFQuQUxnjgDLJgntY7HJPqkzH2am4YXAKn1ElfDB1870f2VzkynBAulXkeXOZaCtgDY7IWrfUqybzAaHN1GGCiF-xxURMRL99idG6G_nXPQ5sJv_pJVqSm5HZgmWB1NE7qcwsdpm5BEB4fcA4X6Rv9H1OVyBAWk8dnkfoGOblJfNU0rt-XyPcpt3PDlCd0ibllATrMImQ')"></div>
+<div class="flex justify-between items-start relative z-10">
+<h3 class="font-headline-sm text-headline-sm font-bold">Diseño UI</h3>
+<span class="font-label-md text-label-md opacity-70">1:30 PM</span>
+</div>
+<p class="font-body-sm text-body-sm mt-sm opacity-70 leading-tight">Diseño visual a partir del wireframe y crear sistema de diseño.</p>
+</div>
+</div>
+<!-- Timeline Item 3 -->
+<div class="flex relative">
+<div class="w-12 flex-shrink-0 flex justify-center pt-md relative">
+<div class="timeline-circle"></div>
+<div class="timeline-line"></div>
+</div>
+<div class="flex-1 bg-card-yellow rounded-3xl p-md relative overflow-hidden shadow-sm hover:scale-[1.02] transition-transform">
+<div class="card-bg-pattern" data-alt="Subtle topographic contour lines pattern overlay, barely visible, adding texture to a pale yellow UI card. Modern, clean vector aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuC44DsWqIwtKJzPhX_w-Yjihw_KAmzlOwRlDVCvRBdsUnGVYDXHnTo5AUj9E2boseXZ-UBqpNvtWnkB6dYI-CCa2pBx8K6b5ktx9Y_1g_HRSi9qpPETDhJo1v34fWT5EzBbG9yA9KLloUHCEEz8FXgqx0fd8_yzXO3uBkWdvSSn8fNIL9DzbNVroL2huu5CfvMWaI-8eK3e54xvwmKq_pZBaDw1PMbyo_C94Ye5EiSCqdhGU2g1n7QW8A')"></div>
+<div class="flex justify-between items-start relative z-10">
+<h3 class="font-headline-sm text-headline-sm font-bold">Prototipado</h3>
+<span class="font-label-md text-label-md opacity-70">3:00 PM</span>
+</div>
+<p class="font-body-sm text-body-sm mt-sm opacity-70 leading-tight">Crear el prototipo interactivo para pruebas y stakeholders.</p>
+</div>
+</div>
+<!-- Timeline Item 4 -->
+<div class="flex relative">
+<div class="w-12 flex-shrink-0 flex justify-center pt-md relative">
+<div class="timeline-circle"></div>
+<div class="timeline-line"></div>
+</div>
+<div class="flex-1 bg-card-green rounded-3xl p-md relative overflow-hidden shadow-sm hover:scale-[1.02] transition-transform">
+<div class="card-bg-pattern" data-alt="Subtle topographic contour lines pattern overlay, barely visible, adding texture to a pale green UI card. Modern, clean vector aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDU5hwHpbxwvB4-pRhgiOe9FIkGtE9ZtyRsxLhR4VqqBk5vGh3LexmukEN9zzvINoGsBrbBFZJbb-0VUMXjcFKyQHq8Iazm8TvazC0uv4v84qso4-nKy9NeOc1v2oeyHwQkTKFbmtHdY84qqcDtPiMbmGsb7LyVWIRCmEenMKyCbIRSpQPKeIp4ZT5SuHzhDlDvYB37em9iBwNUfrB9VSHxVciK6BPhsp9w0n69Ai19YggkyOBIopMxFg')"></div>
+<div class="flex justify-between items-start relative z-10">
+<h3 class="font-headline-sm text-headline-sm font-bold">Pruebas de Usabilidad</h3>
+<span class="font-label-md text-label-md opacity-70">3:45 PM</span>
+</div>
+<p class="font-body-sm text-body-sm mt-sm opacity-70 leading-tight">Pruebas con usuarios primarios y de usabilidad del prototipo.</p>
+</div>
+</div>
+<!-- Timeline Item 5 -->
+<div class="flex relative">
+<div class="w-12 flex-shrink-0 flex justify-center pt-md relative">
+<div class="timeline-circle"></div>
+<!-- No line for the last item -->
+</div>
+<div class="flex-1 bg-card-pink rounded-3xl p-md relative overflow-hidden shadow-sm hover:scale-[1.02] transition-transform">
+<div class="card-bg-pattern" data-alt="Subtle topographic contour lines pattern overlay, barely visible, adding texture to a pale pink UI card. Modern, clean vector aesthetic." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQwnygyKWxmhDIninuM4dcJQQ8ray0v25AkdRpih1q4DuBzgDE-BoBtGlZ3HExQpXJwweKfR_YEuT272RVdXZyFjvgapWliS1Or4pzmyvK9Tm_VeA8zo4cevmTcx7tq4hx6x3fmglJcvnY1e0_RcwBRsBYJG6gVXJ4r0P1PsDofC0U7AjG0L6jSRBcmtnuDY4wNq20cAW_4SRIyiYzvYX_kNRMDCeo8ZECa5oUhY1X91i_z2K5RCBYcg')"></div>
+<div class="flex justify-between items-start relative z-10">
+<h3 class="font-headline-sm text-headline-sm font-bold">Reunión</h3>
+<span class="font-label-md text-label-md opacity-70">4:30 PM</span>
+</div>
+<p class="font-body-sm text-body-sm mt-sm opacity-70 leading-tight">Resumir la discusión del nuevo producto con los stakeholders.</p>
+</div>
+</div>
+</div>
+</main>
+<!-- Bottom Nav Bar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center h-16 pb-safe px-md max-w-md mx-auto border-t border-outline-variant flat no shadows bg-surface">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-transform scale-95 active:scale-90 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">calendar_month</span>
+<span class="font-label-md text-label-md mt-1">Mes</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-transform scale-95 active:scale-90 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">view_week</span>
+<span class="font-label-md text-label-md mt-1">Semana</span>
+</a>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-sm py-xs scale-95 active:scale-90 transition-transform" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">view_day</span>
+<span class="font-label-md text-label-md mt-1">Día</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-transform scale-95 active:scale-90 p-2" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">view_agenda</span>
+<span class="font-label-md text-label-md mt-1">Agenda</span>
+</a>
+</nav>
+
+
+</body></html>

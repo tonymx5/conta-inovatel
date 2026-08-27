@@ -24,7 +24,7 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 ---
 
-## 🗄️ Modelo de Datos (8 Tablas en Supabase con Tiempo Real)
+## 🗄️ Modelo de Datos (9 Tablas en Supabase con Tiempo Real)
 
 1. `invoices` (Facturas Emitidas): Folios normalizados FK-, impuestos 8%/16%, retención ISR 1.25%, descuentos y estatus.
 2. `clients` (Clientes): Catálogo con RFC, contacto y configuración de retención ISR.
@@ -34,11 +34,12 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 6. `audit_logs` (Bitácora de Eventos): Registro inmutable de acciones administrativas.
 7. `card_expenses` (Gastos por Tarjeta): Estados de cuenta de tarjetas Banregio / Nu sincronizados en tiempo real.
 8. `investments` (Portafolio e Inversiones): Activos, rendimientos anuales y recomendaciones del Bot IA.
+9. `agenda_events` (Agenda y Calendario Chronos): Eventos fiscales, fechas límites del SAT, pagos y compromisos con 4 vistas (Mes, Semana, Día, Agenda).
 
 ---
 
 ## ⚡ Sincronización en Tiempo Real & Alta Disponibilidad
-- **WebSockets Supabase:** `postgres_changes` activo en las 8 tablas con `REPLICA IDENTITY FULL`.
+- **WebSockets Supabase:** `postgres_changes` activo en las tablas maestras con `REPLICA IDENTITY FULL`.
 - **Foreground / Tab Wakeup:** Listener de `visibilitychange` y `focus` que ejecuta una sincronización silenciosa instantánea al reabrir la app o desbloquear el celular.
 - **Disaster Recovery / Snapshots:** Módulo de respaldo en 1-clic (`BackupModal.jsx`) para exportar e importar archivos JSON completos.
 - **Protección Fiscal SAT:** Indicador de Reserva Fiscal antes del día 17 de cada mes.

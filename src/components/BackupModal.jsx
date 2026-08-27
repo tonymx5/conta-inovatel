@@ -22,6 +22,7 @@ export default function BackupModal({ isOpen, onClose, userRole = 'admin' }) {
   const depositsCount = (storageService.getAccountDeposits ? storageService.getAccountDeposits() : []).length;
   const cardExpensesCount = (storageService.getCardExpenses ? storageService.getCardExpenses() : []).length;
   const investmentsCount = (storageService.getInvestments ? storageService.getInvestments() : []).length;
+  const agendaCount = (storageService.getAgendaEvents ? storageService.getAgendaEvents() : []).length;
 
   const handleExport = () => {
     setIsExporting(true);
@@ -56,6 +57,7 @@ export default function BackupModal({ isOpen, onClose, userRole = 'admin' }) {
             deposits: Array.isArray(parsed.accountDeposits) ? parsed.accountDeposits.length : 0,
             cards: Array.isArray(parsed.cardExpenses) ? parsed.cardExpenses.length : 0,
             investments: Array.isArray(parsed.investments) ? parsed.investments.length : 0,
+            agenda: Array.isArray(parsed.agendaEvents) ? parsed.agendaEvents.length : 0,
             raw: parsed
           });
         } else {
@@ -147,6 +149,9 @@ export default function BackupModal({ isOpen, onClose, userRole = 'admin' }) {
             <div style={{ background: '#fff', padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
               <span style={{ color: '#64748b' }}>Inversiones:</span> <b style={{ color: '#0f172a' }}>{investmentsCount}</b>
             </div>
+            <div style={{ background: '#fff', padding: '0.4rem 0.6rem', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+              <span style={{ color: '#64748b' }}>Agenda:</span> <b style={{ color: '#004ac6' }}>{agendaCount}</b>
+            </div>
           </div>
         </div>
 
@@ -158,7 +163,7 @@ export default function BackupModal({ isOpen, onClose, userRole = 'admin' }) {
                 <Download size={16} /> 1. Descargar Snapshot Completo (JSON)
               </h3>
               <p style={{ fontSize: '0.78rem', color: '#0284c7', margin: '0.2rem 0 0 0' }}>
-                Genera un archivo JSON con las 8 tablas de datos para resguardo físico seguro.
+                Genera un archivo JSON con todas las tablas de datos para resguardo físico seguro.
               </p>
             </div>
             <button
@@ -260,6 +265,7 @@ export default function BackupModal({ isOpen, onClose, userRole = 'admin' }) {
                 <span>👥 Clientes: <b>{filePreview.clients}</b></span>
                 <span>🧾 Deducibles: <b>{filePreview.deductibles}</b></span>
                 <span>💳 Depósitos: <b>{filePreview.deposits}</b></span>
+                <span>🗓️ Agenda: <b>{filePreview.agenda || 0}</b></span>
               </div>
             </div>
           )}
