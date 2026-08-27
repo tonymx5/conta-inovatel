@@ -28,7 +28,7 @@ export default function Header({
   const allTabs = [
     { id: 'invoices', label: 'Facturas', icon: FileText, restricted: false },
     { id: 'clients', label: 'Clientes', icon: Users, restricted: false },
-    { id: 'agenda', label: 'Agenda', icon: Calendar, restricted: false },
+    { id: 'agenda', label: 'Agenda', icon: Calendar, restricted: false, adminOnly: true },
     { id: 'other_income', label: 'Otros Ingresos', icon: DollarSign, restricted: true },
     { id: 'provider_deductions', label: 'Fact Prov', icon: Receipt, restricted: false, adminOnly: true },
     { id: 'expenses', label: 'Gastos & Bancos', icon: CreditCard, restricted: true },

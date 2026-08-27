@@ -11,10 +11,10 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 ## 👥 Arquitectura de Perfiles y Segregación de Datos
 
-| Perfil | Rol / Permisos | Tarjeta 3 (Depósitos) | Métricas & Analíticas / Inversiones |
+| Perfil | Rol / Permisos | Tarjeta 3 (Depósitos) | Métricas & Inversiones / Agenda |
 | :--- | :--- | :--- | :--- |
-| **Karla / Operador** | Captura operativa diaria. PIN: `2020` | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran las métricas ejecutivas. |
-| **Edson / Administrador** | Control financiero total. PIN: `0808` | Pregunta interactiva: *"¿Depósito para compra equipo/servicio?"*. Deduce el monto de compra y calcula el **Remanente Real en Cuenta**. | **Vinculado 100%**. Solo los remanentes de Edson alimentan los gráficos y recomendaciones del Bot IA. |
+| **Karla / Operador** | Captura operativa diaria. PIN: `2020` | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran métricas. **Agenda & Fact Prov**: Ocultos/Invisibles. |
+| **Edson / Administrador** | Control financiero total. PIN: `0808` | Pregunta interactiva: *"¿Depósito para compra equipo/servicio?"*. Deduce el monto de compra y calcula el **Remanente Real en Cuenta**. | **Vinculado 100%**. Alimenta gráficos y Bot IA. **Agenda & Fact Prov**: Acceso Total. |
 
 ## 🧮 Fórmulas y Conciliación Fiscal Clave
 - **Ingreso Total Facturas:** $\sum (\text{Base Neta} + \text{IVA Trasladado} - \text{Retención ISR 1.25\%})$

@@ -143,6 +143,9 @@ export default function App() {
   const handleLoginSuccess = (role) => {
     setUserRole(role);
     setIsSessionLocked(false);
+    if (role !== 'admin' && (activeTab === 'agenda' || activeTab === 'provider_deductions')) {
+      setActiveTab('invoices');
+    }
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
       role,
       lastActivity: Date.now()
@@ -155,6 +158,9 @@ export default function App() {
     localStorage.removeItem(SESSION_STORAGE_KEY);
     setIsSessionLocked(true);
     setUserRole('operator');
+    if (activeTab === 'agenda' || activeTab === 'provider_deductions') {
+      setActiveTab('invoices');
+    }
   };
 
   const handleMobileNav = (tabId, label, isRestricted) => {
@@ -202,7 +208,7 @@ export default function App() {
         {/* Main Module Content */}
         <main style={{ flex: 1, padding: '1.25rem', maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
           {activeTab === 'invoices' && <InvoicesModule userRole={userRole} />}
-          {activeTab === 'agenda' && <AgendaModule userRole={userRole} />}
+          {activeTab === 'agenda' && userRole === 'admin' && <AgendaModule userRole={userRole} />}
           {activeTab === 'other_income' && <OtherIncomeModule userRole={userRole} />}
           {activeTab === 'provider_deductions' && userRole === 'admin' && <ProviderDeductionsModule userRole={userRole} />}
           {activeTab === 'clients' && <ClientsModule userRole={userRole} />}
@@ -231,14 +237,16 @@ export default function App() {
             <span className="tooltip">Clientes</span>
           </button>
 
-          <button
-            className={`mobile-icon-btn ${activeTab === 'agenda' ? 'active' : ''}`}
-            onClick={() => handleMobileNav('agenda', 'Agenda', false)}
-            aria-label="Agenda"
-          >
-            <Calendar size={22} />
-            <span className="tooltip">Agenda</span>
-          </button>
+          {userRole === 'admin' && (
+            <button
+              className={`mobile-icon-btn ${activeTab === 'agenda' ? 'active' : ''}`}
+              onClick={() => handleMobileNav('agenda', 'Agenda', false)}
+              aria-label="Agenda"
+            >
+              <Calendar size={22} />
+              <span className="tooltip">Agenda</span>
+            </button>
+          )}
 
           {userRole === 'admin' && (
             <button
