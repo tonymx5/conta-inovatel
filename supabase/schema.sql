@@ -107,3 +107,14 @@ CREATE TABLE IF NOT EXISTS public.security_incidents (
     failed_attempts INT DEFAULT 3,
     tried_passwords JSONB
 );
+
+-- 10. Other Expenses Table (Ingresos del Mes)
+CREATE TABLE IF NOT EXISTS public.other_expenses (
+    id TEXT PRIMARY KEY,
+    concept TEXT NOT NULL,
+    amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
+    user_role TEXT DEFAULT 'ADMIN',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+

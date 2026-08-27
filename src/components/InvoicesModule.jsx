@@ -160,7 +160,7 @@ export default function InvoicesModule({ userRole }) {
         ivaTotal: result.ivaTotal ? result.ivaTotal.toString() : '',
         appliesIsr,
         isrRate: isrRate || 1.25,
-        status: 'PENDIENTE',
+        status: 'PAGADA',
         fileName: file.name,
         uuid: result.uuid || ''
       });
@@ -551,7 +551,7 @@ export default function InvoicesModule({ userRole }) {
     });
   };
 
-  const handleOtherExpenseSubmit = (e) => {
+  const handleOtherExpenseSubmit = async (e) => {
     e.preventDefault();
     const amount = parseFloat(otherExpenseFormData.amount) || 0;
     const expenseToSave = {
@@ -560,7 +560,7 @@ export default function InvoicesModule({ userRole }) {
       amount,
       date: otherExpenseFormData.date
     };
-    const updated = storageService.saveOtherExpense(expenseToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
+    const updated = await storageService.saveOtherExpense(expenseToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setOtherExpenses(updated);
     setShowOtherExpenseModal(false);
     resetOtherExpenseForm();
@@ -576,9 +576,9 @@ export default function InvoicesModule({ userRole }) {
     setShowOtherExpenseModal(true);
   };
 
-  const handleDeleteOtherExpense = (id) => {
+  const handleDeleteOtherExpense = async (id) => {
     if (window.confirm('¿Eliminar este registro de gasto?')) {
-      const updated = storageService.deleteOtherExpense(id, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
+      const updated = await storageService.deleteOtherExpense(id, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
       setOtherExpenses(updated);
     }
   };
@@ -666,53 +666,35 @@ export default function InvoicesModule({ userRole }) {
 
   // Excel Summary Totals Math calculated on the filtered month view
   const currentIsrRate = taxConfig.isrEstimatedRate !== undefined ? taxConfig.isrEstimatedRate : 2.5;
-  
-  // Segregación estricta de facturas: PAGADAS (flujo de efectivo computable) vs PENDIENTES (por cobrar)
-  const paidInvoices = useMemo(() => {
-    return filteredInvoices.filter(inv => inv.status === 'PAGADA');
-  }, [filteredInvoices]);
 
-  const pendingInvoices = useMemo(() => {
-    return filteredInvoices.filter(inv => inv.status === 'PENDIENTE');
-  }, [filteredInvoices]);
-
-  // Monto total acumulado de facturas efectivamente cobradas (PAGADAS)
-  const totalCobradoMonto = useMemo(() => {
-    return paidInvoices.reduce((sum, inv) => {
+  // Monto total acumulado de facturas del período
+  const totalIngresoTotal = useMemo(() => {
+    return filteredInvoices.reduce((sum, inv) => {
       const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-      const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
+      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
       const ivaTot = parseFloat(inv.ivaTotal) || 0;
       return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
     }, 0);
-  }, [paidInvoices]);
+  }, [filteredInvoices]);
 
-  // Monto total de facturas pendientes de cobro
-  const totalPendienteMonto = useMemo(() => {
-    return pendingInvoices.reduce((sum, inv) => {
-      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-      const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
-      const ivaTot = parseFloat(inv.ivaTotal) || 0;
-      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
-    }, 0);
-  }, [pendingInvoices]);
-
-  // Total Ingreso Total: suma exacta de Ingreso Total ÚNICAMENTE de las facturas con status PAGADA
-  const totalIngresoTotal = totalCobradoMonto;
-
-  // IVA Trasladado de facturas efectivamente pagadas
-  const totalIvaTrasladado = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  // IVA Trasladado de facturas del período
+  const totalIvaTrasladado = useMemo(() => {
+    return filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  }, [filteredInvoices]);
   
-  // Retención ISR calculada con base al Ingreso Total efectivamente cobrado (modificable en Liquidación Fiscal, default 2.5%)
+  // Retención ISR calculada con base al Ingreso Total (modificable en selector, default 2.5%)
   const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
 
-  // Suma de Retención ISR 1.25% de todas las facturas pagadas del período seleccionado
-  const totalIsrFacturas = paidInvoices.reduce((sum, inv) => {
-    const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-    const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
-    return sum + isrRet;
-  }, 0);
+  // Suma de Retención ISR 1.25% de todas las facturas del período seleccionado
+  const totalIsrFacturas = useMemo(() => {
+    return filteredInvoices.reduce((sum, inv) => {
+      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
+      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
+      return sum + isrRet;
+    }, 0);
+  }, [filteredInvoices]);
 
-  // Utilidad Real (edson): Ingreso Total Pagado menos IVA Trasladado Pagado menos Retención ISR menos ISR Facturas Pagadas (1.25%) menos Otros Gastos
+  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR menos ISR Facturas (1.25%) menos Otros Gastos
   const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos;
 
   // Por Depositar: Utilidad Real menos Total de Depósitos
@@ -1148,9 +1130,6 @@ export default function InvoicesModule({ userRole }) {
                   <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '600' }}>
                     {selectedMonth === 'ALL' ? 'Todos los Meses' : MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} {selectedYear}
                   </span>
-                  <span style={{ fontSize: '0.68rem', color: '#047857', background: '#ecfdf5', padding: '0.1rem 0.35rem', borderRadius: '4px', fontWeight: '700', border: '1px solid #a7f3d0' }}>
-                    ✓ Solo Facturas Pagadas
-                  </span>
                 </div>
               </div>
               
@@ -1290,28 +1269,6 @@ export default function InvoicesModule({ userRole }) {
               ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
             </strong>
           </div>
-
-          {/* Aviso informativo de facturas pendientes del período */}
-          {pendingInvoices.length > 0 && (
-            <div style={{
-              background: '#fffbeb',
-              border: '1px solid #fde68a',
-              borderRadius: '8px',
-              padding: '0.45rem 0.75rem',
-              marginTop: '0.65rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '0.74rem'
-            }}>
-              <span style={{ color: '#b45309', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                <Clock size={12} /> {pendingInvoices.length} {pendingInvoices.length === 1 ? 'factura pendiente' : 'facturas pendientes'} de cobro:
-              </span>
-              <strong style={{ color: '#d97706', fontWeight: '800' }}>
-                ${totalPendienteMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
-            </div>
-          )}
         </div>
 
         {/* Card 2: Tarjeta Facturas Proveedores (IVA Acreditable) - Solo visible para edson / admin */}

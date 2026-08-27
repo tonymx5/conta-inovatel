@@ -120,6 +120,16 @@ CREATE TABLE IF NOT EXISTS public.investments (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- 9. TABLA: OTROS GASTOS (other_expenses)
+CREATE TABLE IF NOT EXISTS public.other_expenses (
+    id TEXT PRIMARY KEY,
+    concept TEXT NOT NULL,
+    amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
+    user_role TEXT DEFAULT 'ADMIN',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- =========================================================================
 -- DESACTIVAR RLS (Permitir lectura y escritura a la API Anon de forma inmediata)
 -- =========================================================================
@@ -131,6 +141,7 @@ ALTER TABLE public.tax_config DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.card_expenses DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.investments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.other_expenses DISABLE ROW LEVEL SECURITY;
 
 -- =========================================================================
 -- DATOS INICIALES (SEMILLA)

@@ -84,6 +84,10 @@ const initialCardExpenses = [
   { id: 'exp-aug-4', date: '2026-08-17', description: 'Insumos de Trabajo / Oficina', amount: 952.50, bankId: 'b5', bankName: 'Banregio (Crédito)', sector: 'Trabajo' }
 ];
 
+const initialOtherExpenses = [
+  { id: 'oth-exp-prime-ago', concept: 'prime agosto', amount: 99.00, date: '2026-08-17', userRole: 'ADMIN' }
+];
+
 const initialBankAccounts = [
   { id: 'b1', bankName: 'Santander', type: 'Débito', accountNumber: '**** 2740', balance: 0 },
   { id: 'b2', bankName: 'NU', type: 'Crédito', accountNumber: '**** 0712', balance: 0 },
@@ -295,18 +299,29 @@ function mapInvestmentFromSupabase(inv) {
   };
 }
 
+function mapOtherExpenseFromSupabase(oe) {
+  return {
+    id: oe.id,
+    concept: oe.concept || '',
+    amount: parseFloat(oe.amount) || 0,
+    date: oe.date || new Date().toISOString().split('T')[0],
+    userRole: oe.user_role || 'ADMIN'
+  };
+}
+
 export const storageService = {
   // Sync on startup from Supabase (Non-Destructive Protection)
   syncFromSupabase: async () => {
     try {
-      const [invRes, cliRes, dedRes, depRes, taxRes, cardRes, investRes] = await Promise.all([
+      const [invRes, cliRes, dedRes, depRes, taxRes, cardRes, investRes, otherExpRes] = await Promise.all([
         supabase.from('invoices').select('*'),
         supabase.from('clients').select('*'),
         supabase.from('deductibles').select('*'),
         supabase.from('account_deposits').select('*'),
         supabase.from('tax_config').select('*').limit(1).single(),
         supabase.from('card_expenses').select('*'),
-        supabase.from('investments').select('*')
+        supabase.from('investments').select('*'),
+        supabase.from('other_expenses').select('*')
       ]);
 
       // 1. Invoices
@@ -394,7 +409,20 @@ export const storageService = {
         }))).catch(e => console.error('Seed investments error:', e));
       }
 
-      if (taxRes.data) {
+      // 7. Other Expenses (Otros Gastos - Sincronizado en Nube)
+      const localOtherExpenses = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
+      if (otherExpRes && otherExpRes.data && otherExpRes.data.length > 0) {
+        const mappedOtherExpenses = otherExpRes.data.map(mapOtherExpenseFromSupabase);
+        setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, mappedOtherExpenses);
+      } else if (localOtherExpenses && localOtherExpenses.length > 0) {
+        setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, localOtherExpenses);
+        Promise.all(localOtherExpenses.map(oe => supabase.from('other_expenses').upsert({
+          id: oe.id, concept: oe.concept, amount: oe.amount || 0,
+          date: oe.date, user_role: oe.userRole || 'ADMIN'
+        }))).catch(e => console.error('Seed other_expenses error:', e));
+      }
+
+      if (taxRes && taxRes.data) {
         setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 2.5 });
       }
 
@@ -577,6 +605,23 @@ export const storageService = {
               notifyDataSynced();
             }
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'other_expenses' },
+        (payload) => {
+          const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
+          if (payload.eventType === 'DELETE') {
+            const newList = list.filter(item => item.id !== payload.old.id);
+            setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, newList);
+          } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const mapped = mapOtherExpenseFromSupabase(payload.new);
+            const idx = list.findIndex(oe => oe.id === mapped.id);
+            if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+            setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
+          }
+          notifyDataSynced();
         }
       )
       .subscribe((status) => {
@@ -897,28 +942,43 @@ export const storageService = {
   },
 
   // Otros Gastos (Ingresos del Mes)
-  getOtherExpenses: () => getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, []),
-  saveOtherExpense: (expense, user = 'admin') => {
-    const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, []);
+  getOtherExpenses: () => getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses),
+  saveOtherExpense: async (expense, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
     const amount = parseFloat(expense.amount) || 0;
     const itemToSave = {
       ...expense,
       id: expense.id || 'oth-exp-' + Date.now(),
       concept: (expense.concept || '').trim(),
       amount,
-      date: expense.date || new Date().toISOString().split('T')[0]
+      date: expense.date || new Date().toISOString().split('T')[0],
+      userRole: user
     };
     const idx = list.findIndex(e => e.id === itemToSave.id);
     if (idx >= 0) list[idx] = itemToSave; else list.push(itemToSave);
     setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
 
+    // Sync to Supabase
+    Promise.resolve(supabase.from('other_expenses').upsert({
+      id: itemToSave.id,
+      concept: itemToSave.concept,
+      amount: itemToSave.amount,
+      date: itemToSave.date,
+      user_role: itemToSave.userRole
+    })).catch(err => console.error('Supabase Other Expense sync error:', err));
+
     storageService.logAudit(user, idx >= 0 ? 'EDITAR_OTRO_GASTO' : 'CREAR_OTRO_GASTO', `${itemToSave.concept} - $${itemToSave.amount}`);
     notifyDataSynced();
     return list;
   },
-  deleteOtherExpense: (id, user = 'admin') => {
-    const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, []).filter(e => e.id !== id);
+  deleteOtherExpense: async (id, user = 'admin') => {
+    const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses).filter(e => e.id !== id);
     setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
+
+    // Sync deletion to Supabase
+    Promise.resolve(supabase.from('other_expenses').delete().eq('id', id))
+      .catch(err => console.error('Supabase delete other_expense error:', err));
+
     storageService.logAudit(user, 'ELIMINAR_OTRO_GASTO', `ID ${id}`);
     notifyDataSynced();
     return list;
