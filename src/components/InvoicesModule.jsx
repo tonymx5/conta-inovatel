@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp, UploadCloud } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp, UploadCloud, RefreshCw } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { ocrService } from '../services/ocrService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
@@ -78,14 +78,35 @@ export default function InvoicesModule({ userRole }) {
     uuid: ''
   });
 
+  // Estado de Sincronización en Tiempo Real
+  const [lastSyncTime, setLastSyncTime] = useState(storageService.getLastSyncTime() || '');
+  const [showSyncBadge, setShowSyncBadge] = useState(false);
+  const [isSyncingManual, setIsSyncingManual] = useState(false);
+
   useEffect(() => {
     loadData();
+    // Re-sincronizar con Supabase al abrir el módulo
+    storageService.syncFromSupabase();
 
-    const handleSync = () => {
+    let toastTimeout = null;
+    const handleSync = (e) => {
       loadData();
+      const timeStr = e?.detail?.timeStr || storageService.getLastSyncTime();
+      if (timeStr) {
+        setLastSyncTime(timeStr);
+        setShowSyncBadge(true);
+        if (toastTimeout) clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+          setShowSyncBadge(false);
+        }, 3000); // Visible durante 3 segundos
+      }
     };
+
     window.addEventListener('conta_data_synced', handleSync);
-    return () => window.removeEventListener('conta_data_synced', handleSync);
+    return () => {
+      window.removeEventListener('conta_data_synced', handleSync);
+      if (toastTimeout) clearTimeout(toastTimeout);
+    };
   }, []);
 
   const loadData = () => {
@@ -95,6 +116,24 @@ export default function InvoicesModule({ userRole }) {
     setDeposits(storageService.getAccountDeposits ? storageService.getAccountDeposits() : []);
     setOtherExpenses(storageService.getOtherExpenses ? storageService.getOtherExpenses() : []);
     setTaxConfig(storageService.getTaxConfig());
+  };
+
+  const handleManualRefresh = async () => {
+    setIsSyncingManual(true);
+    try {
+      await storageService.syncFromSupabase();
+      loadData();
+      const timeStr = storageService.getLastSyncTime();
+      if (timeStr) {
+        setLastSyncTime(timeStr);
+        setShowSyncBadge(true);
+        setTimeout(() => setShowSyncBadge(false), 3000);
+      }
+    } catch (e) {
+      console.error('Error in manual refresh:', e);
+    } finally {
+      setIsSyncingManual(false);
+    }
   };
 
   const handleXmlUpload = async (e) => {
@@ -324,7 +363,7 @@ export default function InvoicesModule({ userRole }) {
     return (baseNeta * 0.0125);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const subtotal = parseFloat(formData.subtotal) || 0;
     const discount = parseFloat(formData.discount) || 0;
@@ -356,10 +395,12 @@ export default function InvoicesModule({ userRole }) {
       uuid: formData.uuid || undefined
     };
 
-    const updated = storageService.saveInvoice(invoiceToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
+    const updated = await storageService.saveInvoice(invoiceToSave, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setInvoices(updated);
     setShowModal(false);
     resetForm();
+    setShowSyncBadge(true);
+    setTimeout(() => setShowSyncBadge(false), 3000);
   };
 
   const handleEdit = (inv) => {
@@ -387,10 +428,12 @@ export default function InvoicesModule({ userRole }) {
     setShowModal(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('¿Estás seguro de eliminar esta factura?')) {
-      const updated = storageService.deleteInvoice(id, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
+      const updated = await storageService.deleteInvoice(id, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
       setInvoices(updated);
+      setShowSyncBadge(true);
+      setTimeout(() => setShowSyncBadge(false), 3000);
     }
   };
 
@@ -403,12 +446,14 @@ export default function InvoicesModule({ userRole }) {
     });
   };
 
-  const handleConfirmToggleStatus = () => {
+  const handleConfirmToggleStatus = async () => {
     if (!statusConfirmModal.invoice) return;
     const updatedInvoice = { ...statusConfirmModal.invoice, status: statusConfirmModal.targetStatus };
-    const updated = storageService.saveInvoice(updatedInvoice, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
+    const updated = await storageService.saveInvoice(updatedInvoice, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setInvoices(updated);
     setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA' });
+    setShowSyncBadge(true);
+    setTimeout(() => setShowSyncBadge(false), 3000);
   };
 
   const resetForm = () => {
@@ -875,6 +920,49 @@ export default function InvoicesModule({ userRole }) {
             <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
               <FileText size={20} color="#10b981" /> Facturas Emitidas (Ventas)
             </h3>
+          </div>
+
+          {/* Sync Status Badge (visible 3s) & Manual Refresh Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            {showSyncBadge && (
+              <span 
+                className="badge badge-emerald" 
+                style={{ 
+                  fontSize: '0.76rem', 
+                  fontWeight: '700', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.35rem',
+                  padding: '0.3rem 0.65rem',
+                  boxShadow: '0 2px 10px rgba(16, 185, 129, 0.25)',
+                  animation: 'fadeIn 0.25s ease'
+                }}
+              >
+                <CheckCircle size={13} color="#059669" />
+                <span>✓ Sincronizado {lastSyncTime ? `(${lastSyncTime})` : ''}</span>
+              </span>
+            )}
+
+            <button
+              onClick={handleManualRefresh}
+              className="btn-secondary"
+              disabled={isSyncingManual}
+              style={{
+                padding: '0.35rem 0.75rem',
+                minHeight: '34px',
+                fontSize: '0.78rem',
+                fontWeight: '600',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                cursor: isSyncingManual ? 'not-allowed' : 'pointer',
+                opacity: isSyncingManual ? 0.7 : 1
+              }}
+              title="Consultar y forzar actualización en vivo desde Supabase"
+            >
+              <RefreshCw size={13} className={isSyncingManual ? 'animate-spin' : ''} color="#0284c7" />
+              <span>{isSyncingManual ? 'Sincronizando...' : 'Actualizar'}</span>
+            </button>
           </div>
         </div>
 

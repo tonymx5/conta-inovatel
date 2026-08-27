@@ -44,11 +44,13 @@ export default function App() {
   const [isSessionLocked, setIsSessionLocked] = useState(initialSession.locked);
 
   useEffect(() => {
-    // Initial silent sync with cloud database (Supabase) and active Realtime listener
+    // Initial silent sync with cloud database (Supabase), Realtime listener, and 30s Polling Heartbeat
     storageService.syncFromSupabase();
     storageService.initRealtimeSubscription();
+    storageService.startPolling(30000);
 
     return () => {
+      storageService.stopPolling();
       storageService.unsubscribeRealtime();
     };
   }, []);

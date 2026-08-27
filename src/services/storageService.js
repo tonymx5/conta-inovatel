@@ -178,14 +178,29 @@ function setStorageItem(key, value) {
   }
 }
 
-function notifyDataSynced() {
+let lastSyncTimestamp = null;
+
+function formatTime(date) {
+  if (!date) return '';
+  return date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+}
+
+function notifyDataSynced(detail = {}) {
+  lastSyncTimestamp = new Date();
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('conta_data_synced'));
+    window.dispatchEvent(new CustomEvent('conta_data_synced', { 
+      detail: { 
+        timestamp: lastSyncTimestamp,
+        timeStr: formatTime(lastSyncTimestamp),
+        ...detail 
+      } 
+    }));
   }
 }
 
-// Global Realtime State & Event Handlers
+// Global Realtime State, Polling & Event Handlers
 let realtimeChannel = null;
+let pollingIntervalId = null;
 let currentSyncStatus = typeof navigator !== 'undefined' && navigator.onLine ? 'ONLINE_REALTIME' : 'OFFLINE';
 const syncStatusListeners = new Set();
 
@@ -803,6 +818,31 @@ export const storageService = {
     }
   },
 
+  // Polling Activo de 30 segundos (Heartbeat de Respaldo Multiperfil)
+  startPolling: (intervalMs = 30000) => {
+    if (typeof window === 'undefined') return;
+    if (pollingIntervalId) clearInterval(pollingIntervalId);
+
+    pollingIntervalId = setInterval(async () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        try {
+          await storageService.syncFromSupabase();
+        } catch (e) {
+          console.warn('Polling sync warning:', e);
+        }
+      }
+    }, intervalMs);
+  },
+
+  stopPolling: () => {
+    if (pollingIntervalId) {
+      clearInterval(pollingIntervalId);
+      pollingIntervalId = null;
+    }
+  },
+
+  getLastSyncTime: () => formatTime(lastSyncTimestamp),
+  getLastSyncTimestamp: () => lastSyncTimestamp,
   getSyncStatus: () => currentSyncStatus,
   onSyncStatusChange: (callback) => {
     syncStatusListeners.add(callback);
@@ -812,19 +852,23 @@ export const storageService = {
 
   // Config
   getTaxConfig: () => getStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: 2.5 }),
-  saveTaxConfig: (config) => {
+  saveTaxConfig: async (config) => {
     setStorageItem(STORAGE_KEYS.TAX_CONFIG, config);
-    Promise.resolve(supabase.from('tax_config').upsert({
-      id: 'default',
-      isr_estimated_rate: config.isrEstimatedRate,
-      last_updated: new Date().toISOString()
-    })).catch(err => console.error('Supabase TaxConfig error:', err));
-    notifyDataSynced();
+    try {
+      await supabase.from('tax_config').upsert({
+        id: 'default',
+        isr_estimated_rate: config.isrEstimatedRate,
+        last_updated: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Supabase TaxConfig error:', err);
+    }
+    notifyDataSynced({ action: 'saveTaxConfig' });
   },
 
   // Clients
   getClients: () => getStorageItem(STORAGE_KEYS.CLIENTS, initialClients),
-  saveClient: (client, user = 'admin') => {
+  saveClient: async (client, user = 'admin') => {
     const clients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients);
     const existingIndex = clients.findIndex(c => c.id === client.id);
     const existing = existingIndex >= 0 ? clients[existingIndex] : {};
@@ -839,6 +883,37 @@ export const storageService = {
       isrRate: client.appliesIsr ? (client.isrRate !== undefined ? parseFloat(client.isrRate) : (existing.isrRate || 1.25)) : 0
     };
 
+    try {
+      const { error } = await supabase.from('clients').upsert({
+        id: clientToSave.id,
+        name: clientToSave.name,
+        rfc: clientToSave.rfc,
+        email: clientToSave.email || null,
+        phone: clientToSave.phone || null,
+        sector: clientToSave.sector || null,
+        notes: clientToSave.notes || null,
+        applies_isr: clientToSave.appliesIsr,
+        isr_rate: clientToSave.isrRate
+      });
+      if (error) {
+        if (error.message?.includes('column') || error.code === 'PGRST204') {
+          await supabase.from('clients').upsert({
+            id: clientToSave.id,
+            name: clientToSave.name,
+            rfc: clientToSave.rfc,
+            email: clientToSave.email || null,
+            phone: clientToSave.phone || null,
+            sector: clientToSave.sector || null,
+            notes: clientToSave.notes || null
+          });
+        } else {
+          console.error('Supabase Client save error:', error);
+        }
+      }
+    } catch (err) {
+      console.error('Supabase Client network error:', err);
+    }
+
     if (existingIndex >= 0) {
       clients[existingIndex] = clientToSave;
     } else {
@@ -846,44 +921,20 @@ export const storageService = {
     }
     setStorageItem(STORAGE_KEYS.CLIENTS, clients);
 
-    // Sync to Supabase
-    Promise.resolve(supabase.from('clients').upsert({
-      id: clientToSave.id,
-      name: clientToSave.name,
-      rfc: clientToSave.rfc,
-      email: clientToSave.email || null,
-      phone: clientToSave.phone || null,
-      sector: clientToSave.sector || null,
-      notes: clientToSave.notes || null,
-      applies_isr: clientToSave.appliesIsr,
-      isr_rate: clientToSave.isrRate
-    })).catch(err => {
-      // Graceful fallback if table column is still propagating
-      if (err?.message?.includes('column') || err?.code === 'PGRST204') {
-        supabase.from('clients').upsert({
-          id: clientToSave.id,
-          name: clientToSave.name,
-          rfc: clientToSave.rfc,
-          email: clientToSave.email || null,
-          phone: clientToSave.phone || null,
-          sector: clientToSave.sector || null,
-          notes: clientToSave.notes || null
-        }).catch(e => console.error('Supabase Client fallback save error:', e));
-      } else {
-        console.error('Supabase Client save error:', err);
-      }
-    });
-
     storageService.logAudit(user, existingIndex >= 0 ? 'EDITAR_CLIENTE' : 'CREAR_CLIENTE', `${clientToSave.name} (${clientToSave.rfc}) - ISR: ${clientToSave.appliesIsr ? `${clientToSave.isrRate}%` : 'NO'}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveClient', id: clientToSave.id });
     return clients;
   },
-  deleteClient: (id, user = 'admin') => {
+  deleteClient: async (id, user = 'admin') => {
+    try {
+      await supabase.from('clients').delete().eq('id', id);
+    } catch (err) {
+      console.error('Supabase Client delete error:', err);
+    }
     const clients = getStorageItem(STORAGE_KEYS.CLIENTS, initialClients).filter(c => c.id !== id);
     setStorageItem(STORAGE_KEYS.CLIENTS, clients);
-    Promise.resolve(supabase.from('clients').delete().eq('id', id)).catch(err => console.error('Supabase Client delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_CLIENTE', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteClient', id });
     return clients;
   },
 
@@ -908,7 +959,7 @@ export const storageService = {
       };
     });
   },
-  saveInvoice: (invoice, user = 'admin') => {
+  saveInvoice: async (invoice, user = 'admin') => {
     const invoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
     const existingIndex = invoices.findIndex(i => i.id === invoice.id);
     const updatedInvoice = { 
@@ -917,91 +968,112 @@ export const storageService = {
       folio: formatFolio(invoice.folio)
     };
 
+    // 1. Guardar primero en Supabase (DB-First con confirmación)
+    try {
+      const { error } = await supabase.from('invoices').upsert({
+        id: updatedInvoice.id,
+        folio: updatedInvoice.folio,
+        client_name: updatedInvoice.clientName,
+        rfc: updatedInvoice.rfc,
+        date: updatedInvoice.date,
+        is_mixed_tax: !!updatedInvoice.isMixedTax,
+        subtotal: updatedInvoice.subtotal || 0,
+        discount: updatedInvoice.discount || 0,
+        subtotal8: updatedInvoice.subtotal8 || 0,
+        subtotal16: updatedInvoice.subtotal16 || 0,
+        iva_rate: updatedInvoice.ivaRate || 8,
+        iva_total: updatedInvoice.ivaTotal || 0,
+        applies_isr: !!updatedInvoice.appliesIsr,
+        isr_rate: updatedInvoice.isrRate || 1.25,
+        isr_retained: updatedInvoice.isrRetained || 0,
+        base_neta: updatedInvoice.baseNeta || 0,
+        total: updatedInvoice.total || 0,
+        status: updatedInvoice.status || 'PAGADA'
+      });
+      if (error) {
+        console.error('Supabase Invoice save error:', error);
+      }
+    } catch (err) {
+      console.error('Supabase Invoice save network error:', err);
+    }
+
     if (existingIndex >= 0) {
       invoices[existingIndex] = updatedInvoice;
     } else {
-      invoices.push(updatedInvoice);
+      invoices.unshift(updatedInvoice);
     }
     setStorageItem(STORAGE_KEYS.INVOICES, invoices);
 
-    // Sync to Supabase
-    Promise.resolve(supabase.from('invoices').upsert({
-      id: updatedInvoice.id,
-      folio: updatedInvoice.folio,
-      client_name: updatedInvoice.clientName,
-      rfc: updatedInvoice.rfc,
-      date: updatedInvoice.date,
-      is_mixed_tax: !!updatedInvoice.isMixedTax,
-      subtotal: updatedInvoice.subtotal || 0,
-      discount: updatedInvoice.discount || 0,
-      subtotal8: updatedInvoice.subtotal8 || 0,
-      subtotal16: updatedInvoice.subtotal16 || 0,
-      iva_rate: updatedInvoice.ivaRate || 8,
-      iva_total: updatedInvoice.ivaTotal || 0,
-      applies_isr: !!updatedInvoice.appliesIsr,
-      isr_rate: updatedInvoice.isrRate || 1.25,
-      isr_retained: updatedInvoice.isrRetained || 0,
-      base_neta: updatedInvoice.baseNeta || 0,
-      total: updatedInvoice.total || 0,
-      status: updatedInvoice.status || 'PAGADA'
-    })).catch(err => console.error('Supabase Invoice save error:', err));
-
     storageService.logAudit(user, existingIndex >= 0 ? 'EDITAR_FACTURA' : 'CREAR_FACTURA', `Factura ${updatedInvoice.folio} (${updatedInvoice.clientName})`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveInvoice', id: updatedInvoice.id, invoice: updatedInvoice });
     return invoices;
   },
-  deleteInvoice: (id, user = 'admin') => {
+  deleteInvoice: async (id, user = 'admin') => {
+    try {
+      const { error } = await supabase.from('invoices').delete().eq('id', id);
+      if (error) console.error('Supabase Invoice delete error:', error);
+    } catch (err) {
+      console.error('Supabase Invoice delete network error:', err);
+    }
+
     const invoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices).filter(i => i.id !== id);
     setStorageItem(STORAGE_KEYS.INVOICES, invoices);
-    Promise.resolve(supabase.from('invoices').delete().eq('id', id)).catch(err => console.error('Supabase Invoice delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_FACTURA', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteInvoice', id });
     return invoices;
   },
 
   // Deductibles (Fact Prov)
   getDeductibles: () => getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles),
   getDeductibleExpenses: () => getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles),
-  saveDeductible: (item, user = 'admin') => {
+  saveDeductible: async (item, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles);
     const itemToSave = { ...item, id: item.id || 'ded-' + Date.now() };
     const idx = list.findIndex(d => d.id === itemToSave.id);
 
-    if (idx >= 0) list[idx] = itemToSave; else list.push(itemToSave);
-    setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, list);
+    try {
+      const { error } = await supabase.from('deductibles').upsert({
+        id: itemToSave.id,
+        provider_name: itemToSave.providerName,
+        rfc: itemToSave.rfc,
+        invoice_no: itemToSave.invoiceNo,
+        date: itemToSave.date,
+        subtotal: itemToSave.subtotal || 0,
+        discount: itemToSave.discount || 0,
+        iva_total: itemToSave.ivaTotal || 0,
+        total: itemToSave.total || 0,
+        category: itemToSave.category || 'Telecomunicaciones',
+        file_name: itemToSave.fileName,
+        file_url: itemToSave.fileUrl
+      });
+      if (error) console.error('Supabase Deductible save error:', error);
+    } catch (err) {
+      console.error('Supabase Deductible network error:', err);
+    }
 
-    // Sync to Supabase
-    Promise.resolve(supabase.from('deductibles').upsert({
-      id: itemToSave.id,
-      provider_name: itemToSave.providerName,
-      rfc: itemToSave.rfc,
-      invoice_no: itemToSave.invoiceNo,
-      date: itemToSave.date,
-      subtotal: itemToSave.subtotal || 0,
-      discount: itemToSave.discount || 0,
-      iva_total: itemToSave.ivaTotal || 0,
-      total: itemToSave.total || 0,
-      category: itemToSave.category || 'Telecomunicaciones',
-      file_name: itemToSave.fileName,
-      file_url: itemToSave.fileUrl
-    })).catch(err => console.error('Supabase Deductible save error:', err));
+    if (idx >= 0) list[idx] = itemToSave; else list.unshift(itemToSave);
+    setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, list);
 
     storageService.logAudit(user, 'GUARDAR_DEDUCCION_PROVEEDOR', `${itemToSave.providerName} - IVA $${itemToSave.ivaTotal}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveDeductible', id: itemToSave.id });
     return list;
   },
-  deleteDeductible: (id, user = 'admin') => {
+  deleteDeductible: async (id, user = 'admin') => {
+    try {
+      await supabase.from('deductibles').delete().eq('id', id);
+    } catch (err) {
+      console.error('Supabase Deductible delete error:', err);
+    }
     const list = getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, initialDeductibles).filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, list);
-    Promise.resolve(supabase.from('deductibles').delete().eq('id', id)).catch(err => console.error('Supabase Deductible delete error:', err));
     storageService.logAudit(user, 'ELIMINAR_DEDUCCION', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteDeductible', id });
     return list;
   },
 
   // Account Deposits (Depósitos a Cuenta / Transferencias)
   getAccountDeposits: () => getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, initialAccountDeposits),
-  saveAccountDeposit: (deposit, user = 'admin') => {
+  saveAccountDeposit: async (deposit, user = 'admin') => {
     const list = storageService.getAccountDeposits();
     const amount = parseFloat(deposit.amount) || 0;
     const profile = deposit.profile || (user === 'admin' || user === 'ADMIN' ? 'edson' : 'karla');
@@ -1020,14 +1092,22 @@ export const storageService = {
       profile
     };
 
-    const idx = list.findIndex(d => d.id === depToSave.id);
-    if (idx >= 0) list[idx] = depToSave; else list.push(depToSave);
-    setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
-
-    // Persistir en Supabase de forma robusta con fallback automático
-    (async () => {
-      try {
-        const res = await supabase.from('account_deposits').upsert({
+    try {
+      const res = await supabase.from('account_deposits').upsert({
+        id: depToSave.id,
+        concept: depToSave.concept,
+        amount: depToSave.amount,
+        date: depToSave.date,
+        bank_name: depToSave.bankName || 'Santander',
+        reference: depToSave.reference,
+        applies_equipment_expense: depToSave.appliesEquipmentExpense,
+        equipment_expense: depToSave.equipmentExpense,
+        equipment_provider: depToSave.equipmentProvider,
+        real_utility: depToSave.realUtility,
+        profile: depToSave.profile
+      });
+      if (res?.error) {
+        await supabase.from('account_deposits').upsert({
           id: depToSave.id,
           concept: depToSave.concept,
           amount: depToSave.amount,
@@ -1037,50 +1117,32 @@ export const storageService = {
           applies_equipment_expense: depToSave.appliesEquipmentExpense,
           equipment_expense: depToSave.equipmentExpense,
           equipment_provider: depToSave.equipmentProvider,
-          real_utility: depToSave.realUtility,
-          profile: depToSave.profile
+          real_utility: depToSave.realUtility
         });
-        if (res?.error) {
-          // Fallback por si la columna profile aún no se ha ejecutado en Supabase
-          const fallbackRes = await supabase.from('account_deposits').upsert({
-            id: depToSave.id,
-            concept: depToSave.concept,
-            amount: depToSave.amount,
-            date: depToSave.date,
-            bank_name: depToSave.bankName || 'Santander',
-            reference: depToSave.reference,
-            applies_equipment_expense: depToSave.appliesEquipmentExpense,
-            equipment_expense: depToSave.equipmentExpense,
-            equipment_provider: depToSave.equipmentProvider,
-            real_utility: depToSave.realUtility
-          });
-          if (fallbackRes?.error) {
-            console.error('Supabase deposit fallback error:', fallbackRes.error);
-          }
-        }
-      } catch (e) {
-        console.error('Supabase deposit save error:', e);
       }
-    })();
+    } catch (e) {
+      console.error('Supabase deposit save error:', e);
+    }
+
+    const idx = list.findIndex(d => d.id === depToSave.id);
+    if (idx >= 0) list[idx] = depToSave; else list.unshift(depToSave);
+    setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
     storageService.logAudit(user, 'REGISTRAR_DEPOSITO_CUENTA', `[${profile.toUpperCase()}] ${depToSave.concept} ($${depToSave.amount}) | Utilidad Real: $${depToSave.realUtility}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveAccountDeposit', id: depToSave.id });
     return list;
   },
-  deleteAccountDeposit: (id, user = 'admin') => {
+  deleteAccountDeposit: async (id, user = 'admin') => {
+    try {
+      await supabase.from('account_deposits').delete().eq('id', id);
+    } catch (err) {
+      console.error('Supabase Deposit Delete Error:', err);
+    }
     const list = storageService.getAccountDeposits().filter(d => d.id !== id);
     setStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, list);
 
-    (async () => {
-      try {
-        await supabase.from('account_deposits').delete().eq('id', id);
-      } catch (err) {
-        console.error('Supabase Deposit Delete Error:', err);
-      }
-    })();
-
     storageService.logAudit(user, 'ELIMINAR_DEPOSITO_CUENTA', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteAccountDeposit', id });
     return list;
   },
 
@@ -1093,14 +1155,14 @@ export const storageService = {
     if (idx >= 0) list[idx] = itemToSave; else list.push(itemToSave);
     setStorageItem(STORAGE_KEYS.OTHER_INCOME, list);
     storageService.logAudit(user, 'GUARDAR_OTRO_INGRESO', `${itemToSave.concept} ($${itemToSave.amount})`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveOtherIncome', id: itemToSave.id });
     return list;
   },
   deleteOtherIncome: (id, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.OTHER_INCOME, []).filter(o => o.id !== id);
     setStorageItem(STORAGE_KEYS.OTHER_INCOME, list);
     storageService.logAudit(user, 'ELIMINAR_OTRO_INGRESO', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteOtherIncome', id });
     return list;
   },
 
@@ -1117,45 +1179,52 @@ export const storageService = {
       date: expense.date || new Date().toISOString().split('T')[0],
       userRole: user
     };
+
+    try {
+      await Promise.all([
+        supabase.from('other_expenses').upsert({
+          id: itemToSave.id,
+          concept: itemToSave.concept,
+          amount: itemToSave.amount,
+          date: itemToSave.date,
+          user_role: itemToSave.userRole
+        }),
+        supabase.from('card_expenses').upsert({
+          id: itemToSave.id,
+          date: itemToSave.date,
+          description: itemToSave.concept,
+          amount: itemToSave.amount,
+          bank_id: 'sync_other_expenses',
+          bank_name: 'Otros Gastos',
+          sector: itemToSave.userRole
+        })
+      ]);
+    } catch (err) {
+      console.error('Supabase Other Expense sync error:', err);
+    }
+
     const idx = list.findIndex(e => e.id === itemToSave.id);
-    if (idx >= 0) list[idx] = itemToSave; else list.push(itemToSave);
+    if (idx >= 0) list[idx] = itemToSave; else list.unshift(itemToSave);
     setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
 
-    // 1. Sync to other_expenses table
-    Promise.resolve(supabase.from('other_expenses').upsert({
-      id: itemToSave.id,
-      concept: itemToSave.concept,
-      amount: itemToSave.amount,
-      date: itemToSave.date,
-      user_role: itemToSave.userRole
-    })).catch(() => {});
-
-    // 2. Guaranteed cloud sync via active card_expenses table relay
-    Promise.resolve(supabase.from('card_expenses').upsert({
-      id: itemToSave.id,
-      date: itemToSave.date,
-      description: itemToSave.concept,
-      amount: itemToSave.amount,
-      bank_id: 'sync_other_expenses',
-      bank_name: 'Otros Gastos',
-      sector: itemToSave.userRole
-    })).catch(err => console.error('Supabase Other Expense sync error:', err));
-
     storageService.logAudit(user, idx >= 0 ? 'EDITAR_OTRO_GASTO' : 'CREAR_OTRO_GASTO', `${itemToSave.concept} - $${itemToSave.amount}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveOtherExpense', id: itemToSave.id });
     return list;
   },
   deleteOtherExpense: async (id, user = 'admin') => {
+    try {
+      await Promise.all([
+        supabase.from('other_expenses').delete().eq('id', id),
+        supabase.from('card_expenses').delete().eq('id', id)
+      ]);
+    } catch (err) {
+      console.error('Supabase delete other_expense error:', err);
+    }
+
     const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses).filter(e => e.id !== id);
     setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
-
-    // Sync deletion to both tables
-    Promise.resolve(supabase.from('other_expenses').delete().eq('id', id)).catch(() => {});
-    Promise.resolve(supabase.from('card_expenses').delete().eq('id', id))
-      .catch(err => console.error('Supabase delete other_expense error:', err));
-
     storageService.logAudit(user, 'ELIMINAR_OTRO_GASTO', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteOtherExpense', id });
     return list;
   },
 
@@ -1175,13 +1244,13 @@ export const storageService = {
     const idx = list.findIndex(b => b.id === bankToSave.id);
     if (idx >= 0) list[idx] = bankToSave; else list.push(bankToSave);
     setStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, list);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveBankAccount', id: bankToSave.id });
     return list;
   },
   deleteBankAccount: (id) => {
     const list = storageService.getBankAccounts().filter(b => b.id !== id);
     setStorageItem(STORAGE_KEYS.BANK_ACCOUNTS, list);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteBankAccount', id });
     return list;
   },
   getCardExpenses: () => {
@@ -1197,75 +1266,89 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.CARD_EXPENSES, mergedList);
     return mergedList;
   },
-  saveCardExpense: (expense, user = 'admin') => {
+  saveCardExpense: async (expense, user = 'admin') => {
     const list = storageService.getCardExpenses();
     const expToSave = { ...expense, id: expense.id || 'exp_' + Date.now() };
     const idx = list.findIndex(e => e.id === expToSave.id);
-    if (idx >= 0) list[idx] = expToSave; else list.push(expToSave);
-    setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
 
-    Promise.resolve(supabase.from('card_expenses').upsert({
-      id: expToSave.id,
-      date: expToSave.date,
-      description: expToSave.description,
-      amount: expToSave.amount || 0,
-      bank_id: expToSave.bankId || 'b5',
-      bank_name: expToSave.bankName || 'Banregio (Crédito)',
-      sector: expToSave.sector || 'Extras'
-    })).catch(err => console.error('Supabase card_expense save error:', err));
+    try {
+      await supabase.from('card_expenses').upsert({
+        id: expToSave.id,
+        date: expToSave.date,
+        description: expToSave.description,
+        amount: expToSave.amount || 0,
+        bank_id: expToSave.bankId || 'b5',
+        bank_name: expToSave.bankName || 'Banregio (Crédito)',
+        sector: expToSave.sector || 'Extras'
+      });
+    } catch (err) {
+      console.error('Supabase card_expense save error:', err);
+    }
+
+    if (idx >= 0) list[idx] = expToSave; else list.unshift(expToSave);
+    setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
 
     storageService.logAudit(user, 'REGISTRAR_GASTO_TARJETA', `$${expToSave.amount} - ${expToSave.bankName}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveCardExpense', id: expToSave.id });
     return list;
   },
-  deleteCardExpense: (id, user = 'admin') => {
+  deleteCardExpense: async (id, user = 'admin') => {
+    try {
+      await supabase.from('card_expenses').delete().eq('id', id);
+    } catch (err) {
+      console.error('Supabase card_expense delete error:', err);
+    }
     const list = storageService.getCardExpenses().filter(e => e.id !== id);
     setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
-
-    Promise.resolve(supabase.from('card_expenses').delete().eq('id', id)).catch(err => console.error('Supabase card_expense delete error:', err));
-
     storageService.logAudit(user, 'ELIMINAR_GASTO_TARJETA', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteCardExpense', id });
     return list;
   },
 
   // Investments
   getInvestments: () => getStorageItem(STORAGE_KEYS.INVESTMENTS, []),
-  saveInvestment: (inv, user = 'admin') => {
+  saveInvestment: async (inv, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.INVESTMENTS, []);
     const invToSave = { ...inv, id: inv.id || 'inv_ast_' + Date.now() };
     const idx = list.findIndex(i => i.id === invToSave.id);
-    if (idx >= 0) list[idx] = invToSave; else list.push(invToSave);
-    setStorageItem(STORAGE_KEYS.INVESTMENTS, list);
 
-    Promise.resolve(supabase.from('investments').upsert({
-      id: invToSave.id,
-      asset_name: invToSave.assetName,
-      category: invToSave.category || 'CETES / Renta Fija',
-      amount_invested: invToSave.amountInvested || 0,
-      expected_yield_pct: invToSave.expectedYieldPct || 0,
-      start_date: invToSave.startDate,
-      notes: invToSave.notes || ''
-    })).catch(err => console.error('Supabase investment save error:', err));
+    try {
+      await supabase.from('investments').upsert({
+        id: invToSave.id,
+        asset_name: invToSave.assetName,
+        category: invToSave.category || 'CETES / Renta Fija',
+        amount_invested: invToSave.amountInvested || 0,
+        expected_yield_pct: invToSave.expectedYieldPct || 0,
+        start_date: invToSave.startDate,
+        notes: invToSave.notes || ''
+      });
+    } catch (err) {
+      console.error('Supabase investment save error:', err);
+    }
+
+    if (idx >= 0) list[idx] = invToSave; else list.unshift(invToSave);
+    setStorageItem(STORAGE_KEYS.INVESTMENTS, list);
 
     storageService.logAudit(user, 'REGISTRAR_INVERSION', `${invToSave.assetName} ($${invToSave.amountInvested})`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveInvestment', id: invToSave.id });
     return list;
   },
-  deleteInvestment: (id, user = 'admin') => {
+  deleteInvestment: async (id, user = 'admin') => {
+    try {
+      await supabase.from('investments').delete().eq('id', id);
+    } catch (err) {
+      console.error('Supabase investment delete error:', err);
+    }
     const list = getStorageItem(STORAGE_KEYS.INVESTMENTS, []).filter(i => i.id !== id);
     setStorageItem(STORAGE_KEYS.INVESTMENTS, list);
-
-    Promise.resolve(supabase.from('investments').delete().eq('id', id)).catch(err => console.error('Supabase investment delete error:', err));
-
     storageService.logAudit(user, 'ELIMINAR_INVERSION', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteInvestment', id });
     return list;
   },
 
   // Agenda & Calendar Events
   getAgendaEvents: () => getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents),
-  saveAgendaEvent: (eventData, user = 'admin') => {
+  saveAgendaEvent: async (eventData, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents);
     const evtToSave = {
       id: eventData.id || 'evt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
@@ -1279,48 +1362,57 @@ export const storageService = {
       createdBy: eventData.createdBy || (user === 'admin' ? 'edson' : 'karla')
     };
 
+    try {
+      await supabase.from('agenda_events').upsert({
+        id: evtToSave.id,
+        title: evtToSave.title,
+        description: evtToSave.description,
+        date: evtToSave.date,
+        time: evtToSave.time,
+        category: evtToSave.category,
+        color_theme: evtToSave.colorTheme,
+        completed: evtToSave.completed,
+        created_by: evtToSave.createdBy
+      });
+    } catch (err) {
+      console.warn('Supabase agenda save warning:', err.message);
+    }
+
     const idx = list.findIndex(e => e.id === evtToSave.id);
     if (idx >= 0) list[idx] = evtToSave; else list.unshift(evtToSave);
     setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, list);
 
-    Promise.resolve(supabase.from('agenda_events').upsert({
-      id: evtToSave.id,
-      title: evtToSave.title,
-      description: evtToSave.description,
-      date: evtToSave.date,
-      time: evtToSave.time,
-      category: evtToSave.category,
-      color_theme: evtToSave.colorTheme,
-      completed: evtToSave.completed,
-      created_by: evtToSave.createdBy
-    })).catch(err => console.warn('Supabase agenda save warning:', err.message));
-
     storageService.logAudit(user, idx >= 0 ? 'ACTUALIZAR_EVENTO_AGENDA' : 'REGISTRAR_EVENTO_AGENDA', `${evtToSave.title} (${evtToSave.date})`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'saveAgendaEvent', id: evtToSave.id });
     return list;
   },
-  deleteAgendaEvent: (id, user = 'admin') => {
+  deleteAgendaEvent: async (id, user = 'admin') => {
+    try {
+      await supabase.from('agenda_events').delete().eq('id', id);
+    } catch (err) {
+      console.warn('Supabase agenda delete warning:', err.message);
+    }
     const list = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents).filter(e => e.id !== id);
     setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, list);
-
-    Promise.resolve(supabase.from('agenda_events').delete().eq('id', id)).catch(err => console.warn('Supabase agenda delete warning:', err.message));
-
     storageService.logAudit(user, 'ELIMINAR_EVENTO_AGENDA', `ID ${id}`);
-    notifyDataSynced();
+    notifyDataSynced({ action: 'deleteAgendaEvent', id });
     return list;
   },
-  toggleAgendaEventStatus: (id, user = 'admin') => {
+  toggleAgendaEventStatus: async (id, user = 'admin') => {
     const list = getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, initialAgendaEvents);
     const item = list.find(e => e.id === id);
     if (item) {
       item.completed = !item.completed;
       setStorageItem(STORAGE_KEYS.AGENDA_EVENTS, list);
 
-      Promise.resolve(supabase.from('agenda_events').update({ completed: item.completed }).eq('id', id))
-        .catch(err => console.warn('Supabase agenda status update warning:', err.message));
+      try {
+        await supabase.from('agenda_events').update({ completed: item.completed }).eq('id', id);
+      } catch (err) {
+        console.warn('Supabase agenda status update warning:', err.message);
+      }
 
       storageService.logAudit(user, item.completed ? 'COMPLETAR_EVENTO_AGENDA' : 'REABRIR_EVENTO_AGENDA', item.title);
-      notifyDataSynced();
+      notifyDataSynced({ action: 'toggleAgendaEventStatus', id });
     }
     return list;
   },

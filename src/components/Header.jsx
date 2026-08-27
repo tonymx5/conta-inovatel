@@ -43,6 +43,8 @@ export default function Header({
       onRestrictedClick(tab.label);
     } else {
       setActiveTab(tab.id);
+      // Disparar sincronización silenciosa al cambiar de módulo
+      storageService.syncFromSupabase();
     }
   };
 
