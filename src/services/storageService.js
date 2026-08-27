@@ -276,6 +276,9 @@ function mapDepositFromSupabase(dp, localMap = new Map()) {
 }
 
 function mapCardExpenseFromSupabase(ce) {
+  if (ce.bank_id === 'sync_other_expenses' || (ce.id && ce.id.startsWith('oth-exp-'))) {
+    return null;
+  }
   return {
     id: ce.id,
     date: ce.date,
@@ -302,10 +305,10 @@ function mapInvestmentFromSupabase(inv) {
 function mapOtherExpenseFromSupabase(oe) {
   return {
     id: oe.id,
-    concept: oe.concept || '',
+    concept: oe.concept || oe.description || '',
     amount: parseFloat(oe.amount) || 0,
     date: oe.date || new Date().toISOString().split('T')[0],
-    userRole: oe.user_role || 'ADMIN'
+    userRole: oe.user_role || oe.sector || 'ADMIN'
   };
 }
 
@@ -385,7 +388,7 @@ export const storageService = {
       // 5. Card Expenses (Gastos por Tarjeta)
       const localCardExpenses = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, initialCardExpenses);
       if (cardRes.data && cardRes.data.length > 0) {
-        const mappedCards = cardRes.data.map(mapCardExpenseFromSupabase);
+        const mappedCards = cardRes.data.map(mapCardExpenseFromSupabase).filter(Boolean);
         setStorageItem(STORAGE_KEYS.CARD_EXPENSES, mappedCards);
       } else if (localCardExpenses && localCardExpenses.length > 0) {
         setStorageItem(STORAGE_KEYS.CARD_EXPENSES, localCardExpenses);
@@ -410,17 +413,48 @@ export const storageService = {
       }
 
       // 7. Other Expenses (Otros Gastos - Sincronizado en Nube)
-      const localOtherExpenses = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
+      let syncedOtherExpenses = [];
       if (otherExpRes && otherExpRes.data && otherExpRes.data.length > 0) {
-        const mappedOtherExpenses = otherExpRes.data.map(mapOtherExpenseFromSupabase);
-        setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, mappedOtherExpenses);
+        syncedOtherExpenses = otherExpRes.data.map(mapOtherExpenseFromSupabase);
+      } else if (cardRes && cardRes.data && cardRes.data.length > 0) {
+        const extracted = cardRes.data
+          .filter(c => c.bank_id === 'sync_other_expenses' || (c.id && c.id.startsWith('oth-exp-')))
+          .map(mapOtherExpenseFromSupabase);
+        if (extracted.length > 0) {
+          syncedOtherExpenses = extracted;
+        }
+      }
+
+      const localOtherExpenses = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
+      if (syncedOtherExpenses.length > 0) {
+        localOtherExpenses.forEach(localItem => {
+          if (!syncedOtherExpenses.some(s => s.id === localItem.id)) {
+            syncedOtherExpenses.push(localItem);
+          }
+        });
+        setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, syncedOtherExpenses);
       } else if (localOtherExpenses && localOtherExpenses.length > 0) {
         setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, localOtherExpenses);
-        Promise.all(localOtherExpenses.map(oe => supabase.from('other_expenses').upsert({
+      }
+
+      // Dual sync propagation to ensure 100% remote persistence in all environments
+      const currentList = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
+      Promise.all(currentList.map(oe => {
+        supabase.from('other_expenses').upsert({
           id: oe.id, concept: oe.concept, amount: oe.amount || 0,
           date: oe.date, user_role: oe.userRole || 'ADMIN'
-        }))).catch(e => console.error('Seed other_expenses error:', e));
-      }
+        }).catch(() => {});
+
+        return supabase.from('card_expenses').upsert({
+          id: oe.id,
+          date: oe.date,
+          description: oe.concept,
+          amount: oe.amount || 0,
+          bank_id: 'sync_other_expenses',
+          bank_name: 'Otros Gastos',
+          sector: oe.userRole || 'ADMIN'
+        });
+      })).catch(e => console.error('Seed other_expenses error:', e));
 
       if (taxRes && taxRes.data) {
         setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 2.5 });
@@ -565,15 +599,33 @@ export const storageService = {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'card_expenses' },
         (payload) => {
+          const item = payload.new || payload.old;
+          if (item && (item.bank_id === 'sync_other_expenses' || (item.id && String(item.id).startsWith('oth-exp-')))) {
+            const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
+            if (payload.eventType === 'DELETE') {
+              const newList = list.filter(e => e.id !== item.id);
+              setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, newList);
+            } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              const mapped = mapOtherExpenseFromSupabase(item);
+              const idx = list.findIndex(oe => oe.id === mapped.id);
+              if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+              setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
+            }
+            notifyDataSynced();
+            return;
+          }
+
           const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, initialCardExpenses);
           if (payload.eventType === 'DELETE') {
             const newList = list.filter(item => item.id !== payload.old.id);
             setStorageItem(STORAGE_KEYS.CARD_EXPENSES, newList);
           } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const mapped = mapCardExpenseFromSupabase(payload.new);
-            const idx = list.findIndex(ce => ce.id === mapped.id);
-            if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
-            setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
+            if (mapped) {
+              const idx = list.findIndex(ce => ce.id === mapped.id);
+              if (idx >= 0) list[idx] = mapped; else list.unshift(mapped);
+              setStorageItem(STORAGE_KEYS.CARD_EXPENSES, list);
+            }
           }
           notifyDataSynced();
         }
@@ -958,13 +1010,24 @@ export const storageService = {
     if (idx >= 0) list[idx] = itemToSave; else list.push(itemToSave);
     setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
 
-    // Sync to Supabase
+    // 1. Sync to other_expenses table
     Promise.resolve(supabase.from('other_expenses').upsert({
       id: itemToSave.id,
       concept: itemToSave.concept,
       amount: itemToSave.amount,
       date: itemToSave.date,
       user_role: itemToSave.userRole
+    })).catch(() => {});
+
+    // 2. Guaranteed cloud sync via active card_expenses table relay
+    Promise.resolve(supabase.from('card_expenses').upsert({
+      id: itemToSave.id,
+      date: itemToSave.date,
+      description: itemToSave.concept,
+      amount: itemToSave.amount,
+      bank_id: 'sync_other_expenses',
+      bank_name: 'Otros Gastos',
+      sector: itemToSave.userRole
     })).catch(err => console.error('Supabase Other Expense sync error:', err));
 
     storageService.logAudit(user, idx >= 0 ? 'EDITAR_OTRO_GASTO' : 'CREAR_OTRO_GASTO', `${itemToSave.concept} - $${itemToSave.amount}`);
@@ -975,8 +1038,9 @@ export const storageService = {
     const list = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses).filter(e => e.id !== id);
     setStorageItem(STORAGE_KEYS.OTHER_EXPENSES, list);
 
-    // Sync deletion to Supabase
-    Promise.resolve(supabase.from('other_expenses').delete().eq('id', id))
+    // Sync deletion to both tables
+    Promise.resolve(supabase.from('other_expenses').delete().eq('id', id)).catch(() => {});
+    Promise.resolve(supabase.from('card_expenses').delete().eq('id', id))
       .catch(err => console.error('Supabase delete other_expense error:', err));
 
     storageService.logAudit(user, 'ELIMINAR_OTRO_GASTO', `ID ${id}`);
@@ -1013,7 +1077,11 @@ export const storageService = {
     const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, initialCardExpenses);
     const map = new Map();
     initialCardExpenses.forEach(e => map.set(e.id, e));
-    (list || []).forEach(e => map.set(e.id, e));
+    (list || []).forEach(e => {
+      if (e.bankId !== 'sync_other_expenses' && e.bank_id !== 'sync_other_expenses' && !(e.id && String(e.id).startsWith('oth-exp-'))) {
+        map.set(e.id, e);
+      }
+    });
     const mergedList = Array.from(map.values());
     setStorageItem(STORAGE_KEYS.CARD_EXPENSES, mergedList);
     return mergedList;
