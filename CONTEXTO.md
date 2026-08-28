@@ -38,11 +38,15 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 ---
 
-## ⚡ Sincronización en Tiempo Real & Alta Disponibilidad
+## ⚡ Sincronización en Tiempo Real & Alta Disponibilidad (Cuádruple Garantía DB-First)
+- **DB-First Async/Await:** Todas las operaciones de creación, edición, borrado y cambio de estado se confirman primero con `await` en Supabase Cloud antes de actualizar el estado local.
 - **WebSockets Supabase:** `postgres_changes` activo en las tablas maestras con `REPLICA IDENTITY FULL`.
+- **Heartbeat Polling Activo (30s):** Temporizador de fondo que consulta silenciosamente Supabase cada 30 segundos para garantizar que cualquier cambio cruzado entre perfiles (Karla/Edson) se refleje en vivo sin necesidad de F5.
+- **Refresco On-Demand:** Sincronización forzada al cambiar de módulo, navegar entre pestañas o presionar el botón interactivo "Actualizar".
+- **Badge Visual de Sincronización (3s):** Indicador visual interactivo `✓ Sincronizado (HH:MM:SS)` que confirma al usuario el éxito de cada actualización.
+- **Blindaje Anti-Caché:** Service Worker `v2.6-live` con estrategia `Network-First` para documentos HTML y cabeceras `Cache-Control: no-cache, no-store, must-revalidate` en `vercel.json`.
 - **Foreground / Tab Wakeup:** Listener de `visibilitychange` y `focus` que ejecuta una sincronización silenciosa instantánea al reabrir la app o desbloquear el celular.
 - **Disaster Recovery / Snapshots:** Módulo de respaldo en 1-clic (`BackupModal.jsx`) para exportar e importar archivos JSON completos.
-- **Protección Fiscal SAT:** Indicador de Reserva Fiscal antes del día 17 de cada mes.
 
 ---
 
