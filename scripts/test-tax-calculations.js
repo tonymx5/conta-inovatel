@@ -91,18 +91,38 @@ console.log('🧪 Iniciando Auditoría y Suite de Pruebas de Precisión Fiscal..
   assertEqual(utilidadReal, 86750.00, 'Utilidad Real (edson) deduciendo ISR Facturas (1.25%)');
 }
 
-// 7. Conciliación Mensual de Facturas Emitidas y Otros Gastos (Agosto 2026)
+// 7. Conciliación Mensual de Facturas Emitidas y Otros Gastos (Agosto 2026) con redondeo a 2 decimales
 {
   const totalIngresoTotal = 75056.77;
   const totalIvaTrasladado = 5605.91;
-  const totalRetencionIsr = totalIngresoTotal * 0.025; // 1876.41925
+  const totalRetencionIsr = parseFloat((totalIngresoTotal * 0.025).toFixed(2)); // 1876.42 (2 decimales exactos)
   const totalIsrFacturas = 623.05;
   const totalOtrosGastos = 99.00; // prime agosto
 
-  const utilidadReal = parseFloat((totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos).toFixed(3));
-  // 75056.77 - 5605.91 - 1876.41925 - 623.05 - 99.00 = 66852.391
+  const utilidadReal = parseFloat((totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos).toFixed(2));
+  // 75056.77 - 5605.91 - 1876.42 - 623.05 - 99.00 = 66852.39
 
-  assertEqual(utilidadReal, 66852.391, 'Conciliación Exacta de Utilidad Real Agosto ($66,852.391)');
+  assertEqual(totalRetencionIsr, 1876.42, 'Retención ISR 2.5% a 2 decimales exactos ($1,876.42)');
+  assertEqual(utilidadReal, 66852.39, 'Conciliación Exacta de Utilidad Real Agosto ($66,852.39)');
 }
 
-console.log('\n🎯 Todos los 7 grupos de pruebas fiscales pasaron con 100% de precisión matemática.\n');
+// 8. Segregación y Exclusión de Facturas PENDIENTES vs PAGADAS en Ingresos del Mes
+{
+  const sampleInvoices = [
+    { folio: 'FK-101', subtotal: 10000, discount: 0, baseNeta: 10000, ivaTotal: 800, appliesIsr: true, isrRetained: 125, total: 10675, status: 'PAGADA' },
+    { folio: 'FK-102', subtotal: 5000, discount: 0, baseNeta: 5000, ivaTotal: 400, appliesIsr: true, isrRetained: 62.5, total: 5337.5, status: 'PENDIENTE' }
+  ];
+  
+  // Filtrar solo facturas PAGADAS para el cálculo contable de ingresos del mes
+  const paidInvoices = sampleInvoices.filter(i => i.status === 'PAGADA');
+  const totalIngresosMes = paidInvoices.reduce((sum, i) => sum + i.total, 0);
+  const totalIvaVentasMes = paidInvoices.reduce((sum, i) => sum + i.ivaTotal, 0);
+  const totalIsrFacturasMes = paidInvoices.reduce((sum, i) => sum + i.isrRetained, 0);
+
+  assertEqual(paidInvoices.length, 1, 'Solo 1 factura pagada considerada');
+  assertEqual(totalIngresosMes, 10675.00, 'Ingreso del mes excluye factura PENDIENTE ($10,675.00)');
+  assertEqual(totalIvaVentasMes, 800.00, 'IVA de ventas excluye factura PENDIENTE ($800.00)');
+  assertEqual(totalIsrFacturasMes, 125.00, 'ISR retenido excluye factura PENDIENTE ($125.00)');
+}
+
+console.log('\n🎯 Todos los 8 grupos de pruebas fiscales y segregación pasaron con 100% de precisión matemática.\n');

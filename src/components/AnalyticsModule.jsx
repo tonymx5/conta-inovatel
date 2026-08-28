@@ -117,7 +117,9 @@ export default function AnalyticsModule() {
   const filteredDeposits = useMemo(() => filterByPeriod(edsonDeposits), [edsonDeposits, filterByPeriod]);
 
   // Calculations on Filtered Data
-  const totalIngresoFacturado = filteredInvoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
+  const totalIngresoFacturado = filteredInvoices
+    .filter(i => i.status !== 'PENDIENTE')
+    .reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
   const totalOtroIngreso = filteredOtherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresoGlobal = totalIngresoFacturado + totalOtroIngreso;
 

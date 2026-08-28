@@ -712,17 +712,7 @@ export default function InvoicesModule({ userRole }) {
   // Excel Summary Totals Math calculated on the filtered month view
   const currentIsrRate = taxConfig.isrEstimatedRate !== undefined ? taxConfig.isrEstimatedRate : 2.5;
 
-  // Monto total acumulado de facturas del período
-  const totalIngresoTotal = useMemo(() => {
-    return filteredInvoices.reduce((sum, inv) => {
-      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
-      const ivaTot = parseFloat(inv.ivaTotal) || 0;
-      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
-    }, 0);
-  }, [filteredInvoices]);
-
-  // Segregación informativa de facturas para la barra de estado
+  // Segregación informativa de facturas para la barra de estado y contabilidad de cobranza
   const paidInvoices = useMemo(() => {
     return filteredInvoices.filter(inv => inv.status === 'PAGADA');
   }, [filteredInvoices]);
@@ -731,7 +721,8 @@ export default function InvoicesModule({ userRole }) {
     return filteredInvoices.filter(inv => inv.status === 'PENDIENTE');
   }, [filteredInvoices]);
 
-  const totalCobradoMonto = useMemo(() => {
+  // Monto total acumulado de facturas PAGADAS del período (Ingreso Total Real)
+  const totalIngresoTotal = useMemo(() => {
     return paidInvoices.reduce((sum, inv) => {
       const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
       const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
@@ -739,6 +730,8 @@ export default function InvoicesModule({ userRole }) {
       return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
     }, 0);
   }, [paidInvoices]);
+
+  const totalCobradoMonto = totalIngresoTotal;
 
   const totalPendienteMonto = useMemo(() => {
     return pendingInvoices.reduce((sum, inv) => {
@@ -749,28 +742,28 @@ export default function InvoicesModule({ userRole }) {
     }, 0);
   }, [pendingInvoices]);
 
-  // IVA Trasladado de facturas del período
+  // IVA Trasladado de facturas PAGADAS del período
   const totalIvaTrasladado = useMemo(() => {
-    return filteredInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
-  }, [filteredInvoices]);
+    return paidInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  }, [paidInvoices]);
   
-  // Retención ISR calculada con base al Ingreso Total (modificable en selector, default 2.5%)
-  const totalRetencionIsr = totalIngresoTotal * (currentIsrRate / 100);
+  // Retención ISR calculada con base al Ingreso Total efectivamente cobrado/pagado (2 decimales exactos)
+  const totalRetencionIsr = parseFloat((totalIngresoTotal * (currentIsrRate / 100)).toFixed(2));
 
-  // Suma de Retención ISR 1.25% de todas las facturas del período seleccionado
+  // Suma de Retención ISR 1.25% de todas las facturas PAGADAS del período seleccionado
   const totalIsrFacturas = useMemo(() => {
-    return filteredInvoices.reduce((sum, inv) => {
+    return paidInvoices.reduce((sum, inv) => {
       const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
       const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
       return sum + isrRet;
     }, 0);
-  }, [filteredInvoices]);
+  }, [paidInvoices]);
 
-  // Utilidad Real (edson): Ingreso Total menos IVA Trasladado menos Retención ISR menos ISR Facturas (1.25%) menos Otros Gastos
-  const utilidadReal = totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos;
+  // Utilidad Real (edson): Ingreso Total (pagadas) menos IVA Trasladado (pagadas) menos Retención ISR menos ISR Facturas (1.25% pagadas) menos Otros Gastos
+  const utilidadReal = parseFloat((totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos).toFixed(2));
 
   // Por Depositar: Utilidad Real menos Total de Depósitos
-  const porDepositar = utilidadReal - totalDepositosBrutos;
+  const porDepositar = parseFloat((utilidadReal - totalDepositosBrutos).toFixed(2));
 
   // IVA Acreditable Proveedores (para tarjeta de admin)
   const totalIvaAcreditable = filteredDeductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
@@ -1303,7 +1296,7 @@ export default function InvoicesModule({ userRole }) {
             <div className="excel-row" style={{ padding: '0.45rem 0' }}>
               <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>Ingreso Total:</span>
               <strong style={{ color: '#047857', fontSize: '0.98rem', fontWeight: '800' }}>
-                ${totalIngresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${totalIngresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
 
@@ -1311,7 +1304,7 @@ export default function InvoicesModule({ userRole }) {
             <div className="excel-row" style={{ padding: '0.45rem 0' }}>
               <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>IVA Trasladado (ventas):</span>
               <strong style={{ color: '#0284c7', fontSize: '0.96rem', fontWeight: '800' }}>
-                ${totalIvaTrasladado.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${totalIvaTrasladado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
 
@@ -1319,7 +1312,7 @@ export default function InvoicesModule({ userRole }) {
             <div className="excel-row" style={{ padding: '0.45rem 0' }}>
               <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>Retención ISR ({currentIsrRate}%):</span>
               <strong style={{ color: '#b45309', fontSize: '0.96rem', fontWeight: '800' }}>
-                -${totalRetencionIsr.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                -${totalRetencionIsr.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
 
@@ -1327,7 +1320,7 @@ export default function InvoicesModule({ userRole }) {
             <div className="excel-row" style={{ padding: '0.45rem 0' }}>
               <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>ISR Facturas (1.25%):</span>
               <strong style={{ color: '#b45309', fontSize: '0.96rem', fontWeight: '800' }}>
-                -${totalIsrFacturas.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                -${totalIsrFacturas.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
 
@@ -1336,7 +1329,7 @@ export default function InvoicesModule({ userRole }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                 <span style={{ color: '#64748b', fontWeight: '700', fontSize: '0.86rem' }}>(-) Otros Gastos:</span>
                 <strong style={{ color: totalOtrosGastos > 0 ? '#dc2626' : '#64748b', fontSize: '0.96rem', fontWeight: '800' }}>
-                  {totalOtrosGastos > 0 ? `-$${totalOtrosGastos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}` : '$0.00'}
+                  {totalOtrosGastos > 0 ? `-$${totalOtrosGastos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '$0.00'}
                 </strong>
               </div>
 
@@ -1349,7 +1342,7 @@ export default function InvoicesModule({ userRole }) {
                         {exp.concept} <span style={{ color: '#94a3b8', fontSize: '0.68rem' }}>({formatDate(exp.date)})</span>
                       </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <strong style={{ color: '#dc2626' }}>${parseFloat(exp.amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>
+                        <strong style={{ color: '#dc2626' }}>${parseFloat(exp.amount || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
                         <button onClick={() => handleEditOtherExpense(exp)} style={{ background: 'none', border: 'none', color: '#0284c7', cursor: 'pointer', padding: 0 }}>
                           <Edit3 size={11} />
                         </button>
@@ -1381,7 +1374,7 @@ export default function InvoicesModule({ userRole }) {
               </span>
             </div>
             <strong style={{ fontSize: '1.28rem', color: '#15803d', fontWeight: '900' }}>
-              ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+              ${utilidadReal.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </strong>
           </div>
         </div>
@@ -1618,14 +1611,14 @@ export default function InvoicesModule({ userRole }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#475569' }}>
               <span>{userRole === 'admin' ? '(+) Utilidad Real (edson):' : '(+) Total Facturas Cobradas:'}</span>
               <strong style={{ color: '#15803d', fontWeight: '800' }}>
-                ${(userRole === 'admin' ? utilidadReal : totalIngresoTotal).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${(userRole === 'admin' ? utilidadReal : totalIngresoTotal).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#475569' }}>
               <span>(-) Total Depósitos Realizados:</span>
               <strong style={{ color: '#0f172a', fontWeight: '800' }}>
-                -${totalDepositosBrutos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                -${totalDepositosBrutos.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
 
@@ -1640,7 +1633,7 @@ export default function InvoicesModule({ userRole }) {
                 {porDepositar > 0 ? '⚠️ Por depositar:' : '✓ Por depositar:'}
               </strong>
               <strong style={{ fontSize: '1.25rem', color: porDepositar > 0 ? '#b45309' : '#15803d', fontWeight: '900' }}>
-                ${porDepositar.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                ${porDepositar.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </strong>
             </div>
           </div>

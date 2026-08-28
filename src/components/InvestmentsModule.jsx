@@ -55,7 +55,8 @@ export default function InvestmentsModule({ userRole }) {
     setTaxConfig(storageService.getTaxConfig ? storageService.getTaxConfig() : { isrEstimatedRate: 1.25 });
   };
 
-  const totalIngresoFacturado = invoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
+  const paidInvoices = invoices.filter(i => i.status !== 'PENDIENTE');
+  const totalIngresoFacturado = paidInvoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
   const totalOtroIngreso = otherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresos = totalIngresoFacturado + totalOtroIngreso;
 
@@ -72,12 +73,12 @@ export default function InvestmentsModule({ userRole }) {
   const flujoLibre = Math.max(0, baseCalculoUtilidad - totalGastos);
 
   // Cálculo de Reserva SAT (Día 17)
-  const totalIvaFacturado = invoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  const totalIvaFacturado = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
   const totalIvaDeducible = deductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
   const ivaNetoSat = Math.max(0, totalIvaFacturado - totalIvaDeducible);
 
-  const totalSubtotal = invoices.reduce((sum, i) => sum + (parseFloat(i.subtotal) || 0), 0);
-  const totalIsrRetenido = invoices.reduce((sum, i) => sum + (parseFloat(i.isrRetained) || 0), 0);
+  const totalSubtotal = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.subtotal) || 0), 0);
+  const totalIsrRetenido = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.isrRetained) || 0), 0);
   const isrEstimadoBruto = totalSubtotal * ((parseFloat(taxConfig.isrEstimatedRate) || 1.25) / 100);
   const isrEstimadoSat = Math.max(0, isrEstimadoBruto - totalIsrRetenido);
   const totalReservaSat = parseFloat((ivaNetoSat + isrEstimadoSat).toFixed(2));

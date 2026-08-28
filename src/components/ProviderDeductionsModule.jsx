@@ -267,8 +267,10 @@ export default function ProviderDeductionsModule({ userRole }) {
   }, [invoices, selectedMonth, selectedYear]);
 
   // Period Calculations
-  const totalIvaVentas = filteredInvoices.reduce((sum, i) => sum + (i.ivaTotal || 0), 0);
-  const totalIvaDeducible = filteredDeductibles.reduce((sum, d) => sum + (d.ivaTotal || 0), 0);
+  const totalIvaVentas = filteredInvoices
+    .filter(i => i.status !== 'PENDIENTE')
+    .reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  const totalIvaDeducible = filteredDeductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
 
   const ivaNetoPagar = Math.max(0, totalIvaVentas - totalIvaDeducible);
   const ahorroIva = Math.min(totalIvaVentas, totalIvaDeducible);
