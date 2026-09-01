@@ -471,6 +471,8 @@ CREATE TABLE IF NOT EXISTS public.audit_trail_immutable (
     client_ip TEXT
 );
 
+ALTER TABLE public.audit_trail_immutable ENABLE ROW LEVEL SECURITY;
+
 CREATE INDEX IF NOT EXISTS idx_audit_trail_table_record ON public.audit_trail_immutable (table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_trail_performed_at ON public.audit_trail_immutable (performed_at DESC);
 
