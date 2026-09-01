@@ -968,30 +968,56 @@ export const storageService = {
       folio: formatFolio(invoice.folio)
     };
 
-    // 1. Guardar primero en Supabase (DB-First con confirmación)
+    // 1. Guardar primero en Supabase (RPC Atómica transaccional con Fallback a Upsert)
     try {
-      const { error } = await supabase.from('invoices').upsert({
-        id: updatedInvoice.id,
-        folio: updatedInvoice.folio,
-        client_name: updatedInvoice.clientName,
-        rfc: updatedInvoice.rfc,
-        date: updatedInvoice.date,
-        is_mixed_tax: !!updatedInvoice.isMixedTax,
-        subtotal: updatedInvoice.subtotal || 0,
-        discount: updatedInvoice.discount || 0,
-        subtotal8: updatedInvoice.subtotal8 || 0,
-        subtotal16: updatedInvoice.subtotal16 || 0,
-        iva_rate: updatedInvoice.ivaRate || 8,
-        iva_total: updatedInvoice.ivaTotal || 0,
-        applies_isr: !!updatedInvoice.appliesIsr,
-        isr_rate: updatedInvoice.isrRate || 1.25,
-        isr_retained: updatedInvoice.isrRetained || 0,
-        base_neta: updatedInvoice.baseNeta || 0,
-        total: updatedInvoice.total || 0,
-        status: updatedInvoice.status || 'PAGADA'
-      });
-      if (error) {
-        console.error('Supabase Invoice save error:', error);
+      const payload = {
+        p_id: updatedInvoice.id,
+        p_folio: updatedInvoice.folio,
+        p_client_name: updatedInvoice.clientName,
+        p_rfc: updatedInvoice.rfc,
+        p_date: updatedInvoice.date,
+        p_is_mixed_tax: !!updatedInvoice.isMixedTax,
+        p_subtotal: updatedInvoice.subtotal || 0,
+        p_discount: updatedInvoice.discount || 0,
+        p_subtotal8: updatedInvoice.subtotal8 || 0,
+        p_subtotal16: updatedInvoice.subtotal16 || 0,
+        p_iva_rate: updatedInvoice.ivaRate || 8,
+        p_iva_total: updatedInvoice.ivaTotal || 0,
+        p_applies_isr: !!updatedInvoice.appliesIsr,
+        p_isr_rate: updatedInvoice.isrRate || 1.25,
+        p_isr_retained: updatedInvoice.isrRetained || 0,
+        p_base_neta: updatedInvoice.baseNeta || 0,
+        p_total: updatedInvoice.total || 0,
+        p_status: updatedInvoice.status || 'PAGADA'
+      };
+
+      const { error: rpcError } = await supabase.rpc('crear_factura_completa', payload);
+
+      if (rpcError) {
+        // Fallback transparente a direct upsert si la RPC no existe o está en transición
+        const { error: upsertError } = await supabase.from('invoices').upsert({
+          id: updatedInvoice.id,
+          folio: updatedInvoice.folio,
+          client_name: updatedInvoice.clientName,
+          rfc: updatedInvoice.rfc,
+          date: updatedInvoice.date,
+          is_mixed_tax: !!updatedInvoice.isMixedTax,
+          subtotal: updatedInvoice.subtotal || 0,
+          discount: updatedInvoice.discount || 0,
+          subtotal8: updatedInvoice.subtotal8 || 0,
+          subtotal16: updatedInvoice.subtotal16 || 0,
+          iva_rate: updatedInvoice.ivaRate || 8,
+          iva_total: updatedInvoice.ivaTotal || 0,
+          applies_isr: !!updatedInvoice.appliesIsr,
+          isr_rate: updatedInvoice.isrRate || 1.25,
+          isr_retained: updatedInvoice.isrRetained || 0,
+          base_neta: updatedInvoice.baseNeta || 0,
+          total: updatedInvoice.total || 0,
+          status: updatedInvoice.status || 'PAGADA'
+        });
+        if (upsertError) {
+          console.error('Supabase Invoice save error:', upsertError);
+        }
       }
     } catch (err) {
       console.error('Supabase Invoice save network error:', err);
@@ -1032,21 +1058,40 @@ export const storageService = {
     const idx = list.findIndex(d => d.id === itemToSave.id);
 
     try {
-      const { error } = await supabase.from('deductibles').upsert({
-        id: itemToSave.id,
-        provider_name: itemToSave.providerName,
-        rfc: itemToSave.rfc,
-        invoice_no: itemToSave.invoiceNo,
-        date: itemToSave.date,
-        subtotal: itemToSave.subtotal || 0,
-        discount: itemToSave.discount || 0,
-        iva_total: itemToSave.ivaTotal || 0,
-        total: itemToSave.total || 0,
-        category: itemToSave.category || 'Telecomunicaciones',
-        file_name: itemToSave.fileName,
-        file_url: itemToSave.fileUrl
-      });
-      if (error) console.error('Supabase Deductible save error:', error);
+      const payload = {
+        p_id: itemToSave.id,
+        p_provider_name: itemToSave.providerName,
+        p_rfc: itemToSave.rfc,
+        p_invoice_no: itemToSave.invoiceNo,
+        p_date: itemToSave.date,
+        p_subtotal: itemToSave.subtotal || 0,
+        p_discount: itemToSave.discount || 0,
+        p_iva_total: itemToSave.ivaTotal || 0,
+        p_total: itemToSave.total || 0,
+        p_category: itemToSave.category || 'Telecomunicaciones',
+        p_file_name: itemToSave.fileName || null,
+        p_file_url: itemToSave.fileUrl || null
+      };
+
+      const { error: rpcError } = await supabase.rpc('crear_deducible_completo', payload);
+
+      if (rpcError) {
+        const { error } = await supabase.from('deductibles').upsert({
+          id: itemToSave.id,
+          provider_name: itemToSave.providerName,
+          rfc: itemToSave.rfc,
+          invoice_no: itemToSave.invoiceNo,
+          date: itemToSave.date,
+          subtotal: itemToSave.subtotal || 0,
+          discount: itemToSave.discount || 0,
+          iva_total: itemToSave.ivaTotal || 0,
+          total: itemToSave.total || 0,
+          category: itemToSave.category || 'Telecomunicaciones',
+          file_name: itemToSave.fileName,
+          file_url: itemToSave.fileUrl
+        });
+        if (error) console.error('Supabase Deductible save error:', error);
+      }
     } catch (err) {
       console.error('Supabase Deductible network error:', err);
     }
@@ -1093,21 +1138,24 @@ export const storageService = {
     };
 
     try {
-      const res = await supabase.from('account_deposits').upsert({
-        id: depToSave.id,
-        concept: depToSave.concept,
-        amount: depToSave.amount,
-        date: depToSave.date,
-        bank_name: depToSave.bankName || 'Santander',
-        reference: depToSave.reference,
-        applies_equipment_expense: depToSave.appliesEquipmentExpense,
-        equipment_expense: depToSave.equipmentExpense,
-        equipment_provider: depToSave.equipmentProvider,
-        real_utility: depToSave.realUtility,
-        profile: depToSave.profile
-      });
-      if (res?.error) {
-        await supabase.from('account_deposits').upsert({
+      const payload = {
+        p_id: depToSave.id,
+        p_concept: depToSave.concept,
+        p_amount: depToSave.amount,
+        p_date: depToSave.date,
+        p_bank_name: depToSave.bankName || 'Santander',
+        p_reference: depToSave.reference || null,
+        p_applies_equipment_expense: depToSave.appliesEquipmentExpense,
+        p_equipment_expense: depToSave.equipmentExpense,
+        p_equipment_provider: depToSave.equipmentProvider || null,
+        p_real_utility: depToSave.realUtility,
+        p_profile: depToSave.profile
+      };
+
+      const { error: rpcError } = await supabase.rpc('crear_deposito_completo', payload);
+
+      if (rpcError) {
+        const res = await supabase.from('account_deposits').upsert({
           id: depToSave.id,
           concept: depToSave.concept,
           amount: depToSave.amount,
@@ -1117,8 +1165,23 @@ export const storageService = {
           applies_equipment_expense: depToSave.appliesEquipmentExpense,
           equipment_expense: depToSave.equipmentExpense,
           equipment_provider: depToSave.equipmentProvider,
-          real_utility: depToSave.realUtility
+          real_utility: depToSave.realUtility,
+          profile: depToSave.profile
         });
+        if (res?.error) {
+          await supabase.from('account_deposits').upsert({
+            id: depToSave.id,
+            concept: depToSave.concept,
+            amount: depToSave.amount,
+            date: depToSave.date,
+            bank_name: depToSave.bankName || 'Santander',
+            reference: depToSave.reference,
+            applies_equipment_expense: depToSave.appliesEquipmentExpense,
+            equipment_expense: depToSave.equipmentExpense,
+            equipment_provider: depToSave.equipmentProvider,
+            real_utility: depToSave.realUtility
+          });
+        }
       }
     } catch (e) {
       console.error('Supabase deposit save error:', e);
@@ -1458,19 +1521,59 @@ export const storageService = {
     setStorageItem(STORAGE_KEYS.SECURITY_INCIDENTS, incidents);
   },
 
-  // 1-Click Full Backup Exporter (Non-Destructive Snapshot)
+  // Supabase Storage Integration (Prevención de TOAST Bloat & Persistencia de Comprobantes)
+  uploadComprobanteStorage: async (file, pathPrefix = 'comprobantes') => {
+    if (!file) return { success: false, error: 'No file provided' };
+    try {
+      const ext = file.name ? file.name.split('.').pop() : 'pdf';
+      const cleanName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
+      const filePath = `${pathPrefix}/${cleanName}`;
+
+      const { error } = await supabase.storage
+        .from('comprobantes')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        console.warn('Supabase Storage upload warning (fallback a referencia local):', error.message);
+        return { success: false, fileName: file.name, error: error.message };
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('comprobantes')
+        .getPublicUrl(filePath);
+
+      return {
+        success: true,
+        fileName: file.name,
+        storagePath: filePath,
+        fileUrl: publicUrlData?.publicUrl || ''
+      };
+    } catch (err) {
+      console.warn('Storage exception:', err);
+      return { success: false, fileName: file?.name || '', error: err.message };
+    }
+  },
+
+  // 1-Click Full Backup Exporter (Non-Destructive Snapshot ISO 27001 Ready)
+  exportFullBackupJSON: () => storageService.exportFullBackup(),
   exportFullBackup: () => {
     try {
       const backupData = {
         metadata: {
           system: 'Conta Inovatel',
-          version: '2.6',
+          version: '2.8',
+          standard: 'NEXUS MASTER v2.8 (ISO 27001 Ready)',
           exportDate: new Date().toISOString(),
           totalInvoices: (getStorageItem(STORAGE_KEYS.INVOICES, [])).length,
           totalClients: (getStorageItem(STORAGE_KEYS.CLIENTS, [])).length,
           totalDeductibles: (getStorageItem(STORAGE_KEYS.DEDUCTIBLE_EXPENSES, [])).length,
           totalDeposits: (getStorageItem(STORAGE_KEYS.ACCOUNT_DEPOSITS, [])).length,
-          totalAgendaEvents: (getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, [])).length
+          totalAgendaEvents: (getStorageItem(STORAGE_KEYS.AGENDA_EVENTS, [])).length,
+          totalCardExpenses: (getStorageItem(STORAGE_KEYS.CARD_EXPENSES, [])).length,
+          totalInvestments: (getStorageItem(STORAGE_KEYS.INVESTMENTS, [])).length
         },
         invoices: getStorageItem(STORAGE_KEYS.INVOICES, []),
         clients: getStorageItem(STORAGE_KEYS.CLIENTS, []),

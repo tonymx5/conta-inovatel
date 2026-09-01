@@ -1,4 +1,4 @@
-// Script de Auditoría de Base de Datos Supabase en Tiempo Real (NEXUS v2.6)
+// Script de Auditoría de Base de Datos Supabase en Tiempo Real (NEXUS v2.8)
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -66,6 +66,11 @@ const SCHEMA_AUDIT_MAP = [
   {
     table: 'investments',
     cols: 'id,asset_name,category,amount_invested,expected_yield_pct,start_date,notes,created_at'
+  },
+  {
+    table: 'other_expenses',
+    cols: 'id,concept,amount,date,user_role,created_at',
+    optional: true
   },
   {
     table: 'agenda_events',

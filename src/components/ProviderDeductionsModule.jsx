@@ -56,9 +56,12 @@ export default function ProviderDeductionsModule({ userRole }) {
     if (!file) return;
 
     setIsScanning(true);
-    setOcrStatus('Iniciando lectura digital de documento (PDF / XML / OCR)...');
+    setOcrStatus('Iniciando lectura digital de documento y resguardo seguro (PDF / XML / OCR)...');
 
-    const result = await ocrService.scanDocumentOcr(file, (statusText) => setOcrStatus(statusText));
+    const [result, storageResult] = await Promise.all([
+      ocrService.scanDocumentOcr(file, (statusText) => setOcrStatus(statusText)),
+      storageService.uploadComprobanteStorage(file).catch(() => ({ success: false }))
+    ]);
     setIsScanning(false);
 
     if (result.success) {
@@ -85,6 +88,7 @@ export default function ProviderDeductionsModule({ userRole }) {
         total: result.total ? result.total.toString() : '',
         sector: 'Trabajo',
         fileName: file.name,
+        fileUrl: storageResult?.fileUrl || '',
         fileType: file.name.endsWith('.xml') ? 'xml' : 'pdf'
       });
       setShowModal(true);
@@ -184,6 +188,7 @@ export default function ProviderDeductionsModule({ userRole }) {
       total,
       sector: formData.sector,
       fileName: formData.fileName || 'documento_proveedor.pdf',
+      fileUrl: formData.fileUrl || undefined,
       fileType: formData.fileType || 'pdf',
       scannedWithOcr: true
     };

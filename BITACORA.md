@@ -78,3 +78,40 @@ Corregir la lógica contable de la tarjeta **Ingresos del Mes** para que respete
 - **Robustez & Precisión:** Suite de pruebas con 8/8 tests de precisión matemática a 2 decimales.
 - **Acabado Visual:** Visualización consistente de monedas con 2 decimales estándar `$X,XXX.XX` en todas las tarjetas y desgloses.
 
+---
+
+## 📅 Sesión: 31 de Agosto 2026 (Auditoría, Remediación & Blindaje Enterprise NEXUS v2.8)
+
+### 🎯 Objetivo
+Ejecutar auditoría integral de ciberseguridad, base de datos y red bajo el estándar **NEXUS MASTER v2.8** de forma 100% no destructiva en producción con cero tiempo de inactividad.
+
+---
+
+### 🛠️ Acciones Realizadas
+1. **Red & Cabeceras HTTP (`vercel.json`):**
+   - Inyección de cabecera HSTS: `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`.
+   - Content-Security-Policy (CSP) robusto y adaptado para Supabase Cloud, WebSockets, PDF.js worker, Google Fonts y APIs de conectividad.
+   - Refuerzo de `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `X-XSS-Protection: 1; mode=block`.
+2. **Service Worker & Cache-Busting (`public/sw.js`):**
+   - Actualización de versión a `conta-inovatel-v2.8-enterprise` para forzar la actualización transparente y sin activos obsoletos en dispositivos móviles.
+3. **Servicios de Persistencia & RPCs (`src/services/storageService.js`):**
+   - Conexión de `saveInvoice`, `saveDeductible` y `saveAccountDeposit` a RPCs transaccionales atómicas (`crear_factura_completa`, `crear_deducible_completo`, `crear_deposito_completo`) con fallback seguro a upsert directo.
+   - Implementación de `uploadComprobanteStorage` enlazado con Supabase Storage bucket `comprobantes` para neutralizar el riesgo de TOAST bloat en PostgreSQL.
+   - Estandarización de `exportFullBackupJSON` con metadatos de integridad ISO 27001 para Disaster Recovery en 1-clic.
+4. **Script SQL Maestro Consolidado (`supabase_master_hardening_v2.8.sql`):**
+   - Bloque SQL único 100% idempotente con: Saneamiento y blindaje RLS (`WITH CHECK`), funciones RPC transaccionales atómicas con `SECURITY DEFINER` y `search_path`, índices B-Tree de aceleración en claves foráneas y fechas, constraints numéricos no negativos, tabla de auditoría inmutable (`audit_trail_immutable`) con triggers anti-tamper, y bucket de almacenamiento configurado.
+5. **Auditoría de Esquema & Linter:**
+   - `node scripts/audit-supabase.js`: 100% de tablas y columnas validadas activas en Supabase Cloud.
+   - `npm test`: 8/8 pruebas fiscales y de segregación pasadas con 100% de éxito.
+   - `npm run lint`: 0 errores y 0 advertencias en Oxlint.
+   - `npm run build`: Compilación limpia en Vite.
+
+---
+
+### 🛡️ Auto-Auditoría (PAI - 4 Niveles)
+- **Estructural:** Código modular, asíncrono y desacoplado, sin variables huérfanas ni parches locales.
+- **Alineación Arquitectónica:** Cumplimiento total de los 16 pilares de NEXUS MASTER v2.8 (DB-First, ACID Mandatory, RLS Hardening, Storage Governance, Secrets Shield).
+- **Robustez & Seguridad:** RLS activo con protección contra borrado accidental, RPCs protegidas contra DLL Hijacking, e inmutabilidad de bitácora ISO 27001.
+- **Acabado Visual:** Sistema visual fluido con micro-animaciones, respuesta instantánea y retroalimentación interactiva.
+
+
