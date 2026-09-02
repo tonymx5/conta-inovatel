@@ -114,4 +114,32 @@ Ejecutar auditoría integral de ciberseguridad, base de datos y red bajo el est�
 - **Robustez & Seguridad:** RLS activo con protección contra borrado accidental, RPCs protegidas contra DLL Hijacking, e inmutabilidad de bitácora ISO 27001.
 - **Acabado Visual:** Sistema visual fluido con micro-animaciones, respuesta instantánea y retroalimentación interactiva.
 
+---
 
+## 📅 Sesión: 02 de Septiembre de 2026 — Sincronización Integral de Facturas de Agosto, Resguardo de Depósitos Perfil Karla & Despliegue en Producción (v2.9 Live)
+
+### 🎯 Diagnóstico de Causa Raíz (¿Dónde y por qué ocurrió el error?)
+1. **Excepción no controlada en `syncFromSupabase` (`TypeError: .catch is not a function`):**
+   - En `src/services/storageService.js`, la llamada de resguardo `supabase.from('other_expenses').upsert({...}).catch(...)` invocaba directamente `.catch()` sobre un `PostgrestFilterBuilder` (thenable de Supabase), el cual carece de método `.catch()` nativo.
+   - Esto disparaba un `TypeError` sincrónico dentro del bloque `try` de `syncFromSupabase`, abortando la ejecución y saltando al `catch (err)`. Como resultado, `notifyDataSynced()` jamás se ejecutaba, impidiendo que el evento `conta_data_synced` notificara a los módulos montados en la interfaz gráfica.
+2. **Deficiencia en la semilla de fallback inicial (`initialInvoices` e `initialAccountDeposits`):**
+   - En `src/services/storageService.js`, `initialInvoices` contenía únicamente 8 facturas de julio y exactamente 2 facturas de agosto (`inv9` FK-665 e `inv10` FK-659). Las restantes 8 facturas de agosto (`FK-660`, `FK-669`, `FK-670`, `FK-671`, `FK-679`, `FK-680`, `FK-681`, `FK-682`) no estaban en la semilla base.
+   - `initialAccountDeposits` estaba inicializado como arreglo vacío `[]`. Al no recibir la notificación de sincronización, la interfaz gráfica quedaba varada en los datos semilla iniciales (mostrando solo 2 facturas de agosto y 0 depósitos de Karla).
+3. **Rollover de período calendario al mes de Septiembre 2026:**
+   - Al iniciar el 2 de Septiembre de 2026, el selector de período `selectedMonth` se inicializaba por defecto en `'09'` (Septiembre). Dado que en septiembre aún no hay facturas registradas, los clientes veían una pantalla vacía hasta seleccionar Agosto. Además, los formularios de depósitos adoptaban la fecha de septiembre por defecto.
+
+### 🛠️ Correcciones Implementadas
+1. **Reparación del pipeline de sincronización (`src/services/storageService.js`):**
+   - Reemplazo de sintaxis defectuosa por bloques `try/catch` asíncronos nativos para `other_expenses` y `tax_config`.
+   - Garantía de disparo incondicional de `notifyDataSynced()` mediante bloque `finally`.
+2. **Actualización de semillas base de resguardo offline:**
+   - Incorporación de las 10 facturas completas de Agosto 2026 en `initialInvoices`.
+   - Incorporación de los 8 depósitos activos (incluyendo los 6 depósitos de Karla por $91,812.20) en `initialAccountDeposits`.
+3. **Selección inteligente de período activo (`InvoicesModule`, `ProviderDeductionsModule`, `AnalyticsModule`):**
+   - Lógica de fallback automático: Si el mes en curso (Septiembre) aún no cuenta con movimientos registrados, la interfaz abre automáticamente en el mes previo que contenga información operativa (Agosto 2026), manteniendo la navegación bidireccional inmediata.
+   - Encadenamiento de recarga directa (`.then(() => loadData())`) al completar la sincronización asíncrona en el montaje del componente.
+4. **Invalidación de Caché PWA (`public/sw.js`):**
+   - Actualización de versión de Service Worker a `conta-inovatel-v2.9-live` para purgar cachés locales obsoletas en navegadores móviles y desktop.
+5. **Despliegue y Validación en Vivo:**
+   - Ejecución exitosa de `deploy.ps1` (Linter 0 advertencias, Tests 100% éxito, Build Vite limpio, Auditoría Supabase HTTP 200).
+   - Verificación automatizada con Browser Subagent en `https://conta.inovatel.mx`: Confirmadas 10 facturas completas de Agosto ($103,153.37) y 6 depósitos de Karla ($91,812.20), con perfil Edson/Administrador 100% operativo sin daño colateral.
