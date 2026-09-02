@@ -48,11 +48,23 @@ export default function InvoicesModule({ userRole }) {
 
   // Real dynamic current system date (Agosto)
   const now = new Date();
-  const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0'); // e.g. '08' (Agosto)
+  const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0'); // e.g. '09' (Septiembre)
   const currentYearStr = String(now.getFullYear()); // e.g. '2026'
 
-  // Real dynamic current system date (Agosto por defecto)
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  // Período activo inteligente: si el mes actual aún no tiene registros, abre por defecto el mes previo con datos (ej. Agosto)
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const invs = storageService.getInvoices();
+    const hasCurrentMonth = invs.some(i => i.date && i.date.startsWith(`${currentYearStr}-${currentMonthStr}`));
+    if (!hasCurrentMonth) {
+      const prevMonthNum = now.getMonth(); // Si estamos en Septiembre (8), el previo es Agosto (7 -> '08')
+      if (prevMonthNum >= 1) {
+        const prevMonthStr = String(prevMonthNum).padStart(2, '0');
+        const hasPrevMonth = invs.some(i => i.date && i.date.startsWith(`${currentYearStr}-${prevMonthStr}`));
+        if (hasPrevMonth) return prevMonthStr;
+      }
+    }
+    return currentMonthStr;
+  });
   const [selectedYear, setSelectedYear] = useState(currentYearStr);
 
   // Form State (comienza siempre completamente limpio)
@@ -85,8 +97,12 @@ export default function InvoicesModule({ userRole }) {
 
   useEffect(() => {
     loadData();
-    // Re-sincronizar con Supabase al abrir el módulo
-    storageService.syncFromSupabase();
+    // Re-sincronizar con Supabase al abrir el módulo y asegurar recarga inmediata
+    storageService.syncFromSupabase().then(() => {
+      loadData();
+    }).catch(err => {
+      console.warn('Sync on mount warning:', err);
+    });
 
     let toastTimeout = null;
     const handleSync = (e) => {

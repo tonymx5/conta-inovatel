@@ -12,11 +12,23 @@ export default function ProviderDeductionsModule({ userRole }) {
 
   // Real dynamic current system date (Agosto)
   const now = new Date();
-  const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0'); // e.g. '08' (Agosto)
+  const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0'); // e.g. '09' (Septiembre)
   const currentYearStr = String(now.getFullYear()); // e.g. '2026'
 
-  // Real dynamic current system date (Agosto por defecto)
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  // Período activo inteligente: si el mes actual aún no tiene deducciones, abre por defecto el mes previo con datos
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const deds = storageService.getDeductibles();
+    const hasCurrentMonth = deds.some(d => d.date && d.date.startsWith(`${currentYearStr}-${currentMonthStr}`));
+    if (!hasCurrentMonth) {
+      const prevMonthNum = now.getMonth();
+      if (prevMonthNum >= 1) {
+        const prevMonthStr = String(prevMonthNum).padStart(2, '0');
+        const hasPrevMonth = deds.some(d => d.date && d.date.startsWith(`${currentYearStr}-${prevMonthStr}`));
+        if (hasPrevMonth) return prevMonthStr;
+      }
+    }
+    return currentMonthStr;
+  });
   const [selectedYear, setSelectedYear] = useState(currentYearStr);
   
   // Modal state (siempre limpio)

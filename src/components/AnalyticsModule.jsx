@@ -41,7 +41,19 @@ export default function AnalyticsModule() {
   const currentMonthStr = String(currentDate.getMonth() + 1).padStart(2, '0');
 
   const [selectedYear, setSelectedYear] = useState(currentYearStr);
-  const [selectedMonth, setSelectedMonth] = useState(currentMonthStr);
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const invs = storageService.getInvoices();
+    const hasCurrentMonth = invs.some(i => i.date && i.date.startsWith(`${currentYearStr}-${currentMonthStr}`));
+    if (!hasCurrentMonth) {
+      const prevMonthNum = currentDate.getMonth();
+      if (prevMonthNum >= 1) {
+        const prevMonthStr = String(prevMonthNum).padStart(2, '0');
+        const hasPrevMonth = invs.some(i => i.date && i.date.startsWith(`${currentYearStr}-${prevMonthStr}`));
+        if (hasPrevMonth) return prevMonthStr;
+      }
+    }
+    return currentMonthStr;
+  });
 
   useEffect(() => {
     loadData();

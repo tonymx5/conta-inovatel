@@ -63,9 +63,17 @@ const initialInvoices = [
   { id: 'inv7', folio: 'FK-107', clientName: 'EDGAR', rfc: 'EDG920415XYZ', date: '2026-07-15', subtotal: 450.00, discount: 0, baseNeta: 450.00, ivaRate: 8, ivaTotal: 36.00, appliesIsr: false, isrRate: 0, isrRetained: 0.00, total: 486.00, status: 'PAGADA' },
   { id: 'inv8', folio: 'FK-108', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-07-20', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
 
-  // Agosto 2026 (2 Facturas)
+  // Agosto 2026 (10 Facturas Reales Sincronizadas)
   { id: 'inv9', folio: 'FK-665', clientName: 'ALVARADOS', rfc: 'ALV190930PQR', date: '2026-08-04', subtotal: 35720.00, discount: 1786.00, baseNeta: 33934.00, ivaRate: 8, ivaTotal: 2714.72, appliesIsr: true, isrRate: 1.25, isrRetained: 424.18, total: 36224.54, status: 'PAGADA' },
-  { id: 'inv10', folio: 'FK-659', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-10', subtotal: 6909.60, discount: 0, baseNeta: 6909.60, ivaRate: 8, ivaTotal: 553.10, appliesIsr: true, isrRate: 1.25, isrRetained: 86.37, total: 7376.33, status: 'PAGADA' }
+  { id: 'inv-1787010186364', folio: 'FK-660', clientName: 'GRACIELA', rfc: 'GRA850410GHI', date: '2026-08-06', subtotal: 780.00, discount: 0, baseNeta: 780.00, ivaRate: 8, ivaTotal: 62.40, appliesIsr: false, isrRate: 1.25, isrRetained: 0.00, total: 842.40, status: 'PAGADA' },
+  { id: 'inv10', folio: 'FK-659', clientName: 'JOINT', rfc: 'JOI190822ABC', date: '2026-08-10', subtotal: 6909.91, discount: 0, baseNeta: 6909.91, ivaRate: 8, ivaTotal: 552.79, appliesIsr: true, isrRate: 1.25, isrRetained: 86.37, total: 7376.33, status: 'PAGADA' },
+  { id: 'inv-1787089235498', folio: 'FK-669', clientName: 'EDGAR SOTO', rfc: 'SOHE770725RB8', date: '2026-08-18', subtotal: 450.00, discount: 0, baseNeta: 450.00, ivaRate: 8, ivaTotal: 36.00, appliesIsr: false, isrRate: 1.25, isrRetained: 0.00, total: 486.00, status: 'PAGADA' },
+  { id: 'inv-1787089782636', folio: 'FK-670', clientName: 'ELIZABEHT', rfc: 'EIAE790110M33', date: '2026-08-18', subtotal: 1235.00, discount: 0, baseNeta: 1235.00, ivaRate: 8, ivaTotal: 98.80, appliesIsr: false, isrRate: 1.25, isrRetained: 0.00, total: 1333.80, status: 'PAGADA' },
+  { id: 'inv-1787090037247', folio: 'FK-671', clientName: 'ALVARADOS', rfc: 'ATR1305203T0', date: '2026-08-18', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
+  { id: 'inv-1787684300187', folio: 'FK-679', clientName: 'ALVARADOS', rfc: 'ATR1305203T0', date: '2026-08-25', subtotal: 4000.00, discount: 0, baseNeta: 4000.00, ivaRate: 8, ivaTotal: 320.00, appliesIsr: true, isrRate: 1.25, isrRetained: 50.00, total: 4270.00, status: 'PAGADA' },
+  { id: 'inv-1787684335620', folio: 'FK-680', clientName: 'ALVARADOS', rfc: 'ATR1305203T0', date: '2026-08-25', subtotal: 1000.00, discount: 0, baseNeta: 1000.00, ivaRate: 8, ivaTotal: 80.00, appliesIsr: true, isrRate: 1.25, isrRetained: 12.50, total: 1067.50, status: 'PAGADA' },
+  { id: 'inv-1787789480309', folio: 'FK-681', clientName: 'GRACIELA', rfc: 'PEGG750422FZ7', date: '2026-08-26', subtotal: 18700.00, discount: 935.00, baseNeta: 17765.00, ivaRate: 8, ivaTotal: 1421.20, appliesIsr: false, isrRate: 1.25, isrRetained: 0.00, total: 19186.20, status: 'PAGADA' },
+  { id: 'inv-1787873790682', folio: 'FK-682', clientName: 'RMS', rfc: 'RMS2504148E3', date: '2026-08-27', subtotal: 26320.00, discount: 0, baseNeta: 26320.00, ivaRate: 8, ivaTotal: 2105.60, appliesIsr: true, isrRate: 1.25, isrRetained: 329.00, total: 28096.60, status: 'PAGADA' }
 ];
 
 const initialDeductibles = [
@@ -76,7 +84,112 @@ const initialDeductibles = [
   { id: 'd2', providerName: 'Telmex', rfc: 'EME8903099C7', invoiceNo: 'PDF-8812', date: '2026-07-12', subtotal: 860.00, discount: 0, ivaTotal: 137.60, total: 997.60, category: 'Telecomunicaciones' }
 ];
 
-const initialAccountDeposits = [];
+const initialAccountDeposits = [
+  {
+    id: 'dep-1787024787523',
+    concept: 'Deposito Alvarado factura 665',
+    amount: 32180.05,
+    date: '2026-08-01',
+    bankName: 'NU',
+    reference: '4 agosto 2024',
+    profile: 'karla',
+    appliesEquipmentExpense: false,
+    equipmentExpense: 0,
+    equipmentProvider: '',
+    realUtility: 32180.05
+  },
+  {
+    id: 'dep-1787045393027',
+    concept: 'Abono factura alvarado fact 665',
+    amount: 32180.05,
+    date: '2026-08-01',
+    bankName: 'NU',
+    reference: '4 agosto 2024',
+    profile: 'edson',
+    appliesEquipmentExpense: true,
+    equipmentExpense: 21952.17,
+    equipmentProvider: 'SYSCOM',
+    realUtility: 10227.88
+  },
+  {
+    id: 'dep-1787697151995',
+    concept: '2da trasferencia',
+    amount: 7647.99,
+    date: '2026-08-01',
+    bankName: 'NU',
+    reference: '25 agosto',
+    profile: 'karla',
+    appliesEquipmentExpense: false,
+    equipmentExpense: 0,
+    equipmentProvider: '',
+    realUtility: 7647.99
+  },
+  {
+    id: 'dep-1787790432943',
+    concept: '2da trasferencia',
+    amount: 7647.99,
+    date: '2026-08-01',
+    bankName: 'NU',
+    reference: '25 Agosto',
+    profile: 'edson',
+    appliesEquipmentExpense: false,
+    equipmentExpense: 0,
+    equipmentProvider: '',
+    realUtility: 7647.99
+  },
+  {
+    id: 'dep-1787876882071',
+    concept: 'PAGO LAPTOP',
+    amount: 16999.00,
+    date: '2026-08-27',
+    bankName: 'Santander',
+    reference: 'SPEI-50813',
+    profile: 'karla',
+    appliesEquipmentExpense: false,
+    equipmentExpense: 0,
+    equipmentProvider: '',
+    realUtility: 16999.00
+  },
+  {
+    id: 'dep-1788129577104',
+    concept: 'gastos varios',
+    amount: 17023.07,
+    date: '2026-08-30',
+    bankName: 'NU',
+    reference: 'SPEI-92621',
+    profile: 'karla',
+    appliesEquipmentExpense: false,
+    equipmentExpense: 0,
+    equipmentProvider: '',
+    realUtility: 17023.07
+  },
+  {
+    id: 'dep-1788380941103',
+    concept: 'PAGO AGOSTO',
+    amount: 17013.77,
+    date: '2026-08-31',
+    bankName: 'Santander',
+    reference: 'SPEI-51233',
+    profile: 'karla',
+    appliesEquipmentExpense: false,
+    equipmentExpense: 0,
+    equipmentProvider: '',
+    realUtility: 17013.77
+  },
+  {
+    id: 'dep-1788381973743',
+    concept: 'PAGO TOTAL AGOSTO',
+    amount: 948.32,
+    date: '2026-08-31',
+    bankName: 'NU',
+    reference: 'SPEI-24142',
+    profile: 'karla',
+    appliesEquipmentExpense: false,
+    equipmentExpense: 0,
+    equipmentProvider: '',
+    realUtility: 948.32
+  }
+];
 
 const initialCardExpenses = [
   { id: 'exp-aug-1', date: '2026-08-17', description: 'Consumos y Alimentos', amount: 462.00, bankId: 'b5', bankName: 'Banregio (Crédito)', sector: 'Comida' },
@@ -528,21 +641,25 @@ export const storageService = {
 
       // Dual sync propagation to ensure 100% remote persistence in all environments
       const currentList = getStorageItem(STORAGE_KEYS.OTHER_EXPENSES, initialOtherExpenses);
-      Promise.all(currentList.map(oe => {
-        supabase.from('other_expenses').upsert({
-          id: oe.id, concept: oe.concept, amount: oe.amount || 0,
-          date: oe.date, user_role: oe.userRole || 'ADMIN'
-        }).catch(() => {});
+      Promise.all(currentList.map(async (oe) => {
+        try {
+          await supabase.from('other_expenses').upsert({
+            id: oe.id, concept: oe.concept, amount: oe.amount || 0,
+            date: oe.date, user_role: oe.userRole || 'ADMIN'
+          });
+        } catch {}
 
-        return supabase.from('card_expenses').upsert({
-          id: oe.id,
-          date: oe.date,
-          description: oe.concept,
-          amount: oe.amount || 0,
-          bank_id: 'sync_other_expenses',
-          bank_name: 'Otros Gastos',
-          sector: oe.userRole || 'ADMIN'
-        });
+        try {
+          await supabase.from('card_expenses').upsert({
+            id: oe.id,
+            date: oe.date,
+            description: oe.concept,
+            amount: oe.amount || 0,
+            bank_id: 'sync_other_expenses',
+            bank_name: 'Otros Gastos',
+            sector: oe.userRole || 'ADMIN'
+          });
+        } catch {}
       })).catch(e => console.error('Seed other_expenses error:', e));
 
       // 8. Agenda Events (Calendario & Agenda)
@@ -568,10 +685,10 @@ export const storageService = {
       if (taxRes && taxRes.data) {
         setStorageItem(STORAGE_KEYS.TAX_CONFIG, { isrEstimatedRate: parseFloat(taxRes.data.isr_estimated_rate) || 2.5 });
       }
-
-      notifyDataSynced();
     } catch (err) {
       console.warn('Supabase sync warning (running offline / local cache):', err);
+    } finally {
+      notifyDataSynced();
     }
   },
 
@@ -1689,11 +1806,15 @@ export const storageService = {
       if (backupData.taxConfig) {
         setStorageItem(STORAGE_KEYS.TAX_CONFIG, backupData.taxConfig);
         if (backupData.taxConfig.isrEstimatedRate) {
-          supabase.from('tax_config').upsert({
-            id: 'default',
-            isr_estimated_rate: backupData.taxConfig.isrEstimatedRate,
-            last_updated: new Date().toISOString()
-          }).catch(e => console.error('Restore tax_config error:', e));
+          try {
+            await supabase.from('tax_config').upsert({
+              id: 'default',
+              isr_estimated_rate: backupData.taxConfig.isrEstimatedRate,
+              last_updated: new Date().toISOString()
+            });
+          } catch (e) {
+            console.error('Restore tax_config error:', e);
+          }
         }
       }
 
