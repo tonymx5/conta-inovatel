@@ -8,6 +8,7 @@
     "test": "node scripts/test-tax-calculations.js && node scripts/test-deposit-segregation.js",
     "build": "vite build",
     "lint": "oxlint",
+    "db:restore": "node bin/restore-db.js --dry-run",
     "preview": "vite preview",
     "deploy": "powershell -ExecutionPolicy Bypass -File ./deploy.ps1"
   },

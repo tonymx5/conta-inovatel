@@ -33,7 +33,7 @@ export default function Header({
     { id: 'provider_deductions', label: 'Fact Prov', icon: Receipt, restricted: false, adminOnly: true },
     { id: 'expenses', label: 'Gastos & Bancos', icon: CreditCard, restricted: true },
     { id: 'analytics', label: 'Métricas & Analíticas', icon: BarChart3, restricted: true },
-    { id: 'investments', label: 'Inversiones & Bot IA', icon: TrendingUp, restricted: true }
+    { id: 'investments', label: 'Inversiones & Bot IA', icon: TrendingUp, restricted: false, adminOnly: true }
   ];
 
   const tabs = allTabs.filter(t => !t.adminOnly || userRole === 'admin');

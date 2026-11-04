@@ -30,3 +30,13 @@ dist-ssr
 
 .env.credentials
 .env*.local
+
+# Documentos sensibles con datos fiscales / PII / Comprobantes (ISO 27701 & LFPDPPP)
+Documentos/*.xlsx
+Documentos/*.xls
+Documentos/*.pdf
+Documentos/*.zip
+Documentos/*.json
+Documentos/plantillas_calendario/
+*.xlsx
+

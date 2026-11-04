@@ -1,120 +1,164 @@
--- Supabase / PostgreSQL Schema Migration for Conta Inovatel
+-- =========================================================================
+-- CONTA INOVATEL - ESQUEMA CANÓNICO BLINDADO SUPABASE / POSTGRESQL (v2.8)
+-- Estándar: ISO 27001 / OWASP Top 10 / RLS Zero-Trust
+-- =========================================================================
 
--- 1. Clients Table
-CREATE TABLE IF NOT EXISTS public.clients (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
-    rfc TEXT NOT NULL UNIQUE,
-    applies_isr BOOLEAN DEFAULT TRUE,
-    isr_rate NUMERIC(5,2) DEFAULT 2.00,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 2. Invoices Table (Facturas Emitidas)
+-- 1. Facturas de Ingreso (invoices)
 CREATE TABLE IF NOT EXISTS public.invoices (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     folio TEXT NOT NULL,
     client_name TEXT NOT NULL,
-    rfc TEXT NOT NULL,
+    rfc TEXT,
     date DATE NOT NULL,
-    subtotal NUMERIC(12,2) NOT NULL,
-    iva_total NUMERIC(12,2) NOT NULL,
+    is_mixed_tax BOOLEAN DEFAULT FALSE,
+    subtotal NUMERIC(15,2) NOT NULL DEFAULT 0,
+    discount NUMERIC(15,2) DEFAULT 0,
+    subtotal8 NUMERIC(15,2) DEFAULT 0,
+    subtotal16 NUMERIC(15,2) DEFAULT 0,
+    iva_rate NUMERIC(5,2) DEFAULT 8.00,
+    iva_total NUMERIC(15,2) NOT NULL DEFAULT 0,
     applies_isr BOOLEAN DEFAULT TRUE,
-    isr_rate NUMERIC(5,2) DEFAULT 2.00,
-    isr_retained NUMERIC(12,2) DEFAULT 0.00,
+    isr_rate NUMERIC(5,2) DEFAULT 1.25,
+    isr_retained NUMERIC(15,2) DEFAULT 0,
+    base_neta NUMERIC(15,2) DEFAULT 0,
+    total NUMERIC(15,2) NOT NULL DEFAULT 0,
     status TEXT DEFAULT 'PAGADA',
-    created_by TEXT DEFAULT 'admin',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 
--- 3. Other Income Table (No Facturados)
-CREATE TABLE IF NOT EXISTS public.other_incomes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    date DATE NOT NULL,
-    concept TEXT NOT NULL,
-    amount NUMERIC(12,2) NOT NULL,
-    payment_method TEXT DEFAULT 'Efectivo',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 4. Deductible Expenses Table (Facturas Proveedores)
-CREATE TABLE IF NOT EXISTS public.provider_deductions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    provider_name TEXT NOT NULL,
+-- 2. Clientes (clients)
+CREATE TABLE IF NOT EXISTS public.clients (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
     rfc TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    sector TEXT,
+    notes TEXT,
+    applies_isr BOOLEAN DEFAULT TRUE,
+    isr_rate NUMERIC(5,2) DEFAULT 1.25,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.clients ENABLE ROW LEVEL SECURITY;
+
+-- 3. Facturas Proveedores / Deducciones (deductibles)
+CREATE TABLE IF NOT EXISTS public.deductibles (
+    id TEXT PRIMARY KEY,
+    provider_name TEXT NOT NULL,
+    rfc TEXT,
     invoice_no TEXT,
     date DATE NOT NULL,
-    subtotal NUMERIC(12,2) NOT NULL,
-    iva_total NUMERIC(12,2) NOT NULL,
-    total NUMERIC(12,2) NOT NULL,
-    sector TEXT DEFAULT 'Trabajo',
+    subtotal NUMERIC(15,2) NOT NULL DEFAULT 0,
+    discount NUMERIC(15,2) DEFAULT 0,
+    iva_total NUMERIC(15,2) NOT NULL DEFAULT 0,
+    total NUMERIC(15,2) NOT NULL DEFAULT 0,
+    category TEXT DEFAULT 'Telecomunicaciones',
     file_name TEXT,
-    file_type TEXT DEFAULT 'pdf',
-    scanned_with_ocr BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    file_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+ALTER TABLE public.deductibles ENABLE ROW LEVEL SECURITY;
 
--- 5. Bank Accounts Table
-CREATE TABLE IF NOT EXISTS public.bank_accounts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    bank_name TEXT NOT NULL,
-    account_type TEXT NOT NULL, -- 'Débito' / 'Crédito'
-    account_number TEXT,
-    balance NUMERIC(12,2) DEFAULT 0.00,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+-- 4. Depósitos a Cuenta / Segregación Edson-Karla (account_deposits)
+CREATE TABLE IF NOT EXISTS public.account_deposits (
+    id TEXT PRIMARY KEY,
+    concept TEXT NOT NULL,
+    amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    date DATE NOT NULL,
+    bank_name TEXT DEFAULT 'Santander',
+    reference TEXT,
+    applies_equipment_expense BOOLEAN DEFAULT FALSE,
+    equipment_expense NUMERIC(15,2) DEFAULT 0,
+    equipment_provider TEXT,
+    real_utility NUMERIC(15,2) DEFAULT 0,
+    profile TEXT DEFAULT 'karla',
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+ALTER TABLE public.account_deposits ENABLE ROW LEVEL SECURITY;
 
--- 6. Card Expenses Table
+-- 5. Configuración Fiscal (tax_config)
+CREATE TABLE IF NOT EXISTS public.tax_config (
+    id TEXT PRIMARY KEY,
+    isr_estimated_rate NUMERIC(5,2) DEFAULT 1.25,
+    last_updated TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.tax_config ENABLE ROW LEVEL SECURITY;
+
+-- 6. Bitácora de Auditoría (audit_logs)
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id TEXT PRIMARY KEY,
+    timestamp TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT,
+    user_role TEXT DEFAULT 'ADMIN',
+    ip TEXT
+);
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+-- 7. Gastos por Tarjeta (card_expenses)
 CREATE TABLE IF NOT EXISTS public.card_expenses (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     date DATE NOT NULL,
     description TEXT NOT NULL,
-    amount NUMERIC(12,2) NOT NULL,
-    bank_id UUID REFERENCES public.bank_accounts(id) ON DELETE SET NULL,
+    amount NUMERIC(15,2) NOT NULL DEFAULT 0,
+    bank_id TEXT,
     bank_name TEXT,
-    sector TEXT DEFAULT 'Comida',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    sector TEXT DEFAULT 'Extras',
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+ALTER TABLE public.card_expenses ENABLE ROW LEVEL SECURITY;
 
--- 7. Investments Table
+-- 8. Inversiones y Rendimientos (investments)
 CREATE TABLE IF NOT EXISTS public.investments (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY,
     asset_name TEXT NOT NULL,
-    category TEXT DEFAULT 'Renta Fija',
-    amount_invested NUMERIC(12,2) NOT NULL,
-    expected_yield_pct NUMERIC(5,2) DEFAULT 10.00,
-    start_date DATE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    category TEXT DEFAULT 'CETES / Renta Fija',
+    amount_invested NUMERIC(15,2) NOT NULL DEFAULT 0,
+    expected_yield_pct NUMERIC(5,2) DEFAULT 0,
+    start_date DATE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+ALTER TABLE public.investments ENABLE ROW LEVEL SECURITY;
 
--- 8. Audit Trail Table
-CREATE TABLE IF NOT EXISTS public.audit_logs (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    username TEXT NOT NULL,
-    action TEXT NOT NULL,
-    details TEXT
-);
-
--- 9. Security Incidents Table (Anti-Intruders)
-CREATE TABLE IF NOT EXISTS public.security_incidents (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    user_agent TEXT,
-    client_ip TEXT,
-    hostname TEXT,
-    approx_location TEXT,
-    failed_attempts INT DEFAULT 3,
-    tried_passwords JSONB
-);
-
--- 10. Other Expenses Table (Ingresos del Mes)
+-- 9. Otros Gastos (other_expenses)
 CREATE TABLE IF NOT EXISTS public.other_expenses (
     id TEXT PRIMARY KEY,
     concept TEXT NOT NULL,
     amount NUMERIC(15,2) NOT NULL DEFAULT 0,
     date DATE NOT NULL,
     user_role TEXT DEFAULT 'ADMIN',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+ALTER TABLE public.other_expenses ENABLE ROW LEVEL SECURITY;
 
+-- 10. Agenda y Eventos (agenda_events)
+CREATE TABLE IF NOT EXISTS public.agenda_events (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    date DATE NOT NULL,
+    time TEXT,
+    category TEXT DEFAULT 'general',
+    color_theme TEXT DEFAULT 'blue',
+    completed BOOLEAN DEFAULT FALSE,
+    created_by TEXT DEFAULT 'karla',
+    created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.agenda_events ENABLE ROW LEVEL SECURITY;
+
+-- 11. Auditoría Inmutable (audit_trail_immutable)
+CREATE TABLE IF NOT EXISTS public.audit_trail_immutable (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    table_name TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    record_id TEXT,
+    old_data JSONB,
+    new_data JSONB,
+    changed_by TEXT DEFAULT 'system',
+    changed_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+ALTER TABLE public.audit_trail_immutable ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ NOTA: este archivo solo habilita RLS (sin políticas = acceso denegado a anon). Las políticas y RPC viven en supabase_master_hardening_v2.8.sql (sección 4-5); ejecutarlo SIEMPRE después de este esquema.

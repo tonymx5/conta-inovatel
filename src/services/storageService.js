@@ -843,7 +843,7 @@ export const storageService = {
 
           const list = getStorageItem(STORAGE_KEYS.CARD_EXPENSES, initialCardExpenses);
           if (payload.eventType === 'DELETE') {
-            const newList = list.filter(item => item.id !== payload.old.id);
+            const newList = list.filter(entry => entry.id !== payload.old.id);
             setStorageItem(STORAGE_KEYS.CARD_EXPENSES, newList);
           } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const mapped = mapCardExpenseFromSupabase(payload.new);
@@ -1658,19 +1658,35 @@ export const storageService = {
         return { success: false, fileName: file.name, error: error.message };
       }
 
-      const { data: publicUrlData } = supabase.storage
-        .from('comprobantes')
-        .getPublicUrl(filePath);
-
+      // Persistir la ruta interna (storagePath) en BD para que nunca caduque;
+      // firmar bajo demanda con getComprobanteSignedUrl al abrir el comprobante.
       return {
         success: true,
         fileName: file.name,
         storagePath: filePath,
-        fileUrl: publicUrlData?.publicUrl || ''
+        fileUrl: filePath
       };
     } catch (err) {
       console.warn('Storage exception:', err);
       return { success: false, fileName: file?.name || '', error: err.message };
+    }
+  },
+
+  // Genera una URL firmada efímera bajo demanda a partir del storagePath (ISO 27001 A.8.24)
+  getComprobanteSignedUrl: async (storagePath, expiresInSeconds = 3600) => {
+    if (!storagePath) return '';
+    try {
+      const { data, error } = await supabase.storage
+        .from('comprobantes')
+        .createSignedUrl(storagePath, expiresInSeconds);
+      if (error) {
+        console.warn('No se pudo firmar URL de comprobante:', error.message);
+        return '';
+      }
+      return data?.signedUrl || '';
+    } catch (err) {
+      console.warn('Error generando signedUrl:', err);
+      return '';
     }
   },
 

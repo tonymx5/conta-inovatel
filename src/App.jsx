@@ -145,7 +145,7 @@ export default function App() {
   const handleLoginSuccess = (role) => {
     setUserRole(role);
     setIsSessionLocked(false);
-    if (role !== 'admin' && (activeTab === 'agenda' || activeTab === 'provider_deductions')) {
+    if (role !== 'admin' && (activeTab === 'agenda' || activeTab === 'provider_deductions' || activeTab === 'investments')) {
       setActiveTab('invoices');
     }
     localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
@@ -216,7 +216,7 @@ export default function App() {
           {activeTab === 'clients' && <ClientsModule userRole={userRole} />}
           {activeTab === 'expenses' && <ExpensesModule userRole={userRole} />}
           {activeTab === 'analytics' && <AnalyticsModule userRole={userRole} />}
-          {activeTab === 'investments' && <InvestmentsModule userRole={userRole} />}
+          {activeTab === 'investments' && userRole === 'admin' && <InvestmentsModule userRole={userRole} />}
         </main>
 
         {/* Mobile Floating Icon-Only Navigation Bar (Solo Iconos Interactivos) */}
@@ -279,14 +279,16 @@ export default function App() {
             <span className="tooltip">Métricas</span>
           </button>
 
-          <button
-            className={`mobile-icon-btn ${activeTab === 'investments' ? 'active' : ''}`}
-            onClick={() => handleMobileNav('investments', 'Inversiones & Bot IA', true)}
-            aria-label="IA & Inversiones"
-          >
-            <TrendingUp size={22} />
-            <span className="tooltip">Inversiones</span>
-          </button>
+          {userRole === 'admin' && (
+            <button
+              className={`mobile-icon-btn ${activeTab === 'investments' ? 'active' : ''}`}
+              onClick={() => handleMobileNav('investments', 'Inversiones & Bot IA', false)}
+              aria-label="IA & Inversiones"
+            >
+              <TrendingUp size={22} />
+              <span className="tooltip">Inversiones</span>
+            </button>
+          )}
 
           <button
             className="mobile-icon-btn"

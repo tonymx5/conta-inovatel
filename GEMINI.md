@@ -26,3 +26,9 @@ Sistema Web Progresivo (PWA) contable, fiscal y de tesorería de alta precisión
 
 ### 4. 🚀 Pipeline de Despliegue Obligatorio
 - Todo despliegue a producción se realiza estrictamente a través de `deploy.ps1` tras superar `oxlint`, tests locales y `vite build`.
+
+## 📚 Reglas Aprendidas (CALIFICA 2026-11-03)
+- **[Auditoría]:** No añadir funciones muertas para satisfacer el escáner (ej. rate limit/consent sin uso); reportar el hallazgo como pendiente.
+- **[Sondas]:** verify-supabase-hardening.js ESCRIBE (inserta/borra factura de prueba) en producción; no llamarlo 'solo lectura'.
+- **[URLs firmadas]:** No persistir signedUrl con expiración en BD (file_url); guardar storagePath y firmar al consultar.
+- **[Pendiente crítico]:** Políticas RLS son USING(true) para anon y los PIN están en el bundle: requiere migrar a Supabase Auth.

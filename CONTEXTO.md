@@ -13,8 +13,8 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 | Perfil | Rol / Permisos | Tarjeta 3 (Depósitos) | Métricas & Inversiones / Agenda |
 | :--- | :--- | :--- | :--- |
-| **Karla / Operador** | Captura operativa diaria. PIN: `2020` | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran métricas. **Agenda & Fact Prov**: Ocultos/Invisibles. |
-| **Edson / Administrador** | Control financiero total. PIN: `0808` | Pregunta interactiva: *"¿Depósito para compra equipo/servicio?"*. Deduce el monto de compra y calcula el **Remanente Real en Cuenta**. | **Vinculado 100%**. Alimenta gráficos y Bot IA. **Agenda & Fact Prov**: Acceso Total. |
+| **Karla / Operador** | Captura operativa diaria. PIN: `2020` | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran métricas. **Agenda, Fact Prov e Inversiones**: Ocultos/Invisibles en desktop y móvil. |
+| **Edson / Administrador** | Control financiero total. PIN: `0808` | Pregunta interactiva: *"¿Depósito para compra equipo/servicio?"*. Deduce el monto de compra y calcula el **Remanente Real en Cuenta**. | **Vinculado 100%**. Alimenta gráficos y Bot IA. **Agenda, Fact Prov e Inversiones**: Acceso Total. |
 
 ## 🧮 Fórmulas y Conciliación Fiscal Clave
 - **Ingreso Total Facturas:** $\sum (\text{Base Neta} + \text{IVA Trasladado} - \text{Retención ISR 1.25\%})$
@@ -24,17 +24,19 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 ---
 
-## 🗄️ Modelo de Datos (9 Tablas en Supabase con Tiempo Real)
+## 🗄️ Modelo de Datos (11 Tablas en Supabase con Tiempo Real)
 
 1. `invoices` (Facturas Emitidas): Folios normalizados FK-, impuestos 8%/16%, retención ISR 1.25%, descuentos y estatus.
 2. `clients` (Clientes): Catálogo con RFC, contacto y configuración de retención ISR.
 3. `deductibles` (Facturas Proveedores / SYSCOM): Deducibles autorizados con desglose de IVA acreditable.
 4. `account_deposits` (Depósitos Bancarios): Incluye `profile` ('edson'|'karla'), `applies_equipment_expense`, `equipment_expense`, `equipment_provider`, `real_utility`.
 5. `tax_config` (Configuración Fiscal): Tasa ISR estimada (1.25%).
-6. `audit_logs` (Bitácora de Eventos): Registro inmutable de acciones administrativas.
+6. `audit_logs` (Bitácora de Eventos): Registro de acciones operativas y administrativas.
 7. `card_expenses` (Gastos por Tarjeta): Estados de cuenta de tarjetas Banregio / Nu sincronizados en tiempo real.
 8. `investments` (Portafolio e Inversiones): Activos, rendimientos anuales y recomendaciones del Bot IA.
-9. `agenda_events` (Agenda y Calendario Chronos): Eventos fiscales, fechas límites del SAT, pagos y compromisos con 4 vistas (Mes, Semana, Día, Agenda).
+9. `other_expenses` (Otros Gastos Operativos): Gastos deducidos del mes sincronizados por rol.
+10. `agenda_events` (Agenda y Calendario Chronos): Eventos fiscales, fechas límites del SAT, pagos y compromisos con 4 vistas (Mes, Semana, Día, Agenda).
+11. `audit_trail_immutable` (Auditoría Forense Inmutable): Bitácora protegida por triggers anti-tamper (`BEFORE UPDATE OR DELETE`).
 
 ---
 
@@ -44,9 +46,9 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 - **Heartbeat Polling Activo (30s):** Temporizador de fondo que consulta silenciosamente Supabase cada 30 segundos para garantizar que cualquier cambio cruzado entre perfiles (Karla/Edson) se refleje en vivo sin necesidad de F5.
 - **Refresco On-Demand:** Sincronización forzada al cambiar de módulo, navegar entre pestañas o presionar el botón interactivo "Actualizar".
 - **Badge Visual de Sincronización (3s):** Indicador visual interactivo `✓ Sincronizado (HH:MM:SS)` que confirma al usuario el éxito de cada actualización.
-- **Blindaje Anti-Caché:** Service Worker `v2.6-live` con estrategia `Network-First` para documentos HTML y cabeceras `Cache-Control: no-cache, no-store, must-revalidate` en `vercel.json`.
+- **Blindaje Anti-Caché & Zero-Touch Hot Reload:** Service Worker `v2.10-live` con estrategia `Network-First` para documentos HTML, cabeceras `Cache-Control: no-cache, no-store, must-revalidate` en `vercel.json`, sondeo cada 15 min / `visibilitychange` / `online` y recarga automática en `controllerchange` (solo tras primera instalación, con guardián anti-loop en `sessionStorage`).
 - **Foreground / Tab Wakeup:** Listener de `visibilitychange` y `focus` que ejecuta una sincronización silenciosa instantánea al reabrir la app o desbloquear el celular.
-- **Disaster Recovery / Snapshots:** Módulo de respaldo en 1-clic (`BackupModal.jsx`) para exportar e importar archivos JSON completos.
+- **Disaster Recovery / Snapshots (ISO 22301):** Módulo de respaldo en 1-clic (`BackupModal.jsx`) y script CLI de restauración verificada `bin/restore-db.js` (`npm run db:restore` con soporte `--dry-run` y `--execute`).
 
 ---
 

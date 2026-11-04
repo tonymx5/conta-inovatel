@@ -143,3 +143,26 @@ Ejecutar auditoría integral de ciberseguridad, base de datos y red bajo el est�
 5. **Despliegue y Validación en Vivo:**
    - Ejecución exitosa de `deploy.ps1` (Linter 0 advertencias, Tests 100% éxito, Build Vite limpio, Auditoría Supabase HTTP 200).
    - Verificación automatizada con Browser Subagent en `https://conta.inovatel.mx`: Confirmadas 10 facturas completas de Agosto ($103,153.37) y 6 depósitos de Karla ($91,812.20), con perfil Edson/Administrador 100% operativo sin daño colateral.
+
+
+---
+
+## 📅 Sesión: 03 de Noviembre de 2026 — Auditoría Integral 11D, Particionado de Bundles, Segregación Móvil Karla & Continuidad ISO 22301 (v2.10 Live)
+
+### 🎯 Objetivo
+Ejecutar auditoría profunda (Nivel 2 Compliance + Nivel 3 Sistemas y 5 Procesos Forenses) y aplicar las mejoras no destructivas de rendimiento, segregación visual de perfiles, higiene de Git y recuperación ante desastres, preservando intacta el 100% de la data capturada en Supabase.
+
+### 🛠️ Acciones Realizadas
+1. **Segregación Absoluta Perfil Karla vs Edson (`src/App.jsx`, `src/components/Header.jsx`):**
+   - Ocultación total del módulo `Inversiones & Bot IA` para el perfil Operador/Karla (`adminOnly: true` en desktop y condicional `userRole === 'admin'` en el renderizado principal y en la barra flotante móvil).
+2. **Particionado de Megachunk en Producción (`vite.config.js`):**
+   - Configuración de `manualChunks(id)` compatible con Vite 8 / Rolldown para aislar `pdfjs-dist`, `tesseract.js`, `recharts`, `@supabase/supabase-js`, `lucide-react` y `react`, reduciendo el chunk inicial de `1,580 kB` a `352 kB` (0 advertencias de tamaño).
+3. **Zero-Touch Hot Reload (`src/main.jsx`, `public/sw.js`):**
+   - Actualización a `conta-inovatel-v2.10-live` con verificación de actualizaciones cada 15 min, revalidación en `visibilitychange`/`online` y recarga controlada en `controllerchange` (ignorando la primera instalación y con guardián anti-loop en `sessionStorage`).
+4. **Continuidad de Negocio ISO 22301 (`bin/restore-db.js`, `scripts/restore-supabase.js`, `package.json`):**
+   - Creación de herramienta CLI de restauración con soporte `--dry-run` (`npm run db:restore`) y `--execute`.
+5. **Higiene Git, Dependencias y Storage (`supabase/schema.sql`, `.gitignore`, `src/services/storageService.js`):**
+   - Remediación de 2 vulnerabilidades altas en `devDependencies` (`npm audit` en 0).
+   - Desindexación (`git rm --cached`) de documentos con PII en `Documentos/` conservando los archivos físicos locales.
+   - Persistencia de `storagePath` duradero en `uploadComprobanteStorage` y firma bajo demanda mediante `getComprobanteSignedUrl`.
+   - Sincronización de `supabase/schema.sql` con las 11 tablas activas en producción.

@@ -1,5 +1,5 @@
-// Service Worker for Conta Inovatel PWA (v2.9 Live Data Sync Network-First)
-const CACHE_NAME = 'conta-inovatel-v2.9-live';
+// Service Worker for Conta Inovatel PWA (v2.10 Live Data Sync Network-First)
+const CACHE_NAME = 'conta-inovatel-v2.10-live';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
