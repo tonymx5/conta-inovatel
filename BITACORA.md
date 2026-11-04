@@ -236,3 +236,25 @@ Resolver la fricción de autocompletado en navegadores donde contraseñas antigu
    - Oxlint: 0 advertencias, 0 errores.
    - Tests: 100% aprobados (8 fiscales + segregación de cuentas).
    - Compilación limpia en Vite.
+
+---
+
+## 📅 Sesión: 03 de Noviembre de 2026 — Corrección de Simetría en Tasas Mixtas e Inputs de IVA (v3.3 Live)
+
+### 🎯 Objetivo
+Subsanar la incidencia de renderizado (`ReferenceError: totalSub is not defined`) que ocurría en el modal de captura manual de facturas al ingresar tasas mixtas y escribir en el campo de "Base Gravable al 8%", asegurando el cálculo reactivo del subtotal consolidado e IVA Total compuesto.
+
+### 🔍 Diagnóstico de Causa Raíz
+- En `src/components/InvoicesModule.jsx`, la función `handleSubtotal8Change` calculaba `iva8` e `iva16`, pero omitía declarar `const totalSub = s8 + s16;` antes de usarlo en la actualización de estado (`subtotal: totalSub > 0 ? totalSub.toFixed(2) : ''`), a diferencia de `handleSubtotal16Change` donde sí estaba definida.
+
+### 🛠️ Acciones Realizadas
+1. **`src/components/InvoicesModule.jsx`:**
+   - Declaración simétrica de `const totalSub = s8 + s16;` en `handleSubtotal8Change`.
+   - Refinamiento en `toggleMixedTaxMode` para evitar precargar `"0"` cuando el subtotal esté en cero, preservando placeholders limpios `$0.00`.
+2. **`scripts/test-tax-calculations.js`:**
+   - Incorporación de prueba reactiva de simetría de handlers (Grupo 3.1) que evalúa la interacción secuencial en ambos inputs (8% y 16%) y valida subtotal consolidado e IVA Total compuesto.
+3. **Documentación & Reglas (`GEMINI.md`):**
+   - Registro de regla persistente sobre simetría estricta en handlers de inputs duales/mixtos.
+4. **Pipeline de Despliegue (`deploy.ps1`):**
+   - Verificación completa (Linter 0 errores, Tests 100% exitosos, Supabase 10/10 tablas activas).
+   - Sincronización a GitHub `origin/main` y producción en Vercel ([https://conta.inovatel.mx](https://conta.inovatel.mx)) con HTTP 200 OK.
