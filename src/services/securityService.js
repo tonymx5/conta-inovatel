@@ -238,5 +238,122 @@ export const securityService = {
       hostname: window.location.hostname || 'DESKTOP-CLIENT',
       location
     });
+  },
+
+  // Reset user PIN by Administrator (Edson resetting Karla or himself)
+  adminResetUserPin: async (targetUser, newPin) => {
+    const cleanPin = (newPin || '').trim();
+    if (cleanPin.length < 4) {
+      return { success: false, message: 'El PIN debe contener al menos 4 caracteres.' };
+    }
+
+    const targetEmail = targetUser === 'karla' ? AUTH_PROFILES.OPERATOR.email : AUTH_PROFILES.ADMIN.email;
+    const targetLabel = targetUser === 'karla' ? 'Karla' : 'Edson';
+
+    try {
+      const { data, error } = await supabase.rpc('admin_reset_user_pin', {
+        p_target_email: targetEmail,
+        p_new_pin: cleanPin
+      });
+
+      if (!error && data?.success) {
+        storageService.logAudit('ADMIN', 'RESET_PIN_EXITO', `PIN de ${targetLabel} actualizado.`);
+        return { success: true, message: data.message };
+      }
+
+      if (error) {
+        if (targetUser === 'edson') {
+          const { error: updErr } = await supabase.auth.updateUser({
+            password: buildAuthPassword('Edson', cleanPin)
+          });
+          if (!updErr) {
+            storageService.logAudit('ADMIN', 'CAMBIO_PROPIO_PIN', 'PIN de Administrador actualizado vía Auth.');
+            return { success: true, message: 'Tu PIN de Administrador se actualizó correctamente.' };
+          }
+        }
+        return { 
+          success: false, 
+          message: error.message || 'Error al restablecer PIN en la base de datos.' 
+        };
+      }
+
+      return { success: false, message: data?.message || 'No fue posible restablecer el PIN.' };
+    } catch (err) {
+      return { success: false, message: `Error de conexión: ${err.message}` };
+    }
+  },
+
+  // Recover PIN using Master Recovery Key (Emergency Gatekeeper)
+  recoverPinWithMasterKey: async (targetUser, masterKey, newPin) => {
+    const cleanPin = (newPin || '').trim();
+    const cleanMaster = (masterKey || '').trim();
+
+    if (!cleanMaster) {
+      return { success: false, message: 'Por favor introduce la Clave Maestra de Seguridad.' };
+    }
+
+    if (cleanPin.length < 4) {
+      return { success: false, message: 'El nuevo PIN debe tener al menos 4 caracteres.' };
+    }
+
+    const clientId = securityService.getClientIdentifier();
+
+    try {
+      const { data, error } = await supabase.rpc('recuperar_pin_con_master_key', {
+        p_ip: clientId,
+        p_target_user: targetUser,
+        p_master_key: cleanMaster,
+        p_new_pin: cleanPin
+      });
+
+      if (error) {
+        return { 
+          success: false, 
+          message: error.message?.includes('function') 
+            ? 'Función de rescate pendiente de activación en Supabase. Aplica "supabase_pin_reset_and_recovery.sql".'
+            : (error.message || 'Error en servidor de autenticación.') 
+        };
+      }
+
+      if (data?.is_locked) {
+        const remainingMs = Number(data.remaining_ms) || LOCKOUT_DURATION_MS;
+        localStorage.setItem('admin_lockout_until', (Date.now() + remainingMs).toString());
+        return { success: false, isLocked: true, remainingMs, message: data.message };
+      }
+
+      if (data?.success) {
+        localStorage.removeItem('admin_failed_attempts');
+        localStorage.removeItem('admin_tried_passwords');
+        localStorage.removeItem('admin_lockout_until');
+        return { success: true, message: data.message };
+      }
+
+      return { success: false, message: data?.message || 'Clave Maestra incorrecta.' };
+    } catch (err) {
+      return { success: false, message: `Error de red al procesar recuperación: ${err.message}` };
+    }
+  },
+
+  // Update Master Recovery Key (Admin only)
+  adminUpdateMasterRecoveryKey: async (newMasterKey) => {
+    const clean = (newMasterKey || '').trim();
+    if (clean.length < 8) {
+      return { success: false, message: 'La Clave Maestra debe tener al menos 8 caracteres.' };
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('admin_update_master_recovery_key', {
+        p_new_master_key: clean
+      });
+
+      if (!error && data?.success) {
+        storageService.logAudit('ADMIN', 'UPDATE_MASTER_KEY', 'Clave Maestra de Seguridad actualizada.');
+        return { success: true, message: data.message };
+      }
+
+      return { success: false, message: error?.message || data?.message || 'Error al actualizar Clave Maestra.' };
+    } catch (err) {
+      return { success: false, message: `Error de conexión: ${err.message}` };
+    }
   }
 };

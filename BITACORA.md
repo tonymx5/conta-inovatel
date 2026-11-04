@@ -189,3 +189,29 @@ Migrar la autenticación de PINs a tokens formales de Supabase Auth sin alterar 
    - Transición de `handleSubmit` a flujo asíncrono con feedback visual `isVerifying` ("Verificando sesión segura...").
 4. **Cierre de Sesión Seguro (`src/App.jsx`):**
    - `handleLockSession` ahora invoca `supabase.auth.signOut()` para invalidar tokens JWT activos y proteger la sesión en reposo.
+
+---
+
+## 📅 Sesión: 03 de Noviembre de 2026 — Módulo de Recuperación y Reseteo Autónomo de PINs (v3.1 Live)
+
+### 🎯 Objetivo
+Implementar un método sencillo, autónomo y seguro de recuperación y cambio de contraseñas/PINs para los usuarios del sistema (Karla y Edson), que no dependa de servidores SMTP externos propensos a fallos o spam, manteniendo intacto el estándar Zero-Trust de Supabase Auth.
+
+### 🛠️ Acciones Realizadas
+1. **Script SQL de Gestión & Rescate (`supabase_pin_reset_and_recovery.sql`):**
+   - Creación de tabla privada `public.system_auth_recovery` para almacenar el hash bcrypt de la Clave Maestra de Seguridad (`InovatelMaster2026!#`), con RLS hermético y sin exposición a `anon` ni `authenticated`.
+   - RPC `public.admin_reset_user_pin`: Permite al perfil Administrador (Edson) restablecer el PIN de Karla (o el propio) en 1-clic con recálculo automático de hash `ContaInovatel_${label}_${pin}#SecureAuth` en `auth.users`.
+   - RPC `public.recuperar_pin_con_master_key`: Permite rescatar y reasignar cualquier PIN directamente desde la pantalla de login mediante la Clave Maestra de Seguridad, con protección anti-fuerza bruta ligada a `pin_auth_lockout`.
+   - RPC `public.admin_update_master_recovery_key`: Permite a Edson actualizar la Clave Maestra cuando lo requiera.
+2. **Interfaz de Rescate en Login Gate (`src/components/LoginGateModal.jsx`):**
+   - Enlace interactivo "¿Olvidaste tu contraseña o PIN?".
+   - Subformulario intuitivo con selector de usuario (Edson / Karla), captura de Clave Maestra de Seguridad, nuevo PIN y confirmación, con auto-login tras éxito.
+   - Mensaje orientativo para Karla indicando que Edson puede restablecer su PIN desde el menú de Configuración.
+3. **Gestión de Accesos en Configuración (`src/components/ConfigModal.jsx`):**
+   - Nueva sección "Gestión de Accesos & PINs de Usuarios" exclusiva para el rol Administrador.
+   - Botón directo "⚡ Restablecer a PIN 2020" para Karla.
+   - Formulario para asignar nuevo PIN personalizado a Karla.
+   - Formulario para que Edson actualice su propio PIN de Administrador.
+   - Formulario para actualizar la Clave Maestra de Seguridad.
+4. **Herramienta CLI de Rescate (`scripts/reset-pin.js`, `package.json`):**
+   - Comando `npm run reset-pin -- --user <edson|karla> --pin <nuevo_pin>` para emergencias operativas desde terminal local.

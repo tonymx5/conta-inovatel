@@ -9,6 +9,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "db:restore": "node bin/restore-db.js --dry-run",
+    "reset-pin": "node scripts/reset-pin.js",
     "preview": "vite preview",
     "deploy": "powershell -ExecutionPolicy Bypass -File ./deploy.ps1"
   },

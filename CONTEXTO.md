@@ -18,6 +18,11 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
   - El rol `operator` (Karla) tiene permiso estricto sobre facturas, clientes y depósitos propios (`profile != 'edson'`), con bloqueo a nivel PostgreSQL en deductibles, agenda, inversiones y gastos.
   - El rol `admin` (Edson) tiene privilegios completos.
   - La fuerza bruta está blindada tanto en cliente como en base de datos (`public.pin_auth_lockout` con 5 minutos de enfriamiento).
+- **Recuperación y Reseteo Autónomo de PINs:**
+  - En caso de olvido de credenciales, el sistema no depende de correos salientes ni de configuraciones SMTP frágiles.
+  - **Karla (Operadora):** Edson puede restablecer su PIN a `2020` o asignarle uno nuevo en 1-clic desde `ConfigModal.jsx` (`admin_reset_user_pin`).
+  - **Login Gate (Rescate):** Enlace "¿Olvidaste tu contraseña o PIN?" que valida la **Clave Maestra de Seguridad** en Supabase (`recuperar_pin_con_master_key`) con protección anti-fuerza bruta.
+  - **CLI de Emergencia:** Comando de terminal `npm run reset-pin -- --user <edson|karla> --pin <nuevo_pin>`.
 
 | Perfil | Rol / Permisos | Tarjeta 3 (Depósitos) | Métricas & Inversiones / Agenda |
 | :--- | :--- | :--- | :--- |

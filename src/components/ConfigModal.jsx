@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, CreditCard, Plus, Trash2, Edit3, Check, X, Download, ShieldCheck } from 'lucide-react';
+import { Settings, CreditCard, Plus, Trash2, Edit3, Check, X, Download, ShieldCheck, KeyRound, UserCheck, RefreshCw, Key, ShieldAlert } from 'lucide-react';
 import { storageService } from '../services/storageService';
+import { securityService } from '../services/securityService';
 
 export default function ConfigModal({ isOpen, onClose, userRole }) {
   const [bankAccounts, setBankAccounts] = useState([]);
   const [editingCardId, setEditingCardId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+
+  // Estados para Gestión de Accesos & PINs (Admin Only)
+  const [karlaCustomPin, setKarlaCustomPin] = useState('');
+  const [edsonNewPin, setEdsonNewPin] = useState('');
+  const [edsonConfirmPin, setEdsonConfirmPin] = useState('');
+  const [newMasterKeyInput, setNewMasterKeyInput] = useState('');
+  const [accessStatus, setAccessStatus] = useState(null);
+  const [isProcessingAccess, setIsProcessingAccess] = useState(false);
 
   const [cardForm, setCardForm] = useState({
     bankName: '',
@@ -73,6 +82,98 @@ export default function ConfigModal({ isOpen, onClose, userRole }) {
       balance: '0'
     });
     setShowAddForm(false);
+  };
+
+  const handleResetKarlaDefault = async () => {
+    if (!window.confirm('¿Deseas restablecer el PIN de acceso de Karla al valor inicial seguro (2020)?')) return;
+    setIsProcessingAccess(true);
+    setAccessStatus(null);
+    try {
+      const res = await securityService.adminResetUserPin('karla', '2020');
+      if (res.success) {
+        setAccessStatus({ type: 'success', message: '✅ PIN de Karla restablecido a 2020 exitosamente.' });
+      } else {
+        setAccessStatus({ type: 'error', message: res.message || 'Error al restablecer PIN de Karla.' });
+      }
+    } catch {
+      setAccessStatus({ type: 'error', message: 'Error de conexión con Supabase.' });
+    } finally {
+      setIsProcessingAccess(false);
+    }
+  };
+
+  const handleSaveKarlaCustomPin = async (e) => {
+    e.preventDefault();
+    if (!karlaCustomPin || karlaCustomPin.trim().length < 4) {
+      setAccessStatus({ type: 'error', message: 'El PIN de Karla debe tener al menos 4 caracteres.' });
+      return;
+    }
+    setIsProcessingAccess(true);
+    setAccessStatus(null);
+    try {
+      const res = await securityService.adminResetUserPin('karla', karlaCustomPin.trim());
+      if (res.success) {
+        setAccessStatus({ type: 'success', message: `✅ PIN de Karla actualizado a "${karlaCustomPin.trim()}" exitosamente.` });
+        setKarlaCustomPin('');
+      } else {
+        setAccessStatus({ type: 'error', message: res.message || 'Error al actualizar PIN de Karla.' });
+      }
+    } catch {
+      setAccessStatus({ type: 'error', message: 'Error de conexión al actualizar PIN.' });
+    } finally {
+      setIsProcessingAccess(false);
+    }
+  };
+
+  const handleUpdateEdsonPin = async (e) => {
+    e.preventDefault();
+    if (edsonNewPin.trim() !== edsonConfirmPin.trim()) {
+      setAccessStatus({ type: 'error', message: 'Los campos de PIN de Edson no coinciden.' });
+      return;
+    }
+    if (edsonNewPin.trim().length < 4) {
+      setAccessStatus({ type: 'error', message: 'El nuevo PIN de Edson debe tener al menos 4 caracteres.' });
+      return;
+    }
+    setIsProcessingAccess(true);
+    setAccessStatus(null);
+    try {
+      const res = await securityService.adminResetUserPin('edson', edsonNewPin.trim());
+      if (res.success) {
+        setAccessStatus({ type: 'success', message: '✅ Tu PIN de Administrador (Edson) ha sido actualizado con éxito.' });
+        setEdsonNewPin('');
+        setEdsonConfirmPin('');
+      } else {
+        setAccessStatus({ type: 'error', message: res.message || 'Error al actualizar PIN de Edson.' });
+      }
+    } catch {
+      setAccessStatus({ type: 'error', message: 'Error de conexión al actualizar PIN.' });
+    } finally {
+      setIsProcessingAccess(false);
+    }
+  };
+
+  const handleUpdateMasterKey = async (e) => {
+    e.preventDefault();
+    if (newMasterKeyInput.trim().length < 8) {
+      setAccessStatus({ type: 'error', message: 'La Clave Maestra de Seguridad debe tener al menos 8 caracteres.' });
+      return;
+    }
+    setIsProcessingAccess(true);
+    setAccessStatus(null);
+    try {
+      const res = await securityService.adminUpdateMasterRecoveryKey(newMasterKeyInput.trim());
+      if (res.success) {
+        setAccessStatus({ type: 'success', message: '✅ Clave Maestra de Seguridad actualizada exitosamente en Supabase.' });
+        setNewMasterKeyInput('');
+      } else {
+        setAccessStatus({ type: 'error', message: res.message || 'Error al actualizar Clave Maestra.' });
+      }
+    } catch {
+      setAccessStatus({ type: 'error', message: 'Error de conexión al actualizar Clave Maestra.' });
+    } finally {
+      setIsProcessingAccess(false);
+    }
   };
 
   const predefinedBanks = ['Santander', 'NU', 'Banregio', 'Stori', 'BBVA', 'Banorte', 'HSBC', 'BofA', 'Amex'];
@@ -276,6 +377,272 @@ export default function ConfigModal({ isOpen, onClose, userRole }) {
               )}
             </div>
           </div>
+
+          {/* User Access & PIN Management Section (Admin Only) */}
+          {userRole === 'admin' && (
+            <div style={{ marginTop: '1.25rem', background: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '20px', padding: '1.25rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: '700', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+                    <KeyRound size={20} color="#10b981" /> Gestión de Accesos & PINs de Usuarios
+                  </h4>
+                  <p style={{ fontSize: '0.78rem', color: '#94a3b8', marginTop: '0.2rem', margin: 0 }}>
+                    Administra y restablece de forma directa los PINs de acceso para Karla y Edson, o actualiza la Clave Maestra de Emergencia.
+                  </p>
+                </div>
+                <span style={{ fontSize: '0.72rem', background: 'rgba(16, 185, 129, 0.15)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.3)', padding: '0.25rem 0.6rem', borderRadius: '9999px', fontWeight: '700' }}>
+                  Autonomía Zero-Trust
+                </span>
+              </div>
+
+              {/* Status Alert */}
+              {accessStatus && (
+                <div style={{
+                  background: accessStatus.type === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                  border: accessStatus.type === 'success' ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)',
+                  color: accessStatus.type === 'success' ? '#6ee7b7' : '#fca5a5',
+                  padding: '0.65rem 0.9rem',
+                  borderRadius: '12px',
+                  fontSize: '0.82rem',
+                  fontWeight: '600',
+                  marginBottom: '1rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  {accessStatus.type === 'success' ? <Check size={16} /> : <ShieldAlert size={16} />}
+                  <span>{accessStatus.message}</span>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                {/* 1. Tarjeta de Karla */}
+                <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '16px', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: '800', background: 'rgba(16, 185, 129, 0.2)', color: '#6ee7b7', padding: '0.2rem 0.5rem', borderRadius: '9999px', border: '1px solid rgba(16, 185, 129, 0.4)' }}>
+                        OPERADORA
+                      </span>
+                      <UserCheck size={16} color="#6ee7b7" />
+                    </div>
+                    <h5 style={{ fontSize: '0.98rem', fontWeight: '800', color: '#f8fafc', margin: '0.2rem 0' }}>
+                      Karla
+                    </h5>
+                    <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0 0 0.8rem 0' }}>
+                      karla@inovatel.mx (Captura operativa)
+                    </p>
+
+                    {/* Botón Reset a Default */}
+                    <button
+                      type="button"
+                      onClick={handleResetKarlaDefault}
+                      disabled={isProcessingAccess}
+                      style={{
+                        width: '100%',
+                        background: 'rgba(16, 185, 129, 0.15)',
+                        border: '1px solid rgba(16, 185, 129, 0.4)',
+                        color: '#6ee7b7',
+                        padding: '0.45rem 0.75rem',
+                        borderRadius: '10px',
+                        fontSize: '0.8rem',
+                        fontWeight: '700',
+                        cursor: isProcessingAccess ? 'wait' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.4rem',
+                        marginBottom: '0.75rem'
+                      }}
+                    >
+                      <RefreshCw size={14} /> Restablecer a PIN 2020
+                    </button>
+                  </div>
+
+                  {/* Formulario Asignar PIN Personalizado */}
+                  <form onSubmit={handleSaveKarlaCustomPin} style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.75rem' }}>
+                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+                      O asignar nuevo PIN a Karla:
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Ej. 1234"
+                        value={karlaCustomPin}
+                        onChange={(e) => setKarlaCustomPin(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          color: '#f8fafc',
+                          padding: '0 0.6rem',
+                          fontSize: '0.85rem'
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={isProcessingAccess}
+                        style={{
+                          background: 'linear-gradient(135deg, #10b981, #059669)',
+                          border: 'none',
+                          color: '#ffffff',
+                          borderRadius: '8px',
+                          padding: '0 0.75rem',
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          cursor: isProcessingAccess ? 'wait' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <Check size={14} /> Guardar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* 2. Tarjeta de Edson */}
+                <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '16px', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: '800', background: 'rgba(2, 132, 199, 0.2)', color: '#38bdf8', padding: '0.2rem 0.5rem', borderRadius: '9999px', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                        ADMINISTRADOR
+                      </span>
+                      <Key size={16} color="#38bdf8" />
+                    </div>
+                    <h5 style={{ fontSize: '0.98rem', fontWeight: '800', color: '#f8fafc', margin: '0.2rem 0' }}>
+                      Edson
+                    </h5>
+                    <p style={{ fontSize: '0.78rem', color: '#94a3b8', margin: '0 0 0.8rem 0' }}>
+                      edson@inovatel.mx (Control total del sistema)
+                    </p>
+                  </div>
+
+                  {/* Formulario Cambiar PIN Edson */}
+                  <form onSubmit={handleUpdateEdsonPin} style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.75rem' }}>
+                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+                      Actualizar mi PIN de Administrador:
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                      <input
+                        type="password"
+                        placeholder="Nuevo PIN (mín. 4 caracteres)"
+                        value={edsonNewPin}
+                        onChange={(e) => setEdsonNewPin(e.target.value)}
+                        style={{
+                          height: '36px',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          color: '#f8fafc',
+                          padding: '0 0.6rem',
+                          fontSize: '0.85rem'
+                        }}
+                      />
+                      <input
+                        type="password"
+                        placeholder="Confirmar Nuevo PIN"
+                        value={edsonConfirmPin}
+                        onChange={(e) => setEdsonConfirmPin(e.target.value)}
+                        style={{
+                          height: '36px',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          color: '#f8fafc',
+                          padding: '0 0.6rem',
+                          fontSize: '0.85rem'
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={isProcessingAccess}
+                        style={{
+                          background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                          border: 'none',
+                          color: '#ffffff',
+                          borderRadius: '8px',
+                          height: '36px',
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          cursor: isProcessingAccess ? 'wait' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <Check size={14} /> Actualizar mi PIN
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                {/* 3. Tarjeta Clave Maestra de Seguridad */}
+                <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(168, 85, 247, 0.25)', borderRadius: '16px', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: '800', background: 'rgba(168, 85, 247, 0.2)', color: '#c084fc', padding: '0.2rem 0.5rem', borderRadius: '9999px', border: '1px solid rgba(168, 85, 247, 0.4)' }}>
+                        RESCATE DE EMERGENCIA
+                      </span>
+                      <ShieldCheck size={16} color="#c084fc" />
+                    </div>
+                    <h5 style={{ fontSize: '0.98rem', fontWeight: '800', color: '#f8fafc', margin: '0.2rem 0' }}>
+                      Clave Maestra de Seguridad
+                    </h5>
+                    <p style={{ fontSize: '0.76rem', color: '#94a3b8', margin: '0 0 0.8rem 0' }}>
+                      Frase secreta utilizada para rescatar cualquier PIN en la pantalla de login si se olvida.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleUpdateMasterKey} style={{ borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '0.75rem' }}>
+                    <label style={{ fontSize: '0.75rem', color: '#cbd5e1', fontWeight: '600', display: 'block', marginBottom: '0.35rem' }}>
+                      Cambiar Clave Maestra (mín. 8 caracteres):
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <input
+                        type="password"
+                        placeholder="Nueva Clave Maestra..."
+                        value={newMasterKeyInput}
+                        onChange={(e) => setNewMasterKeyInput(e.target.value)}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          border: '1px solid rgba(255, 255, 255, 0.15)',
+                          borderRadius: '8px',
+                          color: '#f8fafc',
+                          padding: '0 0.6rem',
+                          fontSize: '0.85rem'
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={isProcessingAccess}
+                        style={{
+                          background: 'linear-gradient(135deg, #a855f7, #7e22ce)',
+                          border: 'none',
+                          color: '#ffffff',
+                          borderRadius: '8px',
+                          padding: '0 0.75rem',
+                          fontSize: '0.8rem',
+                          fontWeight: '700',
+                          cursor: isProcessingAccess ? 'wait' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.3rem'
+                        }}
+                      >
+                        <Check size={14} /> Guardar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Database Backup & Disaster Recovery Section */}
           <div style={{ marginTop: '1.25rem', background: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(56, 189, 248, 0.2)', borderRadius: '20px', padding: '1.25rem' }}>
