@@ -6,6 +6,7 @@ export default function RestrictedModal({ isOpen, onClose, onSuccess, targetModu
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLocked, setIsLocked] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [remainingMs, setRemainingMs] = useState(0);
 
   useEffect(() => {
@@ -45,22 +46,30 @@ export default function RestrictedModal({ isOpen, onClose, onSuccess, targetModu
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isLocked) return;
+    if (isLocked || isVerifying) return;
 
-    const result = securityService.validateAdminPass(password);
-    if (result.success) {
-      onSuccess();
-    } else {
-      setPassword('');
-      if (result.isLocked) {
-        setIsLocked(true);
-        setRemainingMs(result.remainingMs);
-        setErrorMsg(result.message || 'Acceso bloqueado por 5 minutos debido a 3 intentos fallidos.');
+    setIsVerifying(true);
+    setErrorMsg('');
+    try {
+      const result = await securityService.validateAdminPass(password);
+      if (result.success) {
+        onSuccess();
       } else {
-        setErrorMsg(result.message);
+        setPassword('');
+        if (result.isLocked) {
+          setIsLocked(true);
+          setRemainingMs(result.remainingMs);
+          setErrorMsg(result.message || 'Acceso bloqueado por 5 minutos debido a 3 intentos fallidos.');
+        } else {
+          setErrorMsg(result.message);
+        }
       }
+    } catch {
+      setErrorMsg('Error de conexión al verificar clave de administrador.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -142,8 +151,16 @@ export default function RestrictedModal({ isOpen, onClose, onSuccess, targetModu
                 <button type="button" className="btn-secondary" onClick={onClose}>
                   Cancelar
                 </button>
-                <button type="submit" className="btn-primary" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}>
-                  Desbloquear Acceso
+                <button 
+                  type="submit" 
+                  className="btn-primary" 
+                  disabled={isVerifying}
+                  style={{ 
+                    background: isVerifying ? '#94a3b8' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                    cursor: isVerifying ? 'wait' : 'pointer'
+                  }}
+                >
+                  {isVerifying ? 'Verificando...' : 'Desbloquear Acceso'}
                 </button>
               </div>
             </form>

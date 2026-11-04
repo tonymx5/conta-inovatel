@@ -6,6 +6,7 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLocked, setIsLocked] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [remainingMs, setRemainingMs] = useState(0);
 
   useEffect(() => {
@@ -45,22 +46,30 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (isLocked) return;
+    if (isLocked || isVerifying) return;
 
-    const result = securityService.validateLoginPass(password);
-    if (result.success) {
-      onLoginSuccess(result.role);
-    } else {
-      setPassword('');
-      if (result.isLocked) {
-        setIsLocked(true);
-        setRemainingMs(result.remainingMs);
-        setErrorMsg(result.message || 'Acceso bloqueado por 5 minutos debido a 3 intentos fallidos.');
+    setIsVerifying(true);
+    setErrorMsg('');
+    try {
+      const result = await securityService.validateLoginPass(password);
+      if (result.success) {
+        onLoginSuccess(result.role);
       } else {
-        setErrorMsg(result.message);
+        setPassword('');
+        if (result.isLocked) {
+          setIsLocked(true);
+          setRemainingMs(result.remainingMs);
+          setErrorMsg(result.message || 'Acceso bloqueado por 5 minutos debido a 3 intentos fallidos.');
+        } else {
+          setErrorMsg(result.message);
+        }
       }
+    } catch {
+      setErrorMsg('Error de conexión al verificar credenciales.');
+    } finally {
+      setIsVerifying(false);
     }
   };
 
@@ -187,6 +196,7 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
             <button 
               type="submit" 
               className="btn-primary" 
+              disabled={isVerifying}
               style={{ 
                 width: '100%', 
                 height: '48px', 
@@ -194,12 +204,14 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
                 fontWeight: '800', 
                 justifyContent: 'center',
                 borderRadius: '12px',
-                background: 'linear-gradient(135deg, #10b981, #059669)',
-                boxShadow: '0 4px 15px rgba(16, 185, 129, 0.35)',
-                gap: '0.5rem'
+                background: isVerifying ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)',
+                boxShadow: isVerifying ? 'none' : '0 4px 15px rgba(16, 185, 129, 0.35)',
+                gap: '0.5rem',
+                opacity: isVerifying ? 0.7 : 1,
+                cursor: isVerifying ? 'wait' : 'pointer'
               }}
             >
-              <span>Ingresar al Sistema</span>
+              <span>{isVerifying ? 'Verificando sesión segura...' : 'Ingresar al Sistema'}</span>
               <ArrowRight size={18} />
             </button>
 

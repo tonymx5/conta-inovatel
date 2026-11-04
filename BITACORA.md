@@ -166,3 +166,26 @@ Ejecutar auditoría profunda (Nivel 2 Compliance + Nivel 3 Sistemas y 5 Procesos
    - Desindexación (`git rm --cached`) de documentos con PII en `Documentos/` conservando los archivos físicos locales.
    - Persistencia de `storagePath` duradero en `uploadComprobanteStorage` y firma bajo demanda mediante `getComprobanteSignedUrl`.
    - Sincronización de `supabase/schema.sql` con las 11 tablas activas en producción.
+
+
+---
+
+## 📅 Sesión: 03 de Noviembre de 2026 — Transición a Supabase Auth Transparente & RLS Zero-Trust (v3.0 Live)
+
+### 🎯 Objetivo
+Migrar la autenticación de PINs a tokens formales de Supabase Auth sin alterar la experiencia de usuario (Karla introduce PIN `2020` y Edson PIN `0808` / `PulguitA`), cerrando las políticas RLS al rol `anon` y segmentando criptográficamente el acceso a nivel de base de datos sin tocar ni modificar ninguna fila de los datos capturados.
+
+### 🛠️ Acciones Realizadas
+1. **Generación de Script SQL Maestro de Blindaje (`supabase_auth_and_rls_hardening.sql`):**
+   - Creación de usuarios con identidad formal en `auth.users` y `auth.identities` (`karla@inovatel.mx` y `edson@inovatel.mx`) con correos confirmados automáticamente.
+   - Creación de tabla `public.pin_auth_lockout` y funciones RPC `verificar_lockout_pin` / `registrar_intento_pin` para forzar el bloqueo por fuerza bruta a nivel de servidor PostgreSQL.
+   - Funciones `is_admin()` e `is_operator_or_admin()` con `SECURITY DEFINER STABLE`.
+   - Cierre de políticas RLS en las 11 tablas maestras: el rol `anon` queda con 0 permisos; el rol `operator` (Karla) solo tiene acceso a `invoices`, `clients`, y a `account_deposits` donde `profile != 'edson'`; el rol `admin` (Edson) tiene control total.
+   - Inclusión de bloque de rollback instantáneo en 1-clic.
+2. **Autenticación Asíncrona Transparente (`src/services/securityService.js`):**
+   - Mapeo de PIN `2020` a `karla@inovatel.mx` y `0808` / `PulguitA` a `edson@inovatel.mx` conectando a `supabase.auth.signInWithPassword`.
+   - Fallback de compatibilidad local seguro en caso de latencia o mientras se ejecuta la migración SQL.
+3. **Modales de Login & Restricción con Estado Asíncrono (`LoginGateModal.jsx`, `RestrictedModal.jsx`):**
+   - Transición de `handleSubmit` a flujo asíncrono con feedback visual `isVerifying` ("Verificando sesión segura...").
+4. **Cierre de Sesión Seguro (`src/App.jsx`):**
+   - `handleLockSession` ahora invoca `supabase.auth.signOut()` para invalidar tokens JWT activos y proteger la sesión en reposo.

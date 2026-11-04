@@ -8,6 +8,7 @@ import ConfigModal from './components/ConfigModal';
 import BackupModal from './components/BackupModal';
 import { FileText, BarChart3, TrendingUp, CreditCard, Users, Settings, Receipt, Calendar } from 'lucide-react';
 import { storageService } from './services/storageService';
+import { supabase } from './services/supabaseClient';
 
 // Application Modules
 import InvoicesModule from './components/InvoicesModule';
@@ -158,9 +159,10 @@ export default function App() {
 
   const handleLockSession = () => {
     localStorage.removeItem(SESSION_STORAGE_KEY);
+    supabase.auth.signOut().catch(() => {});
     setIsSessionLocked(true);
     setUserRole('operator');
-    if (activeTab === 'agenda' || activeTab === 'provider_deductions') {
+    if (activeTab === 'agenda' || activeTab === 'provider_deductions' || activeTab === 'investments') {
       setActiveTab('invoices');
     }
   };

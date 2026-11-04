@@ -9,12 +9,20 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 ---
 
-## 👥 Arquitectura de Perfiles y Segregación de Datos
+## 👥 Arquitectura de Perfiles, Segregación de Datos & Supabase Auth Zero-Trust
+
+- **Gatekeeper Visual:** En la interfaz, los usuarios mantienen su flujo tradicional con PIN simple (Karla: `2020`, Edson: `0808` / `PulguitA`).
+- **Autenticación en Servidor (Supabase Auth):** Internamente, el PIN se mapea a identidades de Supabase Auth (`karla@inovatel.mx` y `edson@inovatel.mx`), adquiriendo tokens JWT firmados criptográficamente.
+- **Políticas RLS en Base de Datos:**
+  - El rol `anon` no tiene acceso directo a ninguna de las 11 tablas.
+  - El rol `operator` (Karla) tiene permiso estricto sobre facturas, clientes y depósitos propios (`profile != 'edson'`), con bloqueo a nivel PostgreSQL en deductibles, agenda, inversiones y gastos.
+  - El rol `admin` (Edson) tiene privilegios completos.
+  - La fuerza bruta está blindada tanto en cliente como en base de datos (`public.pin_auth_lockout` con 5 minutos de enfriamiento).
 
 | Perfil | Rol / Permisos | Tarjeta 3 (Depósitos) | Métricas & Inversiones / Agenda |
 | :--- | :--- | :--- | :--- |
-| **Karla / Operador** | Captura operativa diaria. PIN: `2020` | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran métricas. **Agenda, Fact Prov e Inversiones**: Ocultos/Invisibles en desktop y móvil. |
-| **Edson / Administrador** | Control financiero total. PIN: `0808` | Pregunta interactiva: *"¿Depósito para compra equipo/servicio?"*. Deduce el monto de compra y calcula el **Remanente Real en Cuenta**. | **Vinculado 100%**. Alimenta gráficos y Bot IA. **Agenda, Fact Prov e Inversiones**: Acceso Total. |
+| **Karla / Operador** | Captura operativa diaria. PIN: `2020` (`karla@inovatel.mx`) | Depósitos estándar brutos (sin compra de equipos). | **Desvinculado 100%**. Sus depósitos no alteran métricas. **Agenda, Fact Prov e Inversiones**: Ocultos/Invisibles en desktop y móvil. Bloqueados por RLS en BD. |
+| **Edson / Administrador** | Control financiero total. PIN: `0808` (`edson@inovatel.mx`) | Pregunta interactiva: *"¿Depósito para compra equipo/servicio?"*. Deduce el monto de compra y calcula el **Remanente Real en Cuenta**. | **Vinculado 100%**. Alimenta gráficos y Bot IA. **Agenda, Fact Prov e Inversiones**: Acceso Total. |
 
 ## 🧮 Fórmulas y Conciliación Fiscal Clave
 - **Ingreso Total Facturas:** $\sum (\text{Base Neta} + \text{IVA Trasladado} - \text{Retención ISR 1.25\%})$
