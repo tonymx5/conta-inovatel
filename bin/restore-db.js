@@ -29,12 +29,14 @@ console.log(`🛡️ Modo de Operación: ${isDryRun ? 'DRY-RUN (Simulación sin 
 const envPath = path.resolve(__dirname, '../.env');
 let supabaseUrl = 'https://jyhuvmqibfvmfutcvzhw.supabase.co';
 let anonKey = '';
+let adminPin = process.env.SUPABASE_ADMIN_PIN || '';
 
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
   envContent.split('\n').forEach(line => {
     if (line.startsWith('VITE_SUPABASE_URL=')) supabaseUrl = line.split('=')[1].trim();
     if (line.startsWith('VITE_SUPABASE_ANON_KEY=')) anonKey = line.split('=')[1].trim();
+    if (line.startsWith('SUPABASE_ADMIN_PIN=') && !adminPin) adminPin = line.split('=')[1].trim();
   });
 }
 
@@ -110,10 +112,12 @@ async function runRestore() {
   }
 
   const supabase = createClient(supabaseUrl, anonKey);
-  await supabase.auth.signInWithPassword({
-    email: 'edson@inovatel.mx',
-    password: 'ContaInovatel_Edson_0808#SecureAuth'
-  });
+  if (adminPin) {
+    await supabase.auth.signInWithPassword({
+      email: 'edson@inovatel.mx',
+      password: `ContaInovatel_Edson_${adminPin}#SecureAuth`
+    });
+  }
   const tables = ['invoices', 'clients', 'deductibles', 'account_deposits', 'tax_config', 'card_expenses', 'investments', 'agenda_events'];
 
   console.log('\n🔍 Verificando estado y accesibilidad de tablas destino en Supabase:');

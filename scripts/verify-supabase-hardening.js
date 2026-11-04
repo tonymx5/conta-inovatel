@@ -9,19 +9,22 @@ const __dirname = path.dirname(__filename);
 const envPath = path.resolve(__dirname, '../.env');
 let supabaseUrl = 'https://jyhuvmqibfvmfutcvzhw.supabase.co';
 let anonKey = '';
+let adminPin = process.env.SUPABASE_ADMIN_PIN || '';
 
 if (fs.existsSync(envPath)) {
   const envContent = fs.readFileSync(envPath, 'utf8');
   envContent.split('\n').forEach(line => {
     if (line.startsWith('VITE_SUPABASE_URL=')) supabaseUrl = line.split('=')[1].trim();
     if (line.startsWith('VITE_SUPABASE_ANON_KEY=')) anonKey = line.split('=')[1].trim();
+    if (line.startsWith('SUPABASE_ADMIN_PIN=') && !adminPin) adminPin = line.split('=')[1].trim();
   });
 }
 
 const supabase = createClient(supabaseUrl, anonKey);
+const runWriteTest = process.argv.includes('--write-test');
 
 async function verifyHardening() {
-  console.log('\n🛡️ VERIFICACIÓN INTEGRAL DE BLINDAJE EN SUPABASE (v2.8)\n');
+  console.log('\n🛡️ VERIFICACIÓN INTEGRAL DE BLINDAJE EN SUPABASE (v3.0 Zero-Trust)\n');
 
   // 1. Verificar lectura de todas las tablas con RLS activo
   const tables = [
@@ -38,23 +41,29 @@ async function verifyHardening() {
     console.log(`      ✓ Tabla '${t}': ${count === 0 ? 'PROTEGIDA (0 registros expuestos a anon)' : count + ' registros'}`);
   }
 
-  console.log('\n   b) Acceso Autenticado de Administrador (Edson - PIN 0808):');
-  const { error: authErr } = await supabase.auth.signInWithPassword({
-    email: 'edson@inovatel.mx',
-    password: 'ContaInovatel_Edson_0808#SecureAuth'
-  });
+  let isAdminAuthenticated = false;
+  if (adminPin) {
+    console.log('\n   b) Acceso Autenticado de Administrador (Edson):');
+    const { error: authErr } = await supabase.auth.signInWithPassword({
+      email: 'edson@inovatel.mx',
+      password: `ContaInovatel_Edson_${adminPin}#SecureAuth`
+    });
 
-  if (authErr) {
-    console.error('      ❌ Error al autenticar admin:', authErr.message);
-  } else {
-    for (const t of tables) {
-      const { data, error } = await supabase.from(t).select('*');
-      if (error) {
-        console.error(`      ❌ Error en tabla '${t}':`, error.message);
-      } else {
-        console.log(`      ✓ Tabla '${t}': Acceso Concedido | ${data.length} registros cargados`);
+    if (authErr) {
+      console.error('      ❌ Error al autenticar admin:', authErr.message);
+    } else {
+      isAdminAuthenticated = true;
+      for (const t of tables) {
+        const { data, error } = await supabase.from(t).select('*');
+        if (error) {
+          console.error(`      ❌ Error en tabla '${t}':`, error.message);
+        } else {
+          console.log(`      ✓ Tabla '${t}': Acceso Concedido | ${data.length} registros cargados`);
+        }
       }
     }
+  } else {
+    console.log('\n   b) Acceso Autenticado: Omitido (define SUPABASE_ADMIN_PIN en .env para probar lectura autenticada).');
   }
 
   // 2. Verificar Storage Bucket
@@ -67,37 +76,40 @@ async function verifyHardening() {
     console.log(`  ✓ Bucket 'comprobantes': ${hasComprobantes ? 'ACTIVO Y DISPONIBLE' : 'EN ESPERA'}`);
   }
 
-  // 3. Probar RPC Transaccional con un dry check
-  console.log('\n3. Verificando Funciones RPC Transaccionales:');
-  const testPayload = {
-    p_id: 'test-dry-check-' + Date.now(),
-    p_folio: 'FK-DRY-TEST',
-    p_client_name: 'TEST VERIFICACION',
-    p_rfc: 'XAXX010101000',
-    p_date: '2026-08-31',
-    p_is_mixed_tax: false,
-    p_subtotal: 100,
-    p_discount: 0,
-    p_subtotal8: 0,
-    p_subtotal16: 0,
-    p_iva_rate: 8,
-    p_iva_total: 8,
-    p_applies_isr: true,
-    p_isr_rate: 1.25,
-    p_isr_retained: 1.25,
-    p_base_neta: 100,
-    p_total: 106.75,
-    p_status: 'PAGADA'
-  };
+  // 3. Prueba de escritura RPC (solo si se solicita explícitamente con --write-test y hay sesión admin)
+  if (runWriteTest && isAdminAuthenticated) {
+    console.log('\n3. Verificando Funciones RPC Transaccionales (--write-test activo):');
+    const testPayload = {
+      p_id: 'test-dry-check-' + Date.now(),
+      p_folio: 'FK-DRY-TEST',
+      p_client_name: 'TEST VERIFICACION',
+      p_rfc: 'XAXX010101000',
+      p_date: '2026-08-31',
+      p_is_mixed_tax: false,
+      p_subtotal: 100,
+      p_discount: 0,
+      p_subtotal8: 0,
+      p_subtotal16: 0,
+      p_iva_rate: 8,
+      p_iva_total: 8,
+      p_applies_isr: true,
+      p_isr_rate: 1.25,
+      p_isr_retained: 1.25,
+      p_base_neta: 100,
+      p_total: 106.75,
+      p_status: 'PAGADA'
+    };
 
-  const { data: rpcData, error: rpcError } = await supabase.rpc('crear_factura_completa', testPayload);
-  if (rpcError) {
-    console.error('  ❌ RPC crear_factura_completa:', rpcError.message);
+    const { data: rpcData, error: rpcError } = await supabase.rpc('crear_factura_completa', testPayload);
+    if (rpcError) {
+      console.error('  ❌ RPC crear_factura_completa:', rpcError.message);
+    } else {
+      console.log('  ✓ RPC crear_factura_completa: OPERATIVA Y TRANSACCIONAL (Respuesta:', rpcData, ')');
+      await supabase.from('invoices').delete().eq('id', testPayload.p_id);
+      console.log('  ✓ Limpieza de registro de prueba completada.');
+    }
   } else {
-    console.log('  ✓ RPC crear_factura_completa: OPERATIVA Y TRANSACCIONAL (Respuesta:', rpcData, ')');
-    // Limpieza del registro de prueba
-    await supabase.from('invoices').delete().eq('id', testPayload.p_id);
-    console.log('  ✓ Limpieza de registro de prueba completada.');
+    console.log('\n3. Modo Solo-Lectura: Sin inserciones de prueba en producción (usa --write-test para probar RPC de escritura).');
   }
 
   console.log('\n🎯 CERTIFICACIÓN COMPLETA: Base de datos Supabase 100% blindada, funcional y en producción.\n');

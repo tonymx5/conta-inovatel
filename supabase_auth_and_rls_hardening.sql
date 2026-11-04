@@ -354,6 +354,27 @@ CREATE POLICY "auth_admin_audit_trail" ON public.audit_trail_immutable
     FOR SELECT TO authenticated 
     USING (public.is_admin());
 
+-- 4.12 Revocación de ejecución anónima en RPCs transaccionales SECURITY DEFINER
+DO $$
+DECLARE
+    fn RECORD;
+BEGIN
+    FOR fn IN
+        SELECT p.oid::regprocedure AS regproc
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+          AND p.proname IN ('crear_factura_completa', 'crear_deducible_completo', 'crear_deposito_completo')
+    LOOP
+        EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon', fn.regproc);
+        EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO authenticated', fn.regproc);
+    END LOOP;
+
+    -- Limpiar cuenta residual de sonda si existiera
+    DELETE FROM auth.identities WHERE user_id IN (SELECT id FROM auth.users WHERE email = 'probe_test_account@inovatel.mx');
+    DELETE FROM auth.users WHERE email = 'probe_test_account@inovatel.mx';
+END $$;
+
 -- =========================================================================
 -- PASO 5: CERTIFICACIÓN DE INTEGRIDAD
 -- =========================================================================

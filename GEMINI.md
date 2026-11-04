@@ -29,6 +29,8 @@ Sistema Web Progresivo (PWA) contable, fiscal y de tesorería de alta precisión
 
 ## 📚 Reglas Aprendidas (CALIFICA 2026-11-03)
 - **[Auditoría]:** No añadir funciones muertas para satisfacer el escáner (ej. rate limit/consent sin uso); reportar el hallazgo como pendiente.
-- **[Sondas]:** verify-supabase-hardening.js ESCRIBE (inserta/borra factura de prueba) en producción; no llamarlo 'solo lectura'.
+- **[Sondas]:** verify-supabase-hardening.js es estrictamente de solo lectura por defecto; cualquier prueba de inserción debe requerir `--write-test` y sesión administrativa autenticada para evitar dejar basura en producción.
 - **[URLs firmadas]:** No persistir signedUrl con expiración en BD (file_url); guardar storagePath y firmar al consultar.
-- **[Pendiente crítico]:** Políticas RLS son USING(true) para anon y los PIN están en el bundle: requiere migrar a Supabase Auth.
+- **[Supabase Auth Zero-Trust]:** Prohibido guardar contraseñas o PINs literales en el bundle JS; derivar dinámicamente la credencial (`buildAuthPassword`) al ingresar para que `auth.users` valide con bcrypt en el servidor.
+- **[RPCs SECURITY DEFINER]:** Al blindar con RLS Zero-Trust, revocar siempre la ejecución anónima (`REVOKE EXECUTE ... FROM PUBLIC, anon`) en funciones `SECURITY DEFINER`, de lo contrario `anon` puede mutar datos saltándose el RLS.
+- **[Tokens GoTrue en SQL]:** Al insertar o actualizar usuarios en `auth.users` directamente por SQL, inicializar siempre todas las columnas de tokens de texto a `''` (no `NULL`) e incluir `provider_id = user_id::text` en `auth.identities`.
