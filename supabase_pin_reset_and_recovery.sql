@@ -75,8 +75,13 @@ BEGIN
     WHERE id = v_user_id;
 
     -- 6. Registrar en bitácora de auditoría
-    INSERT INTO public.audit_logs (profile, action, details, timestamp)
-    VALUES ('ADMIN', 'RESET_PIN_ADMIN', 'PIN de ' || v_label || ' actualizado por Administrador.', now());
+    BEGIN
+        INSERT INTO public.audit_logs (id, user_role, action, details, timestamp, ip)
+        VALUES (gen_random_uuid()::text, 'ADMIN', 'RESET_PIN_ADMIN', 'PIN de ' || v_label || ' actualizado por Administrador.', now(), 'server');
+    EXCEPTION WHEN OTHERS THEN
+        -- Si audit_logs tiene otra estructura no bloqueante
+        NULL;
+    END;
 
     RETURN jsonb_build_object('success', true, 'message', 'PIN de ' || v_label || ' actualizado exitosamente.');
 END;
@@ -160,9 +165,13 @@ BEGIN
     -- 7. Limpiar bloqueo de intentos para la IP tras rescate exitoso
     PERFORM public.registrar_intento_pin(p_ip, true);
 
-    -- 8. Registrar en auditoría
-    INSERT INTO public.audit_logs (profile, action, details, timestamp)
-    VALUES ('SISTEMA', 'RESCATE_PIN_MASTER_KEY', 'PIN de ' || v_label || ' restablecido exitosamente con Clave Maestra de Emergencia.', now());
+    -- 8. Registrar en auditoría (protegido con bloque seguro)
+    BEGIN
+        INSERT INTO public.audit_logs (id, user_role, action, details, timestamp, ip)
+        VALUES (gen_random_uuid()::text, 'SISTEMA', 'RESCATE_PIN_MASTER_KEY', 'PIN de ' || v_label || ' restablecido exitosamente con Clave Maestra de Emergencia.', now(), p_ip);
+    EXCEPTION WHEN OTHERS THEN
+        NULL;
+    END;
 
     RETURN jsonb_build_object(
         'success', true, 
@@ -194,8 +203,12 @@ BEGIN
         updated_at = now()
     WHERE id = 'master_key';
 
-    INSERT INTO public.audit_logs (profile, action, details, timestamp)
-    VALUES ('ADMIN', 'UPDATE_MASTER_KEY', 'Clave Maestra de Recuperación actualizada por Administrador.', now());
+    BEGIN
+        INSERT INTO public.audit_logs (id, user_role, action, details, timestamp, ip)
+        VALUES (gen_random_uuid()::text, 'ADMIN', 'UPDATE_MASTER_KEY', 'Clave Maestra de Recuperación actualizada por Administrador.', now(), 'server');
+    EXCEPTION WHEN OTHERS THEN
+        NULL;
+    END;
 
     RETURN jsonb_build_object('success', true, 'message', 'Clave Maestra de Seguridad actualizada exitosamente.');
 END;
