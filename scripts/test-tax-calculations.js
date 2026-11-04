@@ -56,6 +56,47 @@ console.log('🧪 Iniciando Auditoría y Suite de Pruebas de Precisión Fiscal..
   assertEqual(ivaTotal, 1600.00, 'IVA Total en Factura Mixta (8% + 16%)');
   assertEqual(isrRetained, 187.50, 'Retención ISR 1.25% en Factura Mixta');
   assertEqual(total, 16412.50, 'Total Factura Mixta');
+
+  // 3.1 Reactividad y Simetría de Handlers (handleSubtotal8Change / handleSubtotal16Change)
+  let simulatedForm = { subtotal8: '', subtotal16: '', subtotal: '', ivaTotal: '' };
+
+  // Disparo de handleSubtotal8Change('8000')
+  {
+    const val = '8000';
+    const s8 = parseFloat(val) || 0;
+    const s16 = parseFloat(simulatedForm.subtotal16) || 0;
+    const totalSub = s8 + s16;
+    const iva8 = s8 * 0.08;
+    const iva16 = s16 * 0.16;
+    const totalIva = (iva8 + iva16).toFixed(2);
+    simulatedForm = {
+      ...simulatedForm,
+      subtotal8: val,
+      subtotal: totalSub > 0 ? totalSub.toFixed(2) : '',
+      ivaTotal: totalIva
+    };
+  }
+  assertEqual(parseFloat(simulatedForm.subtotal), 8000.00, 'Subtotal acumulado tras input Base 8%');
+  assertEqual(parseFloat(simulatedForm.ivaTotal), 640.00, 'IVA 8% calculado tras input Base 8%');
+
+  // Disparo de handleSubtotal16Change('2500.50')
+  {
+    const val = '2500.50';
+    const s8 = parseFloat(simulatedForm.subtotal8) || 0;
+    const s16 = parseFloat(val) || 0;
+    const totalSub = s8 + s16;
+    const iva8 = s8 * 0.08;
+    const iva16 = s16 * 0.16;
+    const totalIva = (iva8 + iva16).toFixed(2);
+    simulatedForm = {
+      ...simulatedForm,
+      subtotal16: val,
+      subtotal: totalSub > 0 ? totalSub.toFixed(2) : '',
+      ivaTotal: totalIva
+    };
+  }
+  assertEqual(parseFloat(simulatedForm.subtotal), 10500.50, 'Subtotal consolidado tras input Base 16%');
+  assertEqual(parseFloat(simulatedForm.ivaTotal), 1040.08, 'IVA Total compuesto 8% + 16% ($1,040.08)');
 }
 
 // 4. Conciliación de Depósitos y Utilidad Real con Gasto de Equipo

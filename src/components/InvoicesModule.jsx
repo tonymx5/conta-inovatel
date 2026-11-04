@@ -310,6 +310,7 @@ export default function InvoicesModule({ userRole }) {
   const handleSubtotal8Change = (val) => {
     const s8 = parseFloat(val) || 0;
     const s16 = parseFloat(formData.subtotal16) || 0;
+    const totalSub = s8 + s16;
     
     // Proportional or direct mixed tax
     const iva8 = s8 * 0.08;
@@ -343,8 +344,8 @@ export default function InvoicesModule({ userRole }) {
   const toggleMixedTaxMode = (isMixed) => {
     if (isMixed) {
       const currentSub = parseFloat(formData.subtotal) || 0;
-      const s8 = formData.subtotal8 || (formData.ivaRate === 8 ? currentSub.toString() : '');
-      const s16 = formData.subtotal16 || (formData.ivaRate === 16 ? currentSub.toString() : '');
+      const s8 = formData.subtotal8 || (currentSub > 0 && formData.ivaRate === 8 ? currentSub.toString() : '');
+      const s16 = formData.subtotal16 || (currentSub > 0 && formData.ivaRate === 16 ? currentSub.toString() : '');
       const iva8 = (parseFloat(s8) || 0) * 0.08;
       const iva16 = (parseFloat(s16) || 0) * 0.16;
 
