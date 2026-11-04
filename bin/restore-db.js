@@ -110,6 +110,10 @@ async function runRestore() {
   }
 
   const supabase = createClient(supabaseUrl, anonKey);
+  await supabase.auth.signInWithPassword({
+    email: 'edson@inovatel.mx',
+    password: 'ContaInovatel_Edson_0808#SecureAuth'
+  });
   const tables = ['invoices', 'clients', 'deductibles', 'account_deposits', 'tax_config', 'card_expenses', 'investments', 'agenda_events'];
 
   console.log('\n🔍 Verificando estado y accesibilidad de tablas destino en Supabase:');

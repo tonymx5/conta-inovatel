@@ -93,7 +93,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'karla@inovatel.mx') THEN
         INSERT INTO auth.users (
             instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-            raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
+            raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at,
+            confirmation_token, recovery_token, email_change_token_new, email_change,
+            email_change_token_current, phone_change, phone_change_token, reauthentication_token
         ) VALUES (
             '00000000-0000-0000-0000-000000000000',
             v_karla_id,
@@ -106,32 +108,56 @@ BEGIN
             '{"name":"Karla","role":"operator"}'::jsonb,
             false,
             now(),
-            now()
-        );
-        INSERT INTO auth.identities (
-            id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
-        ) VALUES (
-            v_karla_id,
-            v_karla_id,
-            json_build_object('sub', v_karla_id, 'email', 'karla@inovatel.mx'),
-            'email',
             now(),
-            now(),
-            now()
+            '', '', '', '', '', '', '', ''
         );
     ELSE
+        SELECT id INTO v_karla_id FROM auth.users WHERE email = 'karla@inovatel.mx';
         UPDATE auth.users
         SET encrypted_password = extensions.crypt(v_karla_pw, extensions.gen_salt('bf')),
             email_confirmed_at = coalesce(email_confirmed_at, now()),
-            raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{role}', '"operator"')
-        WHERE email = 'karla@inovatel.mx';
+            raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{role}', '"operator"'),
+            confirmation_token = coalesce(confirmation_token, ''),
+            recovery_token = coalesce(recovery_token, ''),
+            email_change_token_new = coalesce(email_change_token_new, ''),
+            email_change = coalesce(email_change, ''),
+            email_change_token_current = coalesce(email_change_token_current, ''),
+            phone_change = coalesce(phone_change, ''),
+            phone_change_token = coalesce(phone_change_token, ''),
+            reauthentication_token = coalesce(reauthentication_token, '')
+        WHERE id = v_karla_id;
+    END IF;
+
+    -- Identidad en auth.identities para Karla (incluye provider_id obligatorio en GoTrue 2.x)
+    IF NOT EXISTS (SELECT 1 FROM auth.identities WHERE user_id = v_karla_id OR (provider = 'email' AND provider_id = v_karla_id::text)) THEN
+        INSERT INTO auth.identities (
+            provider_id,
+            user_id,
+            identity_data,
+            provider,
+            last_sign_in_at,
+            created_at,
+            updated_at,
+            id
+        ) VALUES (
+            v_karla_id::text,
+            v_karla_id,
+            json_build_object('sub', v_karla_id::text, 'email', 'karla@inovatel.mx'),
+            'email',
+            now(),
+            now(),
+            now(),
+            v_karla_id
+        );
     END IF;
 
     -- 2.2 Usuario Edson (Perfil Administrador - PIN 0808 / PulguitA)
     IF NOT EXISTS (SELECT 1 FROM auth.users WHERE email = 'edson@inovatel.mx') THEN
         INSERT INTO auth.users (
             instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-            raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at
+            raw_app_meta_data, raw_user_meta_data, is_super_admin, created_at, updated_at,
+            confirmation_token, recovery_token, email_change_token_new, email_change,
+            email_change_token_current, phone_change, phone_change_token, reauthentication_token
         ) VALUES (
             '00000000-0000-0000-0000-000000000000',
             v_edson_id,
@@ -144,25 +170,47 @@ BEGIN
             '{"name":"Edson","role":"admin"}'::jsonb,
             false,
             now(),
-            now()
-        );
-        INSERT INTO auth.identities (
-            id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at
-        ) VALUES (
-            v_edson_id,
-            v_edson_id,
-            json_build_object('sub', v_edson_id, 'email', 'edson@inovatel.mx'),
-            'email',
             now(),
-            now(),
-            now()
+            '', '', '', '', '', '', '', ''
         );
     ELSE
+        SELECT id INTO v_edson_id FROM auth.users WHERE email = 'edson@inovatel.mx';
         UPDATE auth.users
         SET encrypted_password = extensions.crypt(v_edson_pw, extensions.gen_salt('bf')),
             email_confirmed_at = coalesce(email_confirmed_at, now()),
-            raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{role}', '"admin"')
-        WHERE email = 'edson@inovatel.mx';
+            raw_user_meta_data = jsonb_set(coalesce(raw_user_meta_data, '{}'::jsonb), '{role}', '"admin"'),
+            confirmation_token = coalesce(confirmation_token, ''),
+            recovery_token = coalesce(recovery_token, ''),
+            email_change_token_new = coalesce(email_change_token_new, ''),
+            email_change = coalesce(email_change, ''),
+            email_change_token_current = coalesce(email_change_token_current, ''),
+            phone_change = coalesce(phone_change, ''),
+            phone_change_token = coalesce(phone_change_token, ''),
+            reauthentication_token = coalesce(reauthentication_token, '')
+        WHERE id = v_edson_id;
+    END IF;
+
+    -- Identidad en auth.identities para Edson (incluye provider_id obligatorio en GoTrue 2.x)
+    IF NOT EXISTS (SELECT 1 FROM auth.identities WHERE user_id = v_edson_id OR (provider = 'email' AND provider_id = v_edson_id::text)) THEN
+        INSERT INTO auth.identities (
+            provider_id,
+            user_id,
+            identity_data,
+            provider,
+            last_sign_in_at,
+            created_at,
+            updated_at,
+            id
+        ) VALUES (
+            v_edson_id::text,
+            v_edson_id,
+            json_build_object('sub', v_edson_id::text, 'email', 'edson@inovatel.mx'),
+            'email',
+            now(),
+            now(),
+            now(),
+            v_edson_id
+        );
     END IF;
 END $$;
 

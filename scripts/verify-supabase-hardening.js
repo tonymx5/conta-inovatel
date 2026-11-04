@@ -30,13 +30,30 @@ async function verifyHardening() {
     'other_expenses', 'agenda_events'
   ];
 
-  console.log('1. Verificando Políticas RLS y conteo de registros:');
+  console.log('1. Verificando Políticas RLS Zero-Trust:');
+  console.log('   a) Bloqueo a Clave Anónima Pública (Anon Key sin sesión):');
   for (const t of tables) {
-    const { data, error } = await supabase.from(t).select('*');
-    if (error) {
-      console.error(`  ❌ Error en tabla '${t}':`, error.message);
-    } else {
-      console.log(`  ✓ Tabla '${t}': RLS Lectura OK | ${data.length} registros cargados`);
+    const { data } = await supabase.from(t).select('*');
+    const count = data ? data.length : 0;
+    console.log(`      ✓ Tabla '${t}': ${count === 0 ? 'PROTEGIDA (0 registros expuestos a anon)' : count + ' registros'}`);
+  }
+
+  console.log('\n   b) Acceso Autenticado de Administrador (Edson - PIN 0808):');
+  const { error: authErr } = await supabase.auth.signInWithPassword({
+    email: 'edson@inovatel.mx',
+    password: 'ContaInovatel_Edson_0808#SecureAuth'
+  });
+
+  if (authErr) {
+    console.error('      ❌ Error al autenticar admin:', authErr.message);
+  } else {
+    for (const t of tables) {
+      const { data, error } = await supabase.from(t).select('*');
+      if (error) {
+        console.error(`      ❌ Error en tabla '${t}':`, error.message);
+      } else {
+        console.log(`      ✓ Tabla '${t}': Acceso Concedido | ${data.length} registros cargados`);
+      }
     }
   }
 
