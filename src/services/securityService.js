@@ -99,7 +99,11 @@ export const securityService = {
     }
 
     if (matchedProfile) {
-      supabase.rpc('registrar_intento_pin', { p_ip: clientId, p_exito: true }).catch(() => {});
+      try {
+        await supabase.rpc('registrar_intento_pin', { p_ip: clientId, p_exito: true });
+      } catch {
+        // Operación auxiliar de bitácora no bloqueante
+      }
       localStorage.removeItem('admin_failed_attempts');
       localStorage.removeItem('admin_tried_passwords');
       storageService.logAudit(
@@ -199,7 +203,11 @@ export const securityService = {
         });
 
         if (!error && data?.session) {
-          supabase.rpc('registrar_intento_pin', { p_ip: clientId, p_exito: true }).catch(() => {});
+          try {
+            await supabase.rpc('registrar_intento_pin', { p_ip: clientId, p_exito: true });
+          } catch {
+            // Operación auxiliar no bloqueante
+          }
           localStorage.removeItem('admin_failed_attempts');
           localStorage.removeItem('admin_tried_passwords');
           storageService.logAudit('ADMIN', 'LOGIN_ADMIN', 'Acceso Administrador desbloqueado');

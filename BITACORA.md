@@ -231,6 +231,7 @@ Resolver la fricción de autocompletado en navegadores donde contraseñas antigu
 2. **Tipado de Excepciones y Resiliencia Auth (`src/services/securityService.js`):**
    - Captura y diferenciación de códigos de error de GoTrue / Supabase Auth (`rate limit`, `invalid_credentials`, fallos de red).
    - Manejo seguro de promesas en auto-login post-restablecimiento evitando fallos silenciosos.
+   - Eliminación de llamadas `.catch()` sobre el thenable `PostgrestFilterBuilder` de `supabase.rpc(...)`, reemplazándolas por bloques `try { await ... } catch {}` asíncronos nativos para erradicar el `TypeError: U.rpc(...).catch is not a function`.
 3. **Calidad y Pipeline:**
    - Oxlint: 0 advertencias, 0 errores.
    - Tests: 100% aprobados (8 fiscales + segregación de cuentas).
