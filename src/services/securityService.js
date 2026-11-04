@@ -76,16 +76,24 @@ export const securityService = {
 
     const clean = inputPassword ? inputPassword.trim() : '';
     let matchedProfile = null;
+    let lastAuthError = null;
 
     if (clean) {
       for (const profile of [AUTH_PROFILES.ADMIN, AUTH_PROFILES.OPERATOR]) {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: profile.email,
-          password: buildAuthPassword(profile.label, clean)
-        });
-        if (!error && data?.session) {
-          matchedProfile = profile;
-          break;
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: profile.email,
+            password: buildAuthPassword(profile.label, clean)
+          });
+          if (!error && data?.session) {
+            matchedProfile = profile;
+            break;
+          }
+          if (error) {
+            lastAuthError = error;
+          }
+        } catch (authEx) {
+          lastAuthError = authEx;
         }
       }
     }
@@ -100,6 +108,25 @@ export const securityService = {
         `Acceso ${matchedProfile.role === 'admin' ? 'Administrador' : 'Karla'} concedido al portal`
       );
       return { success: true, role: matchedProfile.role };
+    }
+
+    // Si hubo error específico de límite de tasa (429) o red, transparentar sin penalizar inmediatamente
+    if (lastAuthError) {
+      const errMsg = (lastAuthError.message || '').toLowerCase();
+      if (lastAuthError.status === 429 || errMsg.includes('rate limit') || errMsg.includes('too many requests')) {
+        return {
+          success: false,
+          isLocked: false,
+          message: 'Límite de solicitudes de Supabase Auth alcanzado. Espera unos segundos e intenta nuevamente.'
+        };
+      }
+      if (errMsg.includes('failed to fetch') || errMsg.includes('networkerror') || errMsg.includes('network request failed')) {
+        return {
+          success: false,
+          isLocked: false,
+          message: 'Error de red al conectar con el servidor. Revisa tu conexión a internet.'
+        };
+      }
     }
 
     // Manejo de fallo de credenciales (Servidor + Cliente)
@@ -162,19 +189,45 @@ export const securityService = {
     }
 
     const clean = inputPassword ? inputPassword.trim() : '';
+    let lastAdminAuthError = null;
 
     if (clean) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: AUTH_PROFILES.ADMIN.email,
-        password: buildAuthPassword(AUTH_PROFILES.ADMIN.label, clean)
-      });
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: AUTH_PROFILES.ADMIN.email,
+          password: buildAuthPassword(AUTH_PROFILES.ADMIN.label, clean)
+        });
 
-      if (!error && data?.session) {
-        supabase.rpc('registrar_intento_pin', { p_ip: clientId, p_exito: true }).catch(() => {});
-        localStorage.removeItem('admin_failed_attempts');
-        localStorage.removeItem('admin_tried_passwords');
-        storageService.logAudit('ADMIN', 'LOGIN_ADMIN', 'Acceso Administrador desbloqueado');
-        return { success: true };
+        if (!error && data?.session) {
+          supabase.rpc('registrar_intento_pin', { p_ip: clientId, p_exito: true }).catch(() => {});
+          localStorage.removeItem('admin_failed_attempts');
+          localStorage.removeItem('admin_tried_passwords');
+          storageService.logAudit('ADMIN', 'LOGIN_ADMIN', 'Acceso Administrador desbloqueado');
+          return { success: true };
+        }
+        if (error) {
+          lastAdminAuthError = error;
+        }
+      } catch (authEx) {
+        lastAdminAuthError = authEx;
+      }
+    }
+
+    if (lastAdminAuthError) {
+      const errMsg = (lastAdminAuthError.message || '').toLowerCase();
+      if (lastAdminAuthError.status === 429 || errMsg.includes('rate limit') || errMsg.includes('too many requests')) {
+        return {
+          success: false,
+          isLocked: false,
+          message: 'Límite de solicitudes de Supabase Auth alcanzado. Espera unos segundos e intenta nuevamente.'
+        };
+      }
+      if (errMsg.includes('failed to fetch') || errMsg.includes('networkerror') || errMsg.includes('network request failed')) {
+        return {
+          success: false,
+          isLocked: false,
+          message: 'Error de red al conectar con el servidor. Revisa tu conexión a internet.'
+        };
       }
     }
 

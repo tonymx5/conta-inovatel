@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Lock, Key, AlertTriangle, Clock, ArrowRight, ArrowLeft, ShieldCheck, CheckCircle2, UserCheck } from 'lucide-react';
+import { Lock, Key, AlertTriangle, Clock, ArrowRight, ArrowLeft, ShieldCheck, CheckCircle2, UserCheck, Eye, EyeOff } from 'lucide-react';
 import { securityService } from '../services/securityService';
 
 export default function LoginGateModal({ isOpen, onLoginSuccess }) {
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -11,6 +12,7 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
 
   // Estados de Recuperación de PIN (Opción 1)
   const [showRecovery, setShowRecovery] = useState(false);
+  const [showRecoveryPins, setShowRecoveryPins] = useState(false);
   const [recoveryTarget, setRecoveryTarget] = useState('edson');
   const [masterKey, setMasterKey] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -84,11 +86,12 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
           setRemainingMs(result.remainingMs);
           setErrorMsg(result.message || 'Acceso bloqueado por 5 minutos debido a 3 intentos fallidos.');
         } else {
-          setErrorMsg(result.message);
+          setErrorMsg(result.message || 'Contraseña incorrecta.');
         }
       }
-    } catch {
-      setErrorMsg('Error de conexión al verificar credenciales.');
+    } catch (err) {
+      console.error('Login submit error:', err);
+      setErrorMsg(err?.message || 'Error de conexión al verificar credenciales.');
     } finally {
       setIsVerifying(false);
     }
@@ -125,9 +128,16 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
         setTimeout(async () => {
           setShowRecovery(false);
           setPassword(resolvedPin);
-          const autoLog = await securityService.validateLoginPass(resolvedPin);
-          if (autoLog.success) {
-            onLoginSuccess(autoLog.role);
+          try {
+            const autoLog = await securityService.validateLoginPass(resolvedPin);
+            if (autoLog.success) {
+              onLoginSuccess(autoLog.role);
+            } else {
+              setErrorMsg(autoLog.message || 'PIN actualizado. Introduce tu nueva contraseña para ingresar.');
+            }
+          } catch (autoErr) {
+            console.error('Auto login error:', autoErr);
+            setErrorMsg(autoErr?.message || 'PIN actualizado. Introduce tu nueva contraseña para ingresar.');
           }
         }, 1400);
       } else {
@@ -139,8 +149,9 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
           setRecoveryError(result.message || 'Clave Maestra de Seguridad incorrecta.');
         }
       }
-    } catch {
-      setRecoveryError('Error de comunicación con el servidor de autenticación.');
+    } catch (err) {
+      console.error('Recovery submit error:', err);
+      setRecoveryError(err?.message || 'Error de comunicación con el servidor de autenticación.');
     } finally {
       setIsRecovering(false);
     }
@@ -383,15 +394,39 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
               {/* Nuevo PIN y Confirmar */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.82rem' }}>
-                    Nuevo PIN:
-                  </label>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
+                    <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.82rem', margin: 0 }}>
+                      Nuevo PIN:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowRecoveryPins((prev) => !prev)}
+                      tabIndex={-1}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#0284c7',
+                        fontSize: '0.74rem',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                        padding: 0
+                      }}
+                    >
+                      {showRecoveryPins ? <EyeOff size={13} /> : <Eye size={13} />}
+                      {showRecoveryPins ? 'Ocultar' : 'Ver'}
+                    </button>
+                  </div>
                   <input
-                    type="password"
+                    type={showRecoveryPins ? 'text' : 'password'}
                     className="form-control"
                     placeholder="Mín. 4 dígitos"
                     value={newPin}
                     onChange={(e) => setNewPin(e.target.value)}
+                    autoComplete="off"
+                    data-1p-ignore="true"
                     required
                     style={{
                       width: '100%',
@@ -405,15 +440,17 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.82rem' }}>
+                  <label className="form-label" style={{ fontWeight: '700', color: '#334155', fontSize: '0.82rem', marginBottom: '0.2rem', display: 'block' }}>
                     Confirmar PIN:
                   </label>
                   <input
-                    type="password"
+                    type={showRecoveryPins ? 'text' : 'password'}
                     className="form-control"
                     placeholder="Repite el PIN"
                     value={confirmPin}
                     onChange={(e) => setConfirmPin(e.target.value)}
+                    autoComplete="off"
+                    data-1p-ignore="true"
                     required
                     style={{
                       width: '100%',
@@ -478,16 +515,19 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
               </label>
               <div style={{ position: 'relative' }}>
                 <input
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   className="form-control"
                   placeholder="Introduce tu clave..."
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoFocus
+                  autoComplete="off"
+                  data-1p-ignore="true"
                   required
                   style={{
                     width: '100%',
                     paddingLeft: '2.75rem',
+                    paddingRight: '2.75rem',
                     height: '48px',
                     fontSize: '1rem',
                     borderRadius: '12px',
@@ -495,6 +535,29 @@ export default function LoginGateModal({ isOpen, onLoginSuccess }) {
                   }}
                 />
                 <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '0.95rem', top: '50%', transform: 'translateY(-50%)' }} />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  tabIndex={-1}
+                  title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                  style={{
+                    position: 'absolute',
+                    right: '0.85rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: '#94a3b8',
+                    padding: '4px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'color 0.2s'
+                  }}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
             </div>
 

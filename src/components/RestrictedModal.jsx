@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldAlert, Lock, Key, AlertTriangle, Clock } from 'lucide-react';
+import { ShieldAlert, Lock, Key, AlertTriangle, Clock, Eye, EyeOff } from 'lucide-react';
 import { securityService } from '../services/securityService';
 
 export default function RestrictedModal({ isOpen, onClose, onSuccess, targetModuleName }) {
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -63,11 +64,12 @@ export default function RestrictedModal({ isOpen, onClose, onSuccess, targetModu
           setRemainingMs(result.remainingMs);
           setErrorMsg(result.message || 'Acceso bloqueado por 5 minutos debido a 3 intentos fallidos.');
         } else {
-          setErrorMsg(result.message);
+          setErrorMsg(result.message || 'Contraseña de Administrador incorrecta.');
         }
       }
-    } catch {
-      setErrorMsg('Error de conexión al verificar clave de administrador.');
+    } catch (err) {
+      console.error('RestrictedModal submit error:', err);
+      setErrorMsg(err?.message || 'Error de conexión al verificar clave de administrador.');
     } finally {
       setIsVerifying(false);
     }
@@ -134,16 +136,40 @@ export default function RestrictedModal({ isOpen, onClose, onSuccess, targetModu
                 <label className="form-label">Contraseña de edson:</label>
                 <div style={{ position: 'relative' }}>
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     className="form-control"
                     placeholder="Escribe la clave de edson..."
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoFocus
+                    autoComplete="off"
+                    data-1p-ignore="true"
                     required
-                    style={{ width: '100%', paddingLeft: '2.5rem' }}
+                    style={{ width: '100%', paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
                   />
                   <Key size={18} color="#94a3b8" style={{ position: 'absolute', left: '0.8rem', top: '50%', transform: 'translateY(-50%)' }} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    tabIndex={-1}
+                    title={showPassword ? 'Ocultar clave' : 'Ver clave'}
+                    style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      padding: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </div>
               </div>
 

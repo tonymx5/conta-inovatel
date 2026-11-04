@@ -215,3 +215,23 @@ Implementar un método sencillo, autónomo y seguro de recuperación y cambio de
    - Formulario para actualizar la Clave Maestra de Seguridad.
 4. **Herramienta CLI de Rescate (`scripts/reset-pin.js`, `package.json`):**
    - Comando `npm run reset-pin -- --user <edson|karla> --pin <nuevo_pin>` para emergencias operativas desde terminal local.
+
+---
+
+## 📅 Sesión: 03 de Noviembre de 2026 — Ergonomía de Autenticación, Toggle de Visibilidad y Tipado de Errores (v3.2 Live)
+
+### 🎯 Objetivo
+Resolver la fricción de autocompletado en navegadores donde contraseñas antiguas de 4 dígitos sobreescribían entradas del usuario, incorporar botón interactivo de ver/ocultar contraseña (Eye/EyeOff) en portales de acceso y brindar mensajes descriptivos de autenticación y límites de Supabase Auth en lugar de mensajes genéricos.
+
+### 🛠️ Acciones Realizadas
+1. **Toggle de Visibilidad de Contraseñas (`src/components/LoginGateModal.jsx`, `src/components/RestrictedModal.jsx`):**
+   - Incorporación de estado `showPassword` con botones `<Eye>` y `<EyeOff>` para transparentar lo que el usuario o el navegador escribe.
+   - Protección contra autocompletado invasivo de navegadores con `autoComplete="off"` y `data-1p-ignore="true"`.
+   - Toggle de visibilidad en el subformulario de nuevo PIN durante la recuperación por Clave Maestra.
+2. **Tipado de Excepciones y Resiliencia Auth (`src/services/securityService.js`):**
+   - Captura y diferenciación de códigos de error de GoTrue / Supabase Auth (`rate limit`, `invalid_credentials`, fallos de red).
+   - Manejo seguro de promesas en auto-login post-restablecimiento evitando fallos silenciosos.
+3. **Calidad y Pipeline:**
+   - Oxlint: 0 advertencias, 0 errores.
+   - Tests: 100% aprobados (8 fiscales + segregación de cuentas).
+   - Compilación limpia en Vite.
