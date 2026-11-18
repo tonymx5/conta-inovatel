@@ -3,6 +3,7 @@ import { Receipt, UploadCloud, Trash2, Sparkles, Calendar, RotateCcw, ShieldChec
 import { storageService } from '../services/storageService';
 import { ocrService } from '../services/ocrService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
+import { getInvoiceFinancials } from '../utils/invoicePaymentUtils';
 
 export default function ProviderDeductionsModule({ userRole }) {
   const [deductibles, setDeductibles] = useState([]);
@@ -283,10 +284,11 @@ export default function ProviderDeductionsModule({ userRole }) {
       });
   }, [invoices, selectedMonth, selectedYear]);
 
-  // Period Calculations
-  const totalIvaVentas = filteredInvoices
-    .filter(i => i.status !== 'PENDIENTE')
-    .reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  // Period Calculations (IVA trasladado proporcional a lo efectivamente cobrado)
+  const totalIvaVentas = filteredInvoices.reduce((sum, i) => {
+    const fin = getInvoiceFinancials(i);
+    return sum + fin.collectedIva;
+  }, 0);
   const totalIvaDeducible = filteredDeductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
 
   const ivaNetoPagar = Math.max(0, totalIvaVentas - totalIvaDeducible);

@@ -1,3 +1,5 @@
+import { getInvoiceFinancials } from '../src/utils/invoicePaymentUtils.js';
+
 // Suite de Pruebas Autónomas de Precisión Fiscal & Aritmética para Conta Inovatel
 // Valida que ninguna actualización rompa los cálculos de IVA, ISR (RESICO), Utilidad y redondeo SAT.
 
@@ -166,4 +168,44 @@ console.log('🧪 Iniciando Auditoría y Suite de Pruebas de Precisión Fiscal..
   assertEqual(totalIsrFacturasMes, 125.00, 'ISR retenido excluye factura PENDIENTE ($125.00)');
 }
 
-console.log('\n🎯 Todos los 8 grupos de pruebas fiscales y segregación pasaron con 100% de precisión matemática.\n');
+// 9. Pagos Parciales (Anticipo), Proporción Fiscal y Transición Automática a PAGADA
+{
+  const invParcial = {
+    folio: 'FK-900',
+    subtotal: 10000,
+    discount: 0,
+    baseNeta: 10000,
+    ivaTotal: 800,
+    appliesIsr: true,
+    isrRetained: 125,
+    status: 'PARCIAL',
+    hasPartialPayment: true,
+    paidAmount: 5337.50 // Exactamente 50% de $10,675.00
+  };
+
+  const fin50 = getInvoiceFinancials(invParcial);
+  if (fin50.status !== 'PARCIAL') {
+    console.error(`❌ [FALLO] Estado esperado PARCIAL, obtenido: ${fin50.status}`);
+    process.exit(1);
+  }
+  assertEqual(fin50.total, 10675.00, 'Total CFDI Factura Parcial FK-900 ($10,675.00)');
+  assertEqual(fin50.paidAmount, 5337.50, 'Anticipo cobrado 50% ($5,337.50)');
+  assertEqual(fin50.remainingBalance, 5337.50, 'Saldo restante por cobrar ($5,337.50)');
+  assertEqual(fin50.collectedIva, 400.00, 'IVA trasladado proporcional al 50% ($400.00)');
+  assertEqual(fin50.collectedIsr, 62.50, 'ISR retenido proporcional al 50% ($62.50)');
+
+  // Segundo abono que liquida el saldo restante
+  const invLiquidada = {
+    ...invParcial,
+    paidAmount: fin50.paidAmount + 5337.50
+  };
+  const fin100 = getInvoiceFinancials(invLiquidada);
+  if (fin100.status !== 'PAGADA') {
+    console.error(`❌ [FALLO] Al liquidar el 100% debe pasar a PAGADA, obtenido: ${fin100.status}`);
+    process.exit(1);
+  }
+  assertEqual(fin100.paidAmount, 10675.00, 'Factura liquidada suma el 100% ($10,675.00)');
+  assertEqual(fin100.remainingBalance, 0.00, 'Saldo restante en $0.00 tras liquidación');
+}
+
+console.log('\n🎯 Todos los 9 grupos de pruebas fiscales y segregación pasaron con 100% de precisión matemática.\n');

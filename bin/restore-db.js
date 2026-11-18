@@ -138,7 +138,32 @@ async function runRestore() {
     // Lógica de restauración idempotente (upsert)
     for (const [table, records] of Object.entries(backupData)) {
       if (tables.includes(table) && Array.isArray(records) && records.length > 0) {
-        const { error } = await supabase.from(table).upsert(records, { onConflict: 'id' });
+        const payloadRecords = table === 'invoices'
+          ? records.map(r => (r.clientName !== undefined && r.client_name === undefined ? {
+              id: r.id,
+              folio: r.folio,
+              client_name: r.clientName,
+              rfc: r.rfc,
+              date: r.date,
+              is_mixed_tax: !!r.isMixedTax,
+              subtotal: r.subtotal || 0,
+              discount: r.discount || 0,
+              subtotal8: r.subtotal8 || 0,
+              subtotal16: r.subtotal16 || 0,
+              iva_rate: r.ivaRate || 8,
+              iva_total: r.ivaTotal || 0,
+              applies_isr: !!r.appliesIsr,
+              isr_rate: r.isrRate || 1.25,
+              isr_retained: r.isrRetained || 0,
+              base_neta: r.baseNeta || 0,
+              total: r.total || 0,
+              status: r.status || 'PAGADA',
+              has_partial_payment: !!(r.hasPartialPayment ?? r.has_partial_payment),
+              paid_amount: parseFloat(r.paidAmount ?? r.paid_amount) || 0
+            } : r))
+          : records;
+
+        const { error } = await supabase.from(table).upsert(payloadRecords, { onConflict: 'id' });
         if (error) {
           console.error(`  ❌ Error al restaurar en '${table}': ${error.message}`);
         } else {

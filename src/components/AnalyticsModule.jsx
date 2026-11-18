@@ -3,6 +3,7 @@ import { BarChart3, PieChart as PieIcon, TrendingUp, Calendar, CalendarRange, Hi
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { storageService } from '../services/storageService';
 import { MONTH_NAMES } from '../utils/dateFormatter';
+import { getInvoiceFinancials } from '../utils/invoicePaymentUtils';
 
 const SECTOR_COLORS = {
   Trabajo: '#10b981',
@@ -128,10 +129,11 @@ export default function AnalyticsModule() {
   const filteredOtherIncome = useMemo(() => filterByPeriod(otherIncome), [otherIncome, filterByPeriod]);
   const filteredDeposits = useMemo(() => filterByPeriod(edsonDeposits), [edsonDeposits, filterByPeriod]);
 
-  // Calculations on Filtered Data
-  const totalIngresoFacturado = filteredInvoices
-    .filter(i => i.status !== 'PENDIENTE')
-    .reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
+  // Calculations on Filtered Data (Proporcional a lo efectivamente cobrado en PAGADA y PARCIAL)
+  const totalIngresoFacturado = filteredInvoices.reduce((sum, i) => {
+    const fin = getInvoiceFinancials(i);
+    return sum + fin.paidAmount;
+  }, 0);
   const totalOtroIngreso = filteredOtherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresoGlobal = totalIngresoFacturado + totalOtroIngreso;
 

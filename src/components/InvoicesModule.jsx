@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp, UploadCloud, RefreshCw } from 'lucide-react';
+import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp, UploadCloud, RefreshCw, DollarSign } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { ocrService } from '../services/ocrService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
 import { formatFolio } from '../utils/folioFormatter';
+import { getInvoiceFinancials } from '../utils/invoicePaymentUtils';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function InvoicesModule({ userRole }) {
@@ -39,11 +40,12 @@ export default function InvoicesModule({ userRole }) {
     equipmentProvider: ''
   });
 
-  // Modal Pop-up Confirmación de Estado de Factura (PAGADA / PENDIENTE)
+  // Modal Pop-up Confirmación de Estado / Abonos de Factura (PAGADA / PARCIAL / PENDIENTE)
   const [statusConfirmModal, setStatusConfirmModal] = useState({
     isOpen: false,
     invoice: null,
-    targetStatus: 'PAGADA'
+    targetStatus: 'PAGADA',
+    paymentAddition: ''
   });
 
   // Real dynamic current system date (Agosto)
@@ -86,6 +88,8 @@ export default function InvoicesModule({ userRole }) {
     appliesIsr: true,
     isrRate: 1.25,
     status: 'PAGADA',
+    hasPartialPayment: false,
+    paidAmount: '',
     fileName: '',
     uuid: ''
   });
@@ -216,6 +220,8 @@ export default function InvoicesModule({ userRole }) {
         appliesIsr,
         isrRate: isrRate || 1.25,
         status: 'PAGADA',
+        hasPartialPayment: false,
+        paidAmount: '',
         fileName: file.name,
         uuid: result.uuid || ''
       });
@@ -387,7 +393,35 @@ export default function InvoicesModule({ userRole }) {
     const baseNeta = getBaseNeta(subtotal, discount);
     const ivaTotal = parseFloat(formData.ivaTotal) || 0;
     const isrRetained = calculateIsrRetained(subtotal, discount, formData.appliesIsr, formData.isrRate);
-    const total = baseNeta + ivaTotal - isrRetained;
+    const total = parseFloat((baseNeta + ivaTotal - isrRetained).toFixed(2));
+
+    let finalStatus = formData.status || 'PAGADA';
+    let finalHasPartial = !!formData.hasPartialPayment;
+    let finalPaidAmount = 0;
+
+    if (finalStatus === 'PAGADA') {
+      finalPaidAmount = total;
+    } else if (finalStatus === 'PARCIAL' || finalHasPartial) {
+      const enteredPaid = parseFloat(formData.paidAmount) || 0;
+      const clampedPaid = parseFloat(Math.min(total, Math.max(0, enteredPaid)).toFixed(2));
+      if (total > 0 && clampedPaid >= total - 0.009) {
+        finalStatus = 'PAGADA';
+        finalHasPartial = true;
+        finalPaidAmount = total;
+      } else if (clampedPaid <= 0) {
+        finalStatus = 'PENDIENTE';
+        finalHasPartial = false;
+        finalPaidAmount = 0;
+      } else {
+        finalStatus = 'PARCIAL';
+        finalHasPartial = true;
+        finalPaidAmount = clampedPaid;
+      }
+    } else {
+      finalStatus = 'PENDIENTE';
+      finalHasPartial = false;
+      finalPaidAmount = 0;
+    }
 
     const invoiceToSave = {
       id: editingId || undefined,
@@ -406,8 +440,10 @@ export default function InvoicesModule({ userRole }) {
       appliesIsr: formData.appliesIsr,
       isrRate: formData.isrRate,
       isrRetained: parseFloat(isrRetained.toFixed(2)),
-      total: parseFloat(total.toFixed(2)),
-      status: formData.status,
+      total,
+      status: finalStatus,
+      hasPartialPayment: finalHasPartial,
+      paidAmount: finalPaidAmount,
       fileName: formData.fileName || undefined,
       uuid: formData.uuid || undefined
     };
@@ -425,6 +461,7 @@ export default function InvoicesModule({ userRole }) {
     const isMixed = !!inv.isMixedTax || (inv.subtotal8 > 0 && inv.subtotal16 > 0);
     const disc = inv.discount || 0;
     const baseNeta = inv.baseNeta || (inv.subtotal - disc);
+    const fin = getInvoiceFinancials(inv);
 
     setFormData({
       folio: formatFolio(inv.folio),
@@ -440,7 +477,11 @@ export default function InvoicesModule({ userRole }) {
       ivaTotal: inv.ivaTotal.toString(),
       appliesIsr: inv.appliesIsr,
       isrRate: inv.isrRate || 1.25,
-      status: inv.status
+      status: fin.status,
+      hasPartialPayment: fin.hasPartialPayment,
+      paidAmount: fin.status === 'PARCIAL' || (fin.hasPartialPayment && fin.paidAmount > 0) ? fin.paidAmount.toString() : '',
+      fileName: inv.fileName || '',
+      uuid: inv.uuid || ''
     });
     setShowModal(true);
   };
@@ -455,20 +496,67 @@ export default function InvoicesModule({ userRole }) {
   };
 
   const handleRequestToggleStatus = (inv) => {
-    const nextStatus = inv.status === 'PENDIENTE' ? 'PAGADA' : 'PENDIENTE';
+    const fin = getInvoiceFinancials(inv);
+    const nextStatus = fin.status === 'PAGADA' ? 'PENDIENTE' : 'PAGADA';
     setStatusConfirmModal({
       isOpen: true,
-      invoice: inv,
-      targetStatus: nextStatus
+      invoice: { ...inv, ...fin },
+      targetStatus: nextStatus,
+      paymentAddition: ''
     });
   };
 
-  const handleConfirmToggleStatus = async () => {
+  const handleConfirmToggleStatus = async (overrideTargetStatus) => {
     if (!statusConfirmModal.invoice) return;
-    const updatedInvoice = { ...statusConfirmModal.invoice, status: statusConfirmModal.targetStatus };
+    const inv = statusConfirmModal.invoice;
+    const fin = getInvoiceFinancials(inv);
+    const chosenStatus = overrideTargetStatus || statusConfirmModal.targetStatus;
+
+    let updatedInvoice;
+    if (chosenStatus === 'PAGADA') {
+      updatedInvoice = {
+        ...inv,
+        status: 'PAGADA',
+        hasPartialPayment: fin.hasPartialPayment,
+        paidAmount: fin.total
+      };
+    } else {
+      updatedInvoice = {
+        ...inv,
+        status: 'PENDIENTE',
+        hasPartialPayment: false,
+        paidAmount: 0
+      };
+    }
+
     const updated = await storageService.saveInvoice(updatedInvoice, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
     setInvoices(updated);
-    setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA' });
+    setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA', paymentAddition: '' });
+    setShowSyncBadge(true);
+    setTimeout(() => setShowSyncBadge(false), 3000);
+  };
+
+  const handleRegisterPartialPayment = async (e) => {
+    e.preventDefault();
+    if (!statusConfirmModal.invoice) return;
+    const inv = statusConfirmModal.invoice;
+    const fin = getInvoiceFinancials(inv);
+    const addition = parseFloat(statusConfirmModal.paymentAddition) || 0;
+    if (addition <= 0) return;
+
+    const newPaidAmount = parseFloat(Math.min(fin.total, fin.paidAmount + addition).toFixed(2));
+    const isNowPaid = fin.total > 0 && newPaidAmount >= fin.total - 0.009;
+
+    const updatedInvoice = {
+      ...inv,
+      status: isNowPaid ? 'PAGADA' : 'PARCIAL',
+      hasPartialPayment: true,
+      paidAmount: isNowPaid ? fin.total : newPaidAmount
+    };
+
+    const updated = await storageService.saveInvoice(updatedInvoice, userRole === 'admin' ? 'ADMIN' : 'KARLA (2020)');
+    setInvoices(updated);
+    setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA', paymentAddition: '' });
     setShowSyncBadge(true);
     setTimeout(() => setShowSyncBadge(false), 3000);
   };
@@ -493,6 +581,8 @@ export default function InvoicesModule({ userRole }) {
       appliesIsr: true,
       isrRate: 1.25,
       status: 'PAGADA',
+      hasPartialPayment: false,
+      paidAmount: '',
       fileName: '',
       uuid: ''
     });
@@ -731,52 +821,41 @@ export default function InvoicesModule({ userRole }) {
 
   // Segregación informativa de facturas para la barra de estado y contabilidad de cobranza
   const paidInvoices = useMemo(() => {
-    return filteredInvoices.filter(inv => inv.status === 'PAGADA');
+    return filteredInvoices.filter(inv => getInvoiceFinancials(inv).status === 'PAGADA');
+  }, [filteredInvoices]);
+
+  const partialInvoices = useMemo(() => {
+    return filteredInvoices.filter(inv => getInvoiceFinancials(inv).status === 'PARCIAL');
   }, [filteredInvoices]);
 
   const pendingInvoices = useMemo(() => {
-    return filteredInvoices.filter(inv => inv.status === 'PENDIENTE');
+    return filteredInvoices.filter(inv => getInvoiceFinancials(inv).status === 'PENDIENTE');
   }, [filteredInvoices]);
 
-  // Monto total acumulado de facturas PAGADAS del período (Ingreso Total Real)
-  const totalIngresoTotal = useMemo(() => {
-    return paidInvoices.reduce((sum, inv) => {
-      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
-      const ivaTot = parseFloat(inv.ivaTotal) || 0;
-      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
-    }, 0);
-  }, [paidInvoices]);
+  // Totales fiscales proporcionales a lo efectivamente cobrado (PAGADA = 100%, PARCIAL = proporción abonada, PENDIENTE = $0)
+  const periodInvoiceTotals = useMemo(() => {
+    return filteredInvoices.reduce((acc, inv) => {
+      const fin = getInvoiceFinancials(inv);
+      acc.collected += fin.paidAmount;
+      acc.pending += fin.remainingBalance;
+      acc.iva += fin.collectedIva;
+      acc.isr += fin.collectedIsr;
+      return acc;
+    }, { collected: 0, pending: 0, iva: 0, isr: 0 });
+  }, [filteredInvoices]);
 
+  const totalIngresoTotal = parseFloat(periodInvoiceTotals.collected.toFixed(2));
   const totalCobradoMonto = totalIngresoTotal;
-
-  const totalPendienteMonto = useMemo(() => {
-    return pendingInvoices.reduce((sum, inv) => {
-      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
-      const ivaTot = parseFloat(inv.ivaTotal) || 0;
-      return sum + parseFloat((base + ivaTot - isrRet).toFixed(2));
-    }, 0);
-  }, [pendingInvoices]);
-
-  // IVA Trasladado de facturas PAGADAS del período
-  const totalIvaTrasladado = useMemo(() => {
-    return paidInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
-  }, [paidInvoices]);
+  const totalPendienteMonto = parseFloat(periodInvoiceTotals.pending.toFixed(2));
+  const totalIvaTrasladado = parseFloat(periodInvoiceTotals.iva.toFixed(2));
   
   // Retención ISR calculada con base al Ingreso Total efectivamente cobrado/pagado (2 decimales exactos)
   const totalRetencionIsr = parseFloat((totalIngresoTotal * (currentIsrRate / 100)).toFixed(2));
 
-  // Suma de Retención ISR 1.25% de todas las facturas PAGADAS del período seleccionado
-  const totalIsrFacturas = useMemo(() => {
-    return paidInvoices.reduce((sum, inv) => {
-      const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-      const isrRet = inv.appliesIsr !== false ? (inv.isrRetained !== undefined && inv.isrRetained !== null ? parseFloat(inv.isrRetained) : parseFloat((base * 0.0125).toFixed(2))) : 0;
-      return sum + isrRet;
-    }, 0);
-  }, [paidInvoices]);
+  // Suma de Retención ISR 1.25% proporcional a lo cobrado en el período seleccionado
+  const totalIsrFacturas = parseFloat(periodInvoiceTotals.isr.toFixed(2));
 
-  // Utilidad Real (edson): Ingreso Total (pagadas) menos IVA Trasladado (pagadas) menos Retención ISR menos ISR Facturas (1.25% pagadas) menos Otros Gastos
+  // Utilidad Real (edson): Ingreso Total (cobrado) menos IVA Trasladado (cobrado) menos Retención ISR menos ISR Facturas (1.25% cobrado) menos Otros Gastos
   const utilidadReal = parseFloat((totalIngresoTotal - totalIvaTrasladado - totalRetencionIsr - totalIsrFacturas - totalOtrosGastos).toFixed(2));
 
   // Por Depositar: Utilidad Real menos Total de Depósitos
@@ -913,11 +992,16 @@ export default function InvoicesModule({ userRole }) {
             Total: <strong style={{ color: '#0f172a' }}>{filteredInvoices.length}</strong> {filteredInvoices.length === 1 ? 'factura' : 'facturas'}
           </span>
           <span className="badge badge-emerald" style={{ fontSize: '0.74rem', fontWeight: '700' }}>
-            ✓ {paidInvoices.length} Pagadas (${totalCobradoMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
+            ✓ {paidInvoices.length} Pagadas (Cobrado: ${totalCobradoMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
           </span>
-          {pendingInvoices.length > 0 && (
+          {partialInvoices.length > 0 && (
+            <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '0.74rem', fontWeight: '700' }}>
+              🌓 {partialInvoices.length} {partialInvoices.length === 1 ? 'Anticipo / Parcial' : 'Anticipos / Parciales'}
+            </span>
+          )}
+          {(pendingInvoices.length > 0 || partialInvoices.length > 0) && (
             <span className="badge badge-amber" style={{ fontSize: '0.74rem', fontWeight: '700' }}>
-              ⏳ {pendingInvoices.length} Pendientes (${totalPendienteMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
+              ⏳ Por Cobrar: ${totalPendienteMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} ({pendingInvoices.length + partialInvoices.length})
             </span>
           )}
         </div>
@@ -985,9 +1069,9 @@ export default function InvoicesModule({ userRole }) {
               </div>
             ) : (
               filteredInvoices.map((inv) => {
-                const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-                const isrRetained = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
-                const ingresoTotal = parseFloat((base + (parseFloat(inv.ivaTotal) || 0) - isrRetained).toFixed(2));
+                const fin = getInvoiceFinancials(inv);
+                const isrRetained = fin.isrRetained;
+                const ingresoTotal = fin.total;
                 const isExpanded = expandedInvoiceId === inv.id;
 
                 return (
@@ -1008,9 +1092,13 @@ export default function InvoicesModule({ userRole }) {
                         onClick={() => handleRequestToggleStatus(inv)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                       >
-                        {inv.status === 'PENDIENTE' ? (
+                        {fin.status === 'PENDIENTE' ? (
                           <span className="badge badge-amber" style={{ fontSize: '0.74rem' }}>
                             <Clock size={12} /> PENDIENTE
+                          </span>
+                        ) : fin.status === 'PARCIAL' ? (
+                          <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc', fontSize: '0.74rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                            <DollarSign size={12} /> PARCIAL (ANTICIPO)
                           </span>
                         ) : (
                           <span className="badge badge-emerald" style={{ fontSize: '0.74rem' }}>
@@ -1037,6 +1125,12 @@ export default function InvoicesModule({ userRole }) {
                         <p style={{ fontSize: '1.25rem', fontWeight: '800', color: '#10b981', margin: 0, letterSpacing: '-0.02em' }}>
                           ${ingresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </p>
+                        {fin.status === 'PARCIAL' && (
+                          <div style={{ fontSize: '0.72rem', marginTop: '0.2rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <span style={{ color: '#34d399', fontWeight: '700' }}>Abonado: ${fin.paidAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                            <span style={{ color: '#fbbf24', fontWeight: '700' }}>Resta: ${fin.remainingBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -1117,9 +1211,10 @@ export default function InvoicesModule({ userRole }) {
                   </tr>
                 ) : (
                   filteredInvoices.map((inv) => {
-                    const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-                    const isrRetained = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
-                    const ingresoTotal = parseFloat((base + (parseFloat(inv.ivaTotal) || 0) - isrRetained).toFixed(2));
+                    const fin = getInvoiceFinancials(inv);
+                    const base = fin.baseNeta;
+                    const isrRetained = fin.isrRetained;
+                    const ingresoTotal = fin.total;
                     const isMixed = inv.isMixedTax || (inv.subtotal8 > 0 && inv.subtotal16 > 0);
 
                     return (
@@ -1188,20 +1283,36 @@ export default function InvoicesModule({ userRole }) {
 
                         {/* Ingreso Total */}
                         <td style={{ whiteSpace: 'nowrap', fontWeight: '800', color: '#047857', textAlign: 'right', fontSize: '0.98rem' }}>
-                          ${ingresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          <div>
+                            ${ingresoTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                            {fin.status === 'PARCIAL' && (
+                              <div style={{ fontSize: '0.7rem', lineHeight: '1.25', marginTop: '0.15rem' }}>
+                                <span style={{ display: 'block', color: '#0284c7', fontWeight: '700' }}>
+                                  Abonado: ${fin.paidAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                </span>
+                                <span style={{ display: 'block', color: '#b45309', fontWeight: '700' }}>
+                                  Resta: ${fin.remainingBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </td>
 
-                        {/* Estado (Clickeable con opción PAGADA y PENDIENTE con Pop-up de Confirmación) */}
+                        {/* Estado (Clickeable con opciones PAGADA / PARCIAL / PENDIENTE y abono rápido) */}
                         <td style={{ whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <button
                             type="button"
                             onClick={() => handleRequestToggleStatus(inv)}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                            title="Clic para cambiar estado (PAGADA / PENDIENTE)"
+                            title="Clic para registrar abono o cambiar estado (PAGADA / PARCIAL / PENDIENTE)"
                           >
-                            {inv.status === 'PENDIENTE' ? (
+                            {fin.status === 'PENDIENTE' ? (
                               <span className="badge badge-amber" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
                                 <Clock size={13} /> PENDIENTE
+                              </span>
+                            ) : fin.status === 'PARCIAL' ? (
+                              <span className="badge" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc' }}>
+                                <DollarSign size={13} /> PARCIAL
                               </span>
                             ) : (
                               <span className="badge badge-emerald" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -1973,66 +2084,149 @@ export default function InvoicesModule({ userRole }) {
                   )}
                 </div>
 
-                {/* Estado de la Factura (PAGADA / PENDIENTE) */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: '700', color: '#334155' }}>
-                    Estado de Cobro de la Factura:
-                  </label>
+                {/* Estado de la Factura (PAGADA / PARCIAL ANTICIPO / PENDIENTE) */}
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <label className="form-label" style={{ fontWeight: '700', color: '#334155', margin: 0 }}>
+                      Estado de Cobro de la Factura:
+                    </label>
+                    <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#0369a1', display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', userSelect: 'none' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.status === 'PARCIAL' || !!formData.hasPartialPayment}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setFormData(prev => ({
+                            ...prev,
+                            hasPartialPayment: checked,
+                            status: checked ? 'PARCIAL' : (prev.status === 'PARCIAL' ? 'PAGADA' : prev.status),
+                            paidAmount: checked ? prev.paidAmount : ''
+                          }));
+                        }}
+                      />
+                      ¿Tuvo pago parcial (Anticipo)?
+                    </label>
+                  </div>
+
                   <div style={{ background: '#f1f5f9', padding: '0.35rem', borderRadius: '12px', display: 'flex', gap: '0.35rem' }}>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, status: 'PAGADA' })}
+                      onClick={() => setFormData({ ...formData, status: 'PAGADA', hasPartialPayment: false })}
                       style={{
                         flex: 1,
-                        padding: '0.55rem 0.8rem',
+                        padding: '0.55rem 0.6rem',
                         border: 'none',
                         borderRadius: '9px',
                         background: formData.status === 'PAGADA' ? '#ffffff' : 'transparent',
                         color: formData.status === 'PAGADA' ? '#047857' : '#64748b',
                         fontWeight: '800',
-                        fontSize: '0.82rem',
+                        fontSize: '0.78rem',
                         cursor: 'pointer',
                         boxShadow: formData.status === 'PAGADA' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
                         transition: 'all 0.2s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '0.4rem'
+                        gap: '0.35rem'
                       }}
                     >
-                      <CheckCircle size={15} color={formData.status === 'PAGADA' ? '#10b981' : '#64748b'} /> PAGADA (Pagada)
+                      <CheckCircle size={14} color={formData.status === 'PAGADA' ? '#10b981' : '#64748b'} /> PAGADA
                     </button>
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, status: 'PENDIENTE' })}
+                      onClick={() => setFormData({ ...formData, status: 'PARCIAL', hasPartialPayment: true })}
                       style={{
                         flex: 1,
-                        padding: '0.55rem 0.8rem',
+                        padding: '0.55rem 0.6rem',
+                        border: 'none',
+                        borderRadius: '9px',
+                        background: formData.status === 'PARCIAL' ? '#ffffff' : 'transparent',
+                        color: formData.status === 'PARCIAL' ? '#0369a1' : '#64748b',
+                        fontWeight: '800',
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                        boxShadow: formData.status === 'PARCIAL' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
+                        transition: 'all 0.2s ease',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '0.35rem'
+                      }}
+                    >
+                      <DollarSign size={14} color={formData.status === 'PARCIAL' ? '#0284c7' : '#64748b'} /> PARCIAL
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, status: 'PENDIENTE', hasPartialPayment: false, paidAmount: '' })}
+                      style={{
+                        flex: 1,
+                        padding: '0.55rem 0.6rem',
                         border: 'none',
                         borderRadius: '9px',
                         background: formData.status === 'PENDIENTE' ? '#ffffff' : 'transparent',
                         color: formData.status === 'PENDIENTE' ? '#b45309' : '#64748b',
                         fontWeight: '800',
-                        fontSize: '0.82rem',
+                        fontSize: '0.78rem',
                         cursor: 'pointer',
                         boxShadow: formData.status === 'PENDIENTE' ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
                         transition: 'all 0.2s ease',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '0.4rem'
+                        gap: '0.35rem'
                       }}
                     >
-                      <Clock size={15} color={formData.status === 'PENDIENTE' ? '#f59e0b' : '#64748b'} /> PENDIENTE (Por Pagar)
+                      <Clock size={14} color={formData.status === 'PENDIENTE' ? '#f59e0b' : '#64748b'} /> PENDIENTE
                     </button>
                   </div>
+
+                  {/* Captura de Anticipo cuando es Pago Parcial */}
+                  {formData.status === 'PARCIAL' && (() => {
+                    const enteredAnticipo = parseFloat(formData.paidAmount) || 0;
+                    const clampedAnticipo = Math.min(Math.max(0, currentTotalFactura), Math.max(0, enteredAnticipo));
+                    const saldoRestante = Math.max(0, currentTotalFactura - clampedAnticipo);
+                    return (
+                      <div style={{ background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: '12px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', alignItems: 'end' }}>
+                          <div className="form-group" style={{ margin: 0 }}>
+                            <label className="form-label" style={{ color: '#0369a1', fontWeight: '800', fontSize: '0.8rem' }}>
+                              Monto de Anticipo / Abonado ($):
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              max={currentTotalFactura > 0 ? currentTotalFactura.toFixed(2) : undefined}
+                              className="form-control"
+                              placeholder="Ej: 5000.00"
+                              style={{ fontWeight: '800', color: '#0369a1', borderColor: '#38bdf8' }}
+                              value={formData.paidAmount}
+                              onChange={(e) => setFormData({ ...formData, paidAmount: e.target.value })}
+                              required={formData.status === 'PARCIAL'}
+                            />
+                          </div>
+
+                          <div style={{ background: '#ffffff', border: '1px solid #fed7aa', borderRadius: '10px', padding: '0.55rem 0.8rem', minHeight: '44px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                            <span style={{ fontSize: '0.7rem', color: '#9a3412', fontWeight: '700' }}>Saldo Restante por Pagar:</span>
+                            <strong style={{ fontSize: '1rem', color: '#b45309', fontWeight: '900' }}>
+                              ${saldoRestante.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </strong>
+                          </div>
+                        </div>
+
+                        <div style={{ fontSize: '0.74rem', color: '#0369a1', lineHeight: '1.4' }}>
+                          💡 Se sumarán <strong>${clampedAnticipo.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong> a <em>Ingresos del Mes</em> y el saldo restante quedará en <em>Por Cobrar</em> hasta completar los pagos siguientes.
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Live Preview of Ingreso Total matching exact CFDI Breakdown */}
                 <div style={{ background: '#ecfdf5', padding: '0.85rem 1.1rem', borderRadius: '12px', border: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
                     <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#047857', display: 'block' }}>
-                      Ingreso Total Cobrado (Total Factura):
+                      {formData.status === 'PARCIAL' ? 'Total Factura (CFDI):' : 'Ingreso Total Cobrado (Total Factura):'}
                     </span>
                     <span style={{ fontSize: '0.72rem', color: '#64748b' }}>
                       Subtotal (${(parseFloat(formData.subtotal) || 0).toFixed(2)}) {formData.discount ? `- Desc. ($${(parseFloat(formData.discount) || 0).toFixed(2)}) ` : ''}+ IVA (${(parseFloat(formData.ivaTotal) || 0).toFixed(2)}) - Retención ISR (${currentIsrAmount.toFixed(2)})
@@ -2295,171 +2489,196 @@ export default function InvoicesModule({ userRole }) {
         </div>
       )}
 
-      {/* Modal / Pop-up de Confirmación de Cambio de Estado (PAGADA / PENDIENTE) */}
-      {statusConfirmModal.isOpen && statusConfirmModal.invoice && (
-        <div className="modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="modal-content" style={{ maxWidth: '480px', borderRadius: '18px', border: '1.5px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
-            <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <div style={{
-                  width: '38px',
-                  height: '38px',
-                  borderRadius: '10px',
-                  background: statusConfirmModal.targetStatus === 'PAGADA' ? '#ecfdf5' : '#fffbeb',
-                  border: `1.5px solid ${statusConfirmModal.targetStatus === 'PAGADA' ? '#a7f3d0' : '#fde68a'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: statusConfirmModal.targetStatus === 'PAGADA' ? '#059669' : '#d97706'
-                }}>
-                  {statusConfirmModal.targetStatus === 'PAGADA' ? <CheckCircle size={22} /> : <Clock size={22} />}
-                </div>
-                <div>
-                  <h3 style={{ fontWeight: '800', color: '#0f172a', margin: 0, fontSize: '1.15rem' }}>
-                    Confirmar Cambio de Estado
-                  </h3>
-                  <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
-                    Factura {formatFolio(statusConfirmModal.invoice.folio)}
-                  </span>
-                </div>
-              </div>
-              <button 
-                onClick={() => setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA' })}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}
-              >
-                ✕
-              </button>
-            </div>
+      {/* Modal / Pop-up de Control de Cobro y Abonos de Factura (PAGADA / PARCIAL / PENDIENTE) */}
+      {statusConfirmModal.isOpen && statusConfirmModal.invoice && (() => {
+        const inv = statusConfirmModal.invoice;
+        const fin = getInvoiceFinancials(inv);
+        const addVal = parseFloat(statusConfirmModal.paymentAddition) || 0;
+        const projectedPaid = parseFloat(Math.min(fin.total, fin.paidAmount + Math.max(0, addVal)).toFixed(2));
+        const projectedRemaining = parseFloat(Math.max(0, fin.total - projectedPaid).toFixed(2));
+        const willComplete = fin.total > 0 && projectedPaid >= fin.total - 0.009;
 
-            <div className="modal-body" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-              {/* Status Transition Badge Pill */}
-              <div style={{
-                background: '#f8fafc',
-                padding: '0.75rem 1rem',
-                borderRadius: '12px',
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-              }}>
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Estado Actual</span>
-                  {statusConfirmModal.invoice.status === 'PENDIENTE' ? (
-                    <span className="badge badge-amber" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Clock size={12} /> PENDIENTE
-                    </span>
-                  ) : (
-                    <span className="badge badge-emerald" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <CheckCircle size={12} /> PAGADA
-                    </span>
-                  )}
-                </div>
-
-                <span style={{ fontSize: '1.2rem', color: '#94a3b8', fontWeight: 'bold' }}>➔</span>
-
-                <div style={{ textAlign: 'center', flex: 1 }}>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700', display: 'block' }}>Nuevo Estado</span>
-                  {statusConfirmModal.targetStatus === 'PAGADA' ? (
-                    <span className="badge badge-emerald" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', boxShadow: '0 2px 8px rgba(16, 185, 129, 0.25)' }}>
-                      <CheckCircle size={12} /> PAGADA
-                    </span>
-                  ) : (
-                    <span className="badge badge-amber" style={{ marginTop: '0.2rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem', boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)' }}>
-                      <Clock size={12} /> PENDIENTE
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Invoice Summary Card */}
-              {(() => {
-                const inv = statusConfirmModal.invoice;
-                const base = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : (parseFloat(inv.subtotal) || 0) - (parseFloat(inv.discount) || 0);
-                const isrRet = inv.appliesIsr !== false ? parseFloat((base * 0.0125).toFixed(2)) : 0;
-                const totalAmt = parseFloat((base + (parseFloat(inv.ivaTotal) || 0) - isrRet).toFixed(2));
-                return (
+        return (
+          <div className="modal-overlay" style={{ zIndex: 1100 }}>
+            <div className="modal-content" style={{ maxWidth: '500px', borderRadius: '18px', border: '1.5px solid rgba(255, 255, 255, 0.2)', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+              <div className="modal-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                   <div style={{
-                    background: statusConfirmModal.targetStatus === 'PAGADA' ? '#f0fdf4' : '#fffbeb',
-                    border: `1.5px solid ${statusConfirmModal.targetStatus === 'PAGADA' ? '#bbf7d0' : '#fde68a'}`,
-                    borderRadius: '12px',
-                    padding: '0.9rem 1.1rem',
+                    width: '38px',
+                    height: '38px',
+                    borderRadius: '10px',
+                    background: fin.status === 'PAGADA' ? '#ecfdf5' : (fin.status === 'PARCIAL' ? '#e0f2fe' : '#fffbeb'),
+                    border: `1.5px solid ${fin.status === 'PAGADA' ? '#a7f3d0' : (fin.status === 'PARCIAL' ? '#7dd3fc' : '#fde68a')}`,
                     display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.4rem'
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: fin.status === 'PAGADA' ? '#059669' : (fin.status === 'PARCIAL' ? '#0284c7' : '#d97706')
                   }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ color: '#0f172a', fontSize: '0.95rem' }}>{inv.clientName}</strong>
-                      <span style={{ fontSize: '0.76rem', color: '#64748b', fontFamily: 'monospace' }}>{inv.rfc}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#64748b' }}>
-                      <span>Fecha: {formatDate(inv.date)}</span>
-                      <span>Folio: <strong style={{ color: '#047857' }}>{formatFolio(inv.folio)}</strong></span>
-                    </div>
-                    <div style={{ borderTop: `1px dashed ${statusConfirmModal.targetStatus === 'PAGADA' ? '#86efac' : '#fcd34d'}`, paddingTop: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>Total Comprobante:</span>
-                      <strong style={{ fontSize: '1.2rem', fontWeight: '900', color: statusConfirmModal.targetStatus === 'PAGADA' ? '#15803d' : '#b45309' }}>
-                        ${totalAmt.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                      </strong>
-                    </div>
+                    {fin.status === 'PAGADA' ? <CheckCircle size={22} /> : (fin.status === 'PARCIAL' ? <DollarSign size={22} /> : <Clock size={22} />)}
                   </div>
-                );
-              })()}
-
-              {/* Explanatory Message about Financial/Fiscal Impact */}
-              <div style={{
-                background: '#f8fafc',
-                padding: '0.75rem 0.95rem',
-                borderRadius: '10px',
-                border: '1px solid #e2e8f0',
-                fontSize: '0.82rem',
-                color: '#475569',
-                lineHeight: '1.45'
-              }}>
-                {statusConfirmModal.targetStatus === 'PAGADA' ? (
-                  <span>
-                    💡 <strong>Impacto Financiero:</strong> Al marcarla como <strong>PAGADA</strong>, el importe total se sumará automáticamente a la tarjeta <strong>Ingresos del Mes</strong> y a la <strong>Utilidad Real</strong>.
-                  </span>
-                ) : (
-                  <span>
-                    ⚠️ <strong>Impacto Financiero:</strong> Al marcarla como <strong>PENDIENTE</strong>, el importe se excluirá de la tarjeta <strong>Ingresos del Mes</strong> hasta que se confirme su pago efectivo.
-                  </span>
-                )}
+                  <div>
+                    <h3 style={{ fontWeight: '800', color: '#0f172a', margin: 0, fontSize: '1.12rem' }}>
+                      Cobro y Pagos Parciales
+                    </h3>
+                    <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
+                      Factura {formatFolio(inv.folio)} • {inv.clientName}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA', paymentAddition: '' })}
+                  style={{ background: 'none', border: 'none', color: '#94a3b8', fontSize: '1.3rem', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
               </div>
-            </div>
 
-            <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-              <button 
-                type="button" 
-                className="btn-secondary" 
-                onClick={() => setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA' })}
-                style={{ padding: '0.5rem 1rem' }}
-              >
-                Cancelar
-              </button>
-              <button 
-                type="button" 
-                className="btn-primary" 
-                onClick={handleConfirmToggleStatus}
-                style={{
-                  background: statusConfirmModal.targetStatus === 'PAGADA' 
-                    ? 'linear-gradient(135deg, #059669, #10b981)' 
-                    : 'linear-gradient(135deg, #d97706, #f59e0b)',
-                  boxShadow: statusConfirmModal.targetStatus === 'PAGADA'
-                    ? '0 4px 14px rgba(16, 185, 129, 0.3)'
-                    : '0 4px 14px rgba(245, 158, 11, 0.3)',
-                  padding: '0.5rem 1.25rem',
+              <div className="modal-body" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Resumen financiero de la factura */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1.5px solid #e2e8f0',
+                  borderRadius: '12px',
+                  padding: '0.9rem 1.1rem',
                   display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.4rem'
-                }}
-              >
-                {statusConfirmModal.targetStatus === 'PAGADA' ? <CheckCircle size={16} /> : <Clock size={16} />}
-                Confirmar como {statusConfirmModal.targetStatus}
-              </button>
+                  flexDirection: 'column',
+                  gap: '0.45rem'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: '700' }}>Estado Actual:</span>
+                    {fin.status === 'PENDIENTE' ? (
+                      <span className="badge badge-amber"><Clock size={12} /> PENDIENTE</span>
+                    ) : fin.status === 'PARCIAL' ? (
+                      <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc' }}>
+                        <DollarSign size={12} /> PARCIAL (ANTICIPO)
+                      </span>
+                    ) : (
+                      <span className="badge badge-emerald"><CheckCircle size={12} /> PAGADA</span>
+                    )}
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.84rem' }}>
+                    <span style={{ color: '#475569', fontWeight: '600' }}>Total Comprobante:</span>
+                    <strong style={{ color: '#0f172a', fontWeight: '800' }}>
+                      ${fin.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.84rem' }}>
+                    <span style={{ color: '#047857', fontWeight: '600' }}>Total Abonado / Cobrado:</span>
+                    <strong style={{ color: '#047857', fontWeight: '800' }}>
+                      ${fin.paidAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+
+                  <div style={{ borderTop: '1px dashed #cbd5e1', paddingTop: '0.4rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.84rem', fontWeight: '700', color: '#b45309' }}>Saldo Restante por Cobrar:</span>
+                    <strong style={{ fontSize: '1.15rem', fontWeight: '900', color: fin.remainingBalance > 0 ? '#b45309' : '#15803d' }}>
+                      ${fin.remainingBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+                </div>
+
+                {/* Registrar Nuevo Abono (cuando hay saldo pendiente) */}
+                {fin.status !== 'PAGADA' && fin.remainingBalance > 0 && (
+                  <form onSubmit={handleRegisterPartialPayment} style={{ background: '#f0f9ff', border: '1.5px solid #bae6fd', borderRadius: '12px', padding: '0.95rem 1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <label style={{ fontSize: '0.84rem', fontWeight: '800', color: '#0369a1' }}>
+                        ➕ Sumar Nuevo Abono / Pago ($):
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setStatusConfirmModal(prev => ({ ...prev, paymentAddition: fin.remainingBalance.toFixed(2) }))}
+                        style={{ background: '#e0f2fe', border: '1px solid #7dd3fc', color: '#0369a1', borderRadius: '6px', padding: '0.2rem 0.5rem', fontSize: '0.72rem', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Usar saldo (${fin.remainingBalance.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
+                      </button>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        max={fin.remainingBalance.toFixed(2)}
+                        className="form-control"
+                        placeholder="Ej: 2500.00"
+                        style={{ fontWeight: '800', color: '#0369a1', borderColor: '#38bdf8' }}
+                        value={statusConfirmModal.paymentAddition}
+                        onChange={(e) => setStatusConfirmModal(prev => ({ ...prev, paymentAddition: e.target.value }))}
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="btn-primary"
+                        disabled={addVal <= 0}
+                        style={{ background: 'linear-gradient(135deg, #0284c7, #0369a1)', whiteSpace: 'nowrap', opacity: addVal <= 0 ? 0.6 : 1 }}
+                      >
+                        Registrar Abono
+                      </button>
+                    </div>
+
+                    {addVal > 0 && (
+                      <div style={{ fontSize: '0.76rem', color: willComplete ? '#15803d' : '#0369a1', fontWeight: '700' }}>
+                        {willComplete
+                          ? '✅ Este abono liquida el 100% de la factura y cambiará su estado a PAGADA.'
+                          : `Nuevo abonado: $${projectedPaid.toLocaleString('es-MX', { minimumFractionDigits: 2 })} • Nuevo saldo restante: $${projectedRemaining.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
+                      </div>
+                    )}
+                  </form>
+                )}
+
+                {/* Nota de impacto fiscal */}
+                <div style={{ background: '#f8fafc', padding: '0.7rem 0.9rem', borderRadius: '10px', border: '1px solid #e2e8f0', fontSize: '0.78rem', color: '#475569', lineHeight: '1.45' }}>
+                  💡 <strong>Cálculo Proporcional Activo:</strong> En <em>Ingresos del Mes</em>, <em>Utilidad Real</em> y <em>Métricas</em> se contabiliza únicamente lo efectivamente cobrado (<strong>${fin.paidAmount.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</strong>).
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ borderTop: '1px solid #e2e8f0', padding: '1rem 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setStatusConfirmModal({ isOpen: false, invoice: null, targetStatus: 'PAGADA', paymentAddition: '' })}
+                  style={{ padding: '0.5rem 1rem' }}
+                >
+                  Cerrar
+                </button>
+
+                <div style={{ display: 'flex', gap: '0.55rem', flexWrap: 'wrap' }}>
+                  {fin.status !== 'PENDIENTE' && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => handleConfirmToggleStatus('PENDIENTE')}
+                      style={{ color: '#b45309', borderColor: '#fcd34d', background: '#fffbeb', padding: '0.5rem 0.9rem', fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                    >
+                      <Clock size={14} /> Marcar PENDIENTE ($0)
+                    </button>
+                  )}
+
+                  {fin.status !== 'PAGADA' && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      onClick={() => handleConfirmToggleStatus('PAGADA')}
+                      style={{
+                        background: 'linear-gradient(135deg, #059669, #10b981)',
+                        boxShadow: '0 4px 14px rgba(16, 185, 129, 0.3)',
+                        padding: '0.5rem 1.1rem',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem'
+                      }}
+                    >
+                      <CheckCircle size={16} /> Liquidar 100% (PAGADA)
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

@@ -39,7 +39,7 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 ## 🗄️ Modelo de Datos (11 Tablas en Supabase con Tiempo Real)
 
-1. `invoices` (Facturas Emitidas): Folios normalizados FK-, impuestos 8%/16%, retención ISR 1.25%, descuentos y estatus.
+1. `invoices` (Facturas Emitidas): Folios normalizados FK-, impuestos 8%/16%, retención ISR 1.25%, descuentos, estatus (`PAGADA`/`PARCIAL`/`PENDIENTE`) y control de anticipos/pagos parciales (`has_partial_payment`, `paid_amount`) con cálculo proporcional en métricas e ingresos.
 2. `clients` (Clientes): Catálogo con RFC, contacto y configuración de retención ISR.
 3. `deductibles` (Facturas Proveedores / SYSCOM): Deducibles autorizados con desglose de IVA acreditable.
 4. `account_deposits` (Depósitos Bancarios): Incluye `profile` ('edson'|'karla'), `applies_equipment_expense`, `equipment_expense`, `equipment_provider`, `real_utility`.

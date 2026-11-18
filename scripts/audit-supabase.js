@@ -45,7 +45,7 @@ const SCHEMA_AUDIT_MAP = [
   },
   {
     table: 'invoices',
-    cols: 'id,folio,client_name,rfc,date,is_mixed_tax,subtotal,discount,subtotal8,subtotal16,iva_rate,iva_total,applies_isr,isr_rate,isr_retained,base_neta,total,status,created_at'
+    cols: 'id,folio,client_name,rfc,date,is_mixed_tax,subtotal,discount,subtotal8,subtotal16,iva_rate,iva_total,applies_isr,isr_rate,isr_retained,base_neta,total,status,has_partial_payment,paid_amount,created_at'
   },
   {
     table: 'deductibles',

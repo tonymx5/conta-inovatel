@@ -1,6 +1,7 @@
 // LocalStorage & Supabase Dual-Sync Service for Conta Inovatel
 import { supabase } from './supabaseClient.js';
 import { formatFolio } from '../utils/folioFormatter.js';
+import { getInvoiceFinancials } from '../utils/invoicePaymentUtils.js';
 
 const STORAGE_KEYS = {
   CLIENTS: 'conta_inovatel_clients',
@@ -337,6 +338,24 @@ function mapInvoiceFromSupabase(i, localMap = new Map()) {
   const isrRate = 1.25;
   const isrRetained = appliesIsr ? parseFloat((baseNeta * 0.0125).toFixed(2)) : 0;
   const total = parseFloat((baseNeta + ivaTotal - isrRetained).toFixed(2));
+  const rawHasPartial = i.has_partial_payment !== undefined && i.has_partial_payment !== null
+    ? !!i.has_partial_payment
+    : (i.hasPartialPayment !== undefined ? !!i.hasPartialPayment : !!local?.hasPartialPayment);
+  const rawPaidAmount = i.paid_amount !== undefined && i.paid_amount !== null
+    ? parseFloat(i.paid_amount)
+    : (i.paidAmount !== undefined ? parseFloat(i.paidAmount) : local?.paidAmount);
+
+  const normalized = getInvoiceFinancials({
+    subtotal,
+    discount,
+    baseNeta,
+    ivaTotal,
+    appliesIsr,
+    isrRetained,
+    status: i.status || local?.status || 'PAGADA',
+    hasPartialPayment: rawHasPartial,
+    paidAmount: rawPaidAmount
+  });
 
   return {
     id: i.id || local?.id || 'inv-' + Date.now(),
@@ -356,7 +375,10 @@ function mapInvoiceFromSupabase(i, localMap = new Map()) {
     isrRetained,
     baseNeta,
     total,
-    status: i.status || 'PAGADA'
+    status: normalized.status,
+    hasPartialPayment: normalized.hasPartialPayment,
+    paidAmount: normalized.paidAmount,
+    remainingBalance: normalized.remainingBalance
   };
 }
 
@@ -537,13 +559,17 @@ export const storageService = {
         setStorageItem(STORAGE_KEYS.INVOICES, mappedInvoices);
       } else if (localInvoices && localInvoices.length > 0) {
         setStorageItem(STORAGE_KEYS.INVOICES, localInvoices);
-        Promise.all(localInvoices.map(inv => supabase.from('invoices').upsert({
-          id: inv.id, folio: inv.folio, client_name: inv.clientName, rfc: inv.rfc, date: inv.date,
-          is_mixed_tax: !!inv.isMixedTax, subtotal: inv.subtotal || 0, discount: inv.discount || 0,
-          subtotal8: inv.subtotal8 || 0, subtotal16: inv.subtotal16 || 0, iva_rate: inv.ivaRate || 8,
-          iva_total: inv.ivaTotal || 0, applies_isr: !!inv.appliesIsr, isr_rate: inv.isrRate || 1.25,
-          isr_retained: inv.isrRetained || 0, base_neta: inv.baseNeta || 0, total: inv.total || 0, status: inv.status || 'PAGADA'
-        }))).catch(e => console.error('Seed invoices error:', e));
+        Promise.all(localInvoices.map(inv => {
+          const fin = getInvoiceFinancials(inv);
+          return supabase.from('invoices').upsert({
+            id: inv.id, folio: inv.folio, client_name: inv.clientName, rfc: inv.rfc, date: inv.date,
+            is_mixed_tax: !!inv.isMixedTax, subtotal: inv.subtotal || 0, discount: inv.discount || 0,
+            subtotal8: inv.subtotal8 || 0, subtotal16: inv.subtotal16 || 0, iva_rate: inv.ivaRate || 8,
+            iva_total: inv.ivaTotal || 0, applies_isr: !!inv.appliesIsr, isr_rate: inv.isrRate || 1.25,
+            isr_retained: fin.isrRetained, base_neta: fin.baseNeta, total: fin.total,
+            status: fin.status, has_partial_payment: fin.hasPartialPayment, paid_amount: fin.paidAmount
+          });
+        })).catch(e => console.error('Seed invoices error:', e));
       }
 
       // 2. Clients
@@ -1059,30 +1085,37 @@ export const storageService = {
   getInvoices: () => {
     const list = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
     return list.map(inv => {
-      const subtotal = parseFloat(inv.subtotal) || 0;
-      const discount = parseFloat(inv.discount) || 0;
-      const baseNeta = inv.baseNeta !== undefined ? parseFloat(inv.baseNeta) : Math.max(0, subtotal - discount);
-      const ivaTotal = parseFloat(inv.ivaTotal) || 0;
-      const appliesIsr = inv.appliesIsr !== false;
-      const isrRetained = appliesIsr ? parseFloat((baseNeta * 0.0125).toFixed(2)) : 0;
-      const total = parseFloat((baseNeta + ivaTotal - isrRetained).toFixed(2));
+      const fin = getInvoiceFinancials(inv);
       return {
         ...inv,
         folio: formatFolio(inv.folio),
-        baseNeta,
+        baseNeta: fin.baseNeta,
         isrRate: 1.25,
-        isrRetained,
-        total
+        isrRetained: fin.isrRetained,
+        total: fin.total,
+        status: fin.status,
+        hasPartialPayment: fin.hasPartialPayment,
+        paidAmount: fin.paidAmount,
+        remainingBalance: fin.remainingBalance
       };
     });
   },
   saveInvoice: async (invoice, user = 'admin') => {
     const invoices = getStorageItem(STORAGE_KEYS.INVOICES, initialInvoices);
     const existingIndex = invoices.findIndex(i => i.id === invoice.id);
+    const fin = getInvoiceFinancials(invoice);
     const updatedInvoice = { 
       ...invoice, 
       id: invoice.id || 'inv-' + Date.now(),
-      folio: formatFolio(invoice.folio)
+      folio: formatFolio(invoice.folio),
+      baseNeta: fin.baseNeta,
+      isrRate: 1.25,
+      isrRetained: fin.isrRetained,
+      total: fin.total,
+      status: fin.status,
+      hasPartialPayment: fin.hasPartialPayment,
+      paidAmount: fin.paidAmount,
+      remainingBalance: fin.remainingBalance
     };
 
     // 1. Guardar primero en Supabase (RPC Atómica transaccional con Fallback a Upsert)
@@ -1105,14 +1138,15 @@ export const storageService = {
         p_isr_retained: updatedInvoice.isrRetained || 0,
         p_base_neta: updatedInvoice.baseNeta || 0,
         p_total: updatedInvoice.total || 0,
-        p_status: updatedInvoice.status || 'PAGADA'
+        p_status: updatedInvoice.status || 'PAGADA',
+        p_has_partial_payment: !!updatedInvoice.hasPartialPayment,
+        p_paid_amount: updatedInvoice.paidAmount || 0
       };
 
       const { error: rpcError } = await supabase.rpc('crear_factura_completa', payload);
 
       if (rpcError) {
-        // Fallback transparente a direct upsert si la RPC no existe o está en transición
-        const { error: upsertError } = await supabase.from('invoices').upsert({
+        const baseUpsertRow = {
           id: updatedInvoice.id,
           folio: updatedInvoice.folio,
           client_name: updatedInvoice.clientName,
@@ -1131,9 +1165,24 @@ export const storageService = {
           base_neta: updatedInvoice.baseNeta || 0,
           total: updatedInvoice.total || 0,
           status: updatedInvoice.status || 'PAGADA'
+        };
+
+        // Fallback transparente a direct upsert si la RPC está en transición
+        const { error: upsertError } = await supabase.from('invoices').upsert({
+          ...baseUpsertRow,
+          has_partial_payment: !!updatedInvoice.hasPartialPayment,
+          paid_amount: updatedInvoice.paidAmount || 0
         });
+
         if (upsertError) {
-          console.error('Supabase Invoice save error:', upsertError);
+          if (upsertError.message?.includes('column') || upsertError.code === 'PGRST204') {
+            const { error: legacyUpsertError } = await supabase.from('invoices').upsert(baseUpsertRow);
+            if (legacyUpsertError) {
+              console.error('Supabase Invoice legacy upsert error:', legacyUpsertError);
+            }
+          } else {
+            console.error('Supabase Invoice save error:', upsertError);
+          }
         }
       }
     } catch (err) {
@@ -1147,7 +1196,10 @@ export const storageService = {
     }
     setStorageItem(STORAGE_KEYS.INVOICES, invoices);
 
-    storageService.logAudit(user, existingIndex >= 0 ? 'EDITAR_FACTURA' : 'CREAR_FACTURA', `Factura ${updatedInvoice.folio} (${updatedInvoice.clientName})`);
+    const auditSummary = updatedInvoice.status === 'PARCIAL'
+      ? `Factura ${updatedInvoice.folio} (${updatedInvoice.clientName}) - Anticipo/Abonado: $${updatedInvoice.paidAmount.toFixed(2)} / Resta: $${updatedInvoice.remainingBalance.toFixed(2)}`
+      : `Factura ${updatedInvoice.folio} (${updatedInvoice.clientName}) - ${updatedInvoice.status}`;
+    storageService.logAudit(user, existingIndex >= 0 ? 'EDITAR_FACTURA' : 'CREAR_FACTURA', auditSummary);
     notifyDataSynced({ action: 'saveInvoice', id: updatedInvoice.id, invoice: updatedInvoice });
     return invoices;
   },
@@ -1748,13 +1800,17 @@ export const storageService = {
 
       if (Array.isArray(backupData.invoices)) {
         setStorageItem(STORAGE_KEYS.INVOICES, backupData.invoices);
-        Promise.all(backupData.invoices.map(inv => supabase.from('invoices').upsert({
-          id: inv.id, folio: inv.folio, client_name: inv.clientName, rfc: inv.rfc, date: inv.date,
-          is_mixed_tax: !!inv.isMixedTax, subtotal: inv.subtotal || 0, discount: inv.discount || 0,
-          subtotal8: inv.subtotal8 || 0, subtotal16: inv.subtotal16 || 0, iva_rate: inv.ivaRate || 8,
-          iva_total: inv.ivaTotal || 0, applies_isr: !!inv.appliesIsr, isr_rate: inv.isrRate || 1.25,
-          isr_retained: inv.isrRetained || 0, base_neta: inv.baseNeta || 0, total: inv.total || 0, status: inv.status || 'PAGADA'
-        }))).catch(e => console.error('Restore invoices error:', e));
+        Promise.all(backupData.invoices.map(inv => {
+          const fin = getInvoiceFinancials(inv);
+          return supabase.from('invoices').upsert({
+            id: inv.id, folio: inv.folio, client_name: inv.clientName, rfc: inv.rfc, date: inv.date,
+            is_mixed_tax: !!inv.isMixedTax, subtotal: inv.subtotal || 0, discount: inv.discount || 0,
+            subtotal8: inv.subtotal8 || 0, subtotal16: inv.subtotal16 || 0, iva_rate: inv.ivaRate || 8,
+            iva_total: inv.ivaTotal || 0, applies_isr: !!inv.appliesIsr, isr_rate: inv.isrRate || 1.25,
+            isr_retained: fin.isrRetained, base_neta: fin.baseNeta, total: fin.total,
+            status: fin.status, has_partial_payment: fin.hasPartialPayment, paid_amount: fin.paidAmount
+          });
+        })).catch(e => console.error('Restore invoices error:', e));
       }
 
       if (Array.isArray(backupData.clients)) {

@@ -258,3 +258,24 @@ Subsanar la incidencia de renderizado (`ReferenceError: totalSub is not defined`
 4. **Pipeline de Despliegue (`deploy.ps1`):**
    - Verificación completa (Linter 0 errores, Tests 100% exitosos, Supabase 10/10 tablas activas).
    - Sincronización a GitHub `origin/main` y producción en Vercel ([https://conta.inovatel.mx](https://conta.inovatel.mx)) con HTTP 200 OK.
+
+---
+
+## 📅 Sesión: 17 de Noviembre de 2026 — Pagos Parciales, Anticipos y Cálculo Fiscal Proporcional (v3.4 Live)
+
+### 🎯 Objetivo
+Incorporar el control de **Pagos Parciales / Anticipos** al dar de alta o editar facturas emitidas, permitiendo registrar un anticipo inicial, sumar abonos posteriores en 1 clic hasta liquidar (`PAGADA`), y reflejar ingresos, IVA trasladado e ISR retenido proporcionalmente a lo efectivamente cobrado.
+
+### 🛠️ Acciones Realizadas
+1. **Base de Datos & RPC (`supabase_schema.sql`, `supabase_master_hardening_v2.8.sql`):**
+   - Agregadas columnas `has_partial_payment` (`BOOLEAN`) y `paid_amount` (`NUMERIC(15,2)`) en `public.invoices` con constraint `chk_invoices_paid_amount_pos`.
+   - Actualizada la RPC `public.crear_factura_completa` (20 parámetros, normalización de estado `PAGADA | PARCIAL | PENDIENTE` y permisos Zero-Trust `authenticated`).
+   - Actualizado `scripts/audit-supabase.js` para validar las 21 columnas activas de `invoices`.
+2. **Motor Proporcional Único (`src/utils/invoicePaymentUtils.js`):**
+   - Creación de `getInvoiceFinancials` como fuente única de verdad para calcular `paidAmount`, `remainingBalance`, `collectionRatio` e impuestos proporcionales.
+3. **Persistencia, UI & Módulos (`storageService.js`, `InvoicesModule.jsx`, `AnalyticsModule.jsx`, `ProviderDeductionsModule.jsx`, `InvestmentsModule.jsx`, `bin/restore-db.js`):**
+   - Selector `PAGADA | PARCIAL | PENDIENTE`, checkbox de anticipo y captura de monto abonado con saldo restante en vivo.
+   - Modal rápido de cobro y abonos para sumar pagos posteriores, liquidar al 100% o marcar como `PENDIENTE`.
+   - Agregación proporcional a `paidAmount` en Ingresos del Mes, Utilidad Real, IVA Trasladado, Métricas e Inversiones.
+4. **Tests (`scripts/test-tax-calculations.js`):**
+   - Agregado Grupo 9 validando anticipo al 50%, proporcionalidad fiscal y transición automática a `PAGADA` al liquidar el saldo restante.

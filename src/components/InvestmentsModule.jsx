@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { formatDate } from '../utils/dateFormatter';
+import { getInvoiceFinancials } from '../utils/invoicePaymentUtils';
 
 export default function InvestmentsModule({ userRole }) {
   const [investments, setInvestments] = useState([]);
@@ -55,8 +56,16 @@ export default function InvestmentsModule({ userRole }) {
     setTaxConfig(storageService.getTaxConfig ? storageService.getTaxConfig() : { isrEstimatedRate: 1.25 });
   };
 
-  const paidInvoices = invoices.filter(i => i.status !== 'PENDIENTE');
-  const totalIngresoFacturado = paidInvoices.reduce((sum, i) => sum + (i.total !== undefined ? i.total : (i.subtotal || 0)), 0);
+  const invoiceMetrics = invoices.reduce((acc, inv) => {
+    const fin = getInvoiceFinancials(inv);
+    acc.ingreso += fin.paidAmount;
+    acc.iva += fin.collectedIva;
+    acc.subtotal += fin.collectedSubtotal;
+    acc.isr += fin.collectedIsr;
+    return acc;
+  }, { ingreso: 0, iva: 0, subtotal: 0, isr: 0 });
+
+  const totalIngresoFacturado = invoiceMetrics.ingreso;
   const totalOtroIngreso = otherIncome.reduce((sum, o) => sum + (o.amount || 0), 0);
   const totalIngresos = totalIngresoFacturado + totalOtroIngreso;
 
@@ -73,12 +82,12 @@ export default function InvestmentsModule({ userRole }) {
   const flujoLibre = Math.max(0, baseCalculoUtilidad - totalGastos);
 
   // Cálculo de Reserva SAT (Día 17)
-  const totalIvaFacturado = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.ivaTotal) || 0), 0);
+  const totalIvaFacturado = invoiceMetrics.iva;
   const totalIvaDeducible = deductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
   const ivaNetoSat = Math.max(0, totalIvaFacturado - totalIvaDeducible);
 
-  const totalSubtotal = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.subtotal) || 0), 0);
-  const totalIsrRetenido = paidInvoices.reduce((sum, i) => sum + (parseFloat(i.isrRetained) || 0), 0);
+  const totalSubtotal = invoiceMetrics.subtotal;
+  const totalIsrRetenido = invoiceMetrics.isr;
   const isrEstimadoBruto = totalSubtotal * ((parseFloat(taxConfig.isrEstimatedRate) || 1.25) / 100);
   const isrEstimadoSat = Math.max(0, isrEstimadoBruto - totalIsrRetenido);
   const totalReservaSat = parseFloat((ivaNetoSat + isrEstimadoSat).toFixed(2));

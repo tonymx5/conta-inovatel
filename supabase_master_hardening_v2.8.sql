@@ -29,8 +29,13 @@ CREATE TABLE IF NOT EXISTS public.invoices (
     base_neta NUMERIC(15,2) DEFAULT 0,
     total NUMERIC(15,2) NOT NULL DEFAULT 0,
     status TEXT DEFAULT 'PAGADA',
+    has_partial_payment BOOLEAN DEFAULT FALSE,
+    paid_amount NUMERIC(15,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS has_partial_payment BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(15,2) DEFAULT 0;
 
 -- 1.2 Clientes (clients)
 CREATE TABLE IF NOT EXISTS public.clients (
@@ -193,6 +198,9 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_invoices_iva_pos') THEN
         ALTER TABLE public.invoices ADD CONSTRAINT chk_invoices_iva_pos CHECK (iva_total >= 0);
     END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_invoices_paid_amount_pos') THEN
+        ALTER TABLE public.invoices ADD CONSTRAINT chk_invoices_paid_amount_pos CHECK (paid_amount >= 0);
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_deductibles_total_pos') THEN
         ALTER TABLE public.deductibles ADD CONSTRAINT chk_deductibles_total_pos CHECK (total >= 0);
     END IF;
@@ -276,7 +284,9 @@ CREATE OR REPLACE FUNCTION public.crear_factura_completa(
     p_isr_retained NUMERIC,
     p_base_neta NUMERIC,
     p_total NUMERIC,
-    p_status TEXT
+    p_status TEXT,
+    p_has_partial_payment BOOLEAN DEFAULT FALSE,
+    p_paid_amount NUMERIC DEFAULT 0
 )
 RETURNS JSON
 LANGUAGE plpgsql
@@ -285,21 +295,49 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_clean_folio TEXT;
+    v_status TEXT;
+    v_has_partial BOOLEAN;
+    v_paid_amount NUMERIC(15,2);
 BEGIN
     -- Normalizar Folio
     v_clean_folio := 'FK-' || regexp_replace(UPPER(p_folio), '^(FK-?|F-?)', '', 'i');
+
+    -- Normalizar estatus y monto abonado
+    v_status := UPPER(TRIM(COALESCE(p_status, 'PAGADA')));
+    v_has_partial := COALESCE(p_has_partial_payment, FALSE);
+
+    IF v_status = 'PAGADA' THEN
+        v_paid_amount := GREATEST(0, COALESCE(p_total, 0));
+    ELSIF v_status = 'PARCIAL' OR v_has_partial THEN
+        v_paid_amount := ROUND(GREATEST(0, LEAST(COALESCE(p_total, 0), COALESCE(p_paid_amount, 0)))::numeric, 2);
+        IF v_paid_amount >= GREATEST(0, COALESCE(p_total, 0)) - 0.009 AND COALESCE(p_total, 0) > 0 THEN
+            v_status := 'PAGADA';
+            v_paid_amount := COALESCE(p_total, 0);
+        ELSIF v_paid_amount <= 0 THEN
+            v_status := 'PENDIENTE';
+            v_has_partial := FALSE;
+            v_paid_amount := 0;
+        ELSE
+            v_status := 'PARCIAL';
+            v_has_partial := TRUE;
+        END IF;
+    ELSE
+        v_status := 'PENDIENTE';
+        v_has_partial := FALSE;
+        v_paid_amount := 0;
+    END IF;
 
     -- Upsert en Facturas
     INSERT INTO public.invoices (
         id, folio, client_name, rfc, date, is_mixed_tax, subtotal, discount,
         subtotal8, subtotal16, iva_rate, iva_total, applies_isr, isr_rate,
-        isr_retained, base_neta, total, status, created_at
+        isr_retained, base_neta, total, status, has_partial_payment, paid_amount, created_at
     ) VALUES (
         p_id, v_clean_folio, UPPER(TRIM(p_client_name)), UPPER(TRIM(COALESCE(p_rfc, ''))),
         p_date, p_is_mixed_tax, p_subtotal, COALESCE(p_discount, 0),
         COALESCE(p_subtotal8, 0), COALESCE(p_subtotal16, 0), p_iva_rate, p_iva_total,
         p_applies_isr, p_isr_rate, p_isr_retained, p_base_neta, p_total,
-        COALESCE(p_status, 'PAGADA'), NOW()
+        v_status, v_has_partial, v_paid_amount, NOW()
     )
     ON CONFLICT (id) DO UPDATE SET
         folio = EXCLUDED.folio,
@@ -318,23 +356,32 @@ BEGIN
         isr_retained = EXCLUDED.isr_retained,
         base_neta = EXCLUDED.base_neta,
         total = EXCLUDED.total,
-        status = EXCLUDED.status;
+        status = EXCLUDED.status,
+        has_partial_payment = EXCLUDED.has_partial_payment,
+        paid_amount = EXCLUDED.paid_amount;
 
-    -- Registrar evento en bitácora
-    INSERT INTO public.audit_logs (id, timestamp, action, details, user_role)
-    VALUES (
-        'log_rpc_' || extract(epoch from now())::bigint || '_' || substr(md5(random()::text), 1, 4),
-        NOW(),
-        'RPC_CREAR_FACTURA',
-        'Factura ' || v_clean_folio || ' (' || UPPER(TRIM(p_client_name)) || ') - Total: $' || p_total,
-        'SYSTEM_RPC'
-    );
+    -- Registrar evento en bitácora de forma resiliente
+    BEGIN
+        INSERT INTO public.audit_logs (id, timestamp, action, details, user_role)
+        VALUES (
+            'log_rpc_' || extract(epoch from now())::bigint || '_' || substr(md5(random()::text), 1, 4),
+            NOW(),
+            'RPC_CREAR_FACTURA',
+            'Factura ' || v_clean_folio || ' (' || UPPER(TRIM(p_client_name)) || ') - Total: $' || p_total || ' | Estado: ' || v_status || ' | Abonado: $' || v_paid_amount,
+            'SYSTEM_RPC'
+        );
+    EXCEPTION WHEN OTHERS THEN
+        NULL;
+    END;
 
     RETURN json_build_object(
         'success', true,
         'id', p_id,
         'folio', v_clean_folio,
-        'total', p_total
+        'total', p_total,
+        'status', v_status,
+        'has_partial_payment', v_has_partial,
+        'paid_amount', v_paid_amount
     );
 EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION 'Error transaccional en crear_factura_completa: %', SQLERRM;

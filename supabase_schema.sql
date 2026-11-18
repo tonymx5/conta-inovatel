@@ -23,8 +23,13 @@ CREATE TABLE IF NOT EXISTS public.invoices (
     base_neta NUMERIC(15,2) DEFAULT 0,
     total NUMERIC(15,2) NOT NULL DEFAULT 0,
     status TEXT DEFAULT 'PAGADA',
+    has_partial_payment BOOLEAN DEFAULT FALSE,
+    paid_amount NUMERIC(15,2) DEFAULT 0,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS has_partial_payment BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(15,2) DEFAULT 0;
 
 -- 2. TABLA: CLIENTES (clients)
 CREATE TABLE IF NOT EXISTS public.clients (
