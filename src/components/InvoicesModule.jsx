@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp, UploadCloud, RefreshCw, DollarSign } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { ocrService } from '../services/ocrService';
-import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
+import { formatDate, formatShortDate, MONTH_NAMES } from '../utils/dateFormatter';
 import { formatFolio } from '../utils/folioFormatter';
 import { getInvoiceFinancials } from '../utils/invoicePaymentUtils';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -986,34 +986,34 @@ export default function InvoicesModule({ userRole }) {
             </button>
           )}
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
-          <span style={{ color: '#64748b', fontWeight: '600' }}>
-            Total: <strong style={{ color: '#0f172a' }}>{filteredInvoices.length}</strong> {filteredInvoices.length === 1 ? 'factura' : 'facturas'}
-          </span>
-          <span className="badge badge-emerald" style={{ fontSize: '0.74rem', fontWeight: '700' }}>
-            ✓ {paidInvoices.length} Pagadas (Cobrado: ${totalCobradoMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
-          </span>
-          {partialInvoices.length > 0 && (
-            <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '0.74rem', fontWeight: '700' }}>
-              🌓 {partialInvoices.length} {partialInvoices.length === 1 ? 'Anticipo / Parcial' : 'Anticipos / Parciales'}
-            </span>
-          )}
-          {(pendingInvoices.length > 0 || partialInvoices.length > 0) && (
-            <span className="badge badge-amber" style={{ fontSize: '0.74rem', fontWeight: '700' }}>
-              ⏳ Por Cobrar: ${totalPendienteMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} ({pendingInvoices.length + partialInvoices.length})
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Top Full-Width Card: Tabla Completa de Facturas Emitidas */}
       <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.45rem', margin: 0 }}>
               <FileText size={20} color="#10b981" /> Facturas Emitidas (Ventas)
             </h3>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+              <span style={{ color: '#64748b', fontWeight: '600' }}>
+                Total: <strong style={{ color: '#0f172a' }}>{filteredInvoices.length}</strong> {filteredInvoices.length === 1 ? 'factura' : 'facturas'}
+              </span>
+              <span className="badge badge-emerald" style={{ fontSize: '0.73rem', fontWeight: '700' }}>
+                ✓ {paidInvoices.length} Pagadas (Cobrado: ${totalCobradoMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })})
+              </span>
+              {partialInvoices.length > 0 && (
+                <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', fontSize: '0.73rem', fontWeight: '700' }}>
+                  🌓 {partialInvoices.length} {partialInvoices.length === 1 ? 'Anticipo / Parcial' : 'Anticipos / Parciales'}
+                </span>
+              )}
+              {(pendingInvoices.length > 0 || partialInvoices.length > 0) && (
+                <span className="badge badge-amber" style={{ fontSize: '0.73rem', fontWeight: '700' }}>
+                  ⏳ Por Cobrar: ${totalPendienteMonto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} ({pendingInvoices.length + partialInvoices.length})
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Sync Status Badge (visible 3s) & Manual Refresh Button */}
@@ -1083,7 +1083,7 @@ export default function InvoicesModule({ userRole }) {
                           {formatFolio(inv.folio)}
                         </span>
                         <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: '600' }}>
-                          {formatDate(inv.date)}
+                          {formatShortDate(inv.date)}
                         </span>
                       </div>
 
@@ -1108,14 +1108,14 @@ export default function InvoicesModule({ userRole }) {
                       </button>
                     </div>
 
-                    {/* Main Info */}
-                    <div style={{ marginBottom: '0.75rem' }}>
-                      <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f8fafc', margin: '0 0 0.2rem 0' }}>
-                        {inv.clientName}
-                      </h4>
+                    {/* Main Info (RFC a la izquierda, Nombre a la derecha) */}
+                    <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.76rem', color: '#94a3b8', fontFamily: 'monospace', background: 'rgba(255, 255, 255, 0.05)', padding: '0.15rem 0.45rem', borderRadius: '6px' }}>
                         {inv.rfc}
                       </span>
+                      <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#f8fafc', margin: 0 }}>
+                        {inv.clientName}
+                      </h4>
                     </div>
 
                     {/* Total Amount & Action Bar */}
@@ -1192,8 +1192,8 @@ export default function InvoicesModule({ userRole }) {
               <thead>
                 <tr>
                   <th style={{ minWidth: '85px', whiteSpace: 'nowrap' }}>Folio</th>
-                  <th style={{ minWidth: '220px', whiteSpace: 'nowrap' }}>Cliente / RFC</th>
-                  <th style={{ minWidth: '140px', whiteSpace: 'nowrap' }}>Fecha</th>
+                  <th style={{ minWidth: '220px', whiteSpace: 'nowrap' }}>RFC / Cliente</th>
+                  <th style={{ minWidth: '115px', whiteSpace: 'nowrap' }}>Fecha</th>
                   <th style={{ minWidth: '130px', whiteSpace: 'nowrap', textAlign: 'right' }}>Subtotal</th>
                   <th style={{ minWidth: '125px', whiteSpace: 'nowrap', textAlign: 'right' }}>IVA Trasladado</th>
                   <th style={{ minWidth: '115px', whiteSpace: 'nowrap', textAlign: 'right' }}>Retención ISR</th>
@@ -1226,10 +1226,9 @@ export default function InvoicesModule({ userRole }) {
                           </strong>
                         </td>
 
-                        {/* Cliente + RFC on same line */}
+                        {/* RFC (izquierda) + Cliente (derecha) on same line */}
                         <td style={{ whiteSpace: 'nowrap' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{ fontWeight: '700', color: '#0f172a' }}>{inv.clientName}</span>
                             <span style={{
                               fontSize: '0.72rem',
                               color: '#475569',
@@ -1242,12 +1241,13 @@ export default function InvoicesModule({ userRole }) {
                             }}>
                               {inv.rfc}
                             </span>
+                            <span style={{ fontWeight: '700', color: '#0f172a' }}>{inv.clientName}</span>
                           </div>
                         </td>
 
-                        {/* Fecha Formatted DD/Mes/YYYY */}
+                        {/* Fecha Formatted DD/mes/YYYY */}
                         <td style={{ whiteSpace: 'nowrap', fontSize: '0.86rem', color: '#334155', fontWeight: '600' }}>
-                          {formatDate(inv.date)}
+                          {formatShortDate(inv.date)}
                         </td>
 
                         {/* Subtotal Base con descuento si aplica */}

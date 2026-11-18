@@ -41,7 +41,7 @@ Sistema Web Progresivo (PWA) de alta precisión contable, fiscal y financiera pa
 
 1. `invoices` (Facturas Emitidas): Folios normalizados FK-, impuestos 8%/16%, retención ISR 1.25%, descuentos, estatus (`PAGADA`/`PARCIAL`/`PENDIENTE`) y control de anticipos/pagos parciales (`has_partial_payment`, `paid_amount`) con cálculo proporcional en métricas e ingresos.
 2. `clients` (Clientes): Catálogo con RFC, contacto y configuración de retención ISR.
-3. `deductibles` (Facturas Proveedores / SYSCOM): Deducibles autorizados con desglose de IVA acreditable.
+3. `deductibles` (Facturas Proveedores / SYSCOM): Deducibles autorizados con desglose de IVA acreditable. Su módulo (`ProviderDeductionsModule.jsx`) incluye tabla/gráfica lineal mensual comparativa contra ingresos cobrados, promedios reales y proyección de ingreso del mes futuro (`monthlyForecastUtils.js`).
 4. `account_deposits` (Depósitos Bancarios): Incluye `profile` ('edson'|'karla'), `applies_equipment_expense`, `equipment_expense`, `equipment_provider`, `real_utility`.
 5. `tax_config` (Configuración Fiscal): Tasa ISR estimada (1.25%).
 6. `audit_logs` (Bitácora de Eventos): Registro de acciones operativas y administrativas.

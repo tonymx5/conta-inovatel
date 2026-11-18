@@ -279,3 +279,20 @@ Incorporar el control de **Pagos Parciales / Anticipos** al dar de alta o editar
    - Agregación proporcional a `paidAmount` en Ingresos del Mes, Utilidad Real, IVA Trasladado, Métricas e Inversiones.
 4. **Tests (`scripts/test-tax-calculations.js`):**
    - Agregado Grupo 9 validando anticipo al 50%, proporcionalidad fiscal y transición automática a `PAGADA` al liquidar el saldo restante.
+
+---
+
+## 📅 Sesión: 17 de Noviembre de 2026 — UI Facturas Emitidas & Tabla Lineal Mensual con Proyección de Ingreso
+
+### 🎯 Objetivo
+Optimizar la lectura de la tabla **Facturas Emitidas (Ventas)** (totales en cabecera, orden `RFC / Cliente` y fecha compacta `13/nov/2026`) y convertir la pestaña **Fact Prov** (`ProviderDeductionsModule.jsx`) en una vista analítica lineal mes a mes con totales, promedios reales y estimación de ingreso del mes futuro.
+
+### 🛠️ Acciones Realizadas
+1. **`src/utils/dateFormatter.js` & `src/components/InvoicesModule.jsx`:**
+   - Creación de `formatShortDate` (`DD/mes/YYYY`, ej. `13/nov/2026`) aplicado en desktop y móvil.
+   - Reubicación de los badges resumen (`Total`, `Pagadas`, `Anticipo / Parcial`, `Por Cobrar`) junto a `Facturas Emitidas (Ventas)`.
+   - Reordenamiento de columna a `RFC / Cliente` (RFC a la izquierda, nombre a la derecha) en tabla desktop y tarjetas móvil.
+2. **`src/utils/monthlyForecastUtils.js` & `src/components/ProviderDeductionsModule.jsx`:**
+   - Nueva sección de **Análisis Lineal Mensual y Proyección de Ingresos** con gráfica `LineChart` (Recharts), tabla mensual con `TOTAL ACUMULADO` y `PROMEDIO MENSUAL REAL` (calculado sobre meses con actividad efectiva), y fórmula híbrida `0.5 × Promedio 3M + 0.5 × Tendencia Lineal` sobre meses cerrados para estimar el ingreso del mes siguiente, conservando debajo el detalle operativo de comprobantes (OCR/XML, edición y borrado).
+3. **Pruebas (`scripts/test-monthly-forecast.js` & `package.json`):**
+   - Incorporación de pruebas unitarias para `formatShortDate`, promedios reales sin dilución y fórmula de estimación híbrida, encadenadas en `npm test`.

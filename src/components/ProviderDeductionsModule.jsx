@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Receipt, UploadCloud, Trash2, Sparkles, Calendar, RotateCcw, ShieldCheck, Tag, Plus, Edit3 } from 'lucide-react';
+import { Receipt, UploadCloud, Trash2, Sparkles, Calendar, RotateCcw, ShieldCheck, Tag, Plus, Edit3, TrendingUp } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { storageService } from '../services/storageService';
 import { ocrService } from '../services/ocrService';
 import { formatDate, MONTH_NAMES } from '../utils/dateFormatter';
 import { getInvoiceFinancials } from '../utils/invoicePaymentUtils';
+import { buildMonthlyProviderAndIncomeSummary } from '../utils/monthlyForecastUtils';
 
 export default function ProviderDeductionsModule({ userRole }) {
   const [deductibles, setDeductibles] = useState([]);
@@ -294,6 +296,14 @@ export default function ProviderDeductionsModule({ userRole }) {
   const ivaNetoPagar = Math.max(0, totalIvaVentas - totalIvaDeducible);
   const ahorroIva = Math.min(totalIvaVentas, totalIvaDeducible);
 
+  const monthlySummary = useMemo(
+    () => buildMonthlyProviderAndIncomeSummary(invoices, deductibles, selectedYear),
+    [invoices, deductibles, selectedYear]
+  );
+
+  const formatMoney = (value) =>
+    `$${(Number(value) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
   const isCurrentMonthSelected = selectedMonth === currentMonthStr && selectedYear === currentYearStr;
 
   const resetToCurrentMonth = () => {
@@ -432,8 +442,266 @@ export default function ProviderDeductionsModule({ userRole }) {
         </div>
       </div>
 
+      {/* Vista Lineal Mensual: Totales, Promedios y Estimación de Ingreso del Mes Futuro */}
+      <div className="glass-panel" style={{ padding: '1.35rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <TrendingUp size={20} color="#0284c7" />
+              Análisis Lineal Mensual y Proyección de Ingresos ({selectedYear === 'ALL' ? 'Histórico Completo' : selectedYear})
+            </h3>
+            <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '0.2rem 0 0 0', fontWeight: '500' }}>
+              Comparativa mes a mes de ingresos cobrados vs. facturas de proveedores, promedios reales y estimación del próximo mes.
+            </p>
+          </div>
+          <span className="badge badge-indigo" style={{ fontSize: '0.74rem', fontWeight: '700' }}>
+            {monthlySummary.averages.activeMonthsCount} {monthlySummary.averages.activeMonthsCount === 1 ? 'mes con registros' : 'meses con registros'}
+          </span>
+        </div>
+
+        {/* 4 Tarjetas Resumen: Totales, Promedios y Estimación de Ingreso Futuro */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+          <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', borderRadius: '14px', padding: '0.95rem 1.1rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#047857', display: 'block', textTransform: 'uppercase' }}>
+              Total Ingresos Cobrados
+            </span>
+            <strong style={{ fontSize: '1.3rem', color: '#065f46', fontWeight: '800', display: 'block', margin: '0.2rem 0' }}>
+              {formatMoney(monthlySummary.totals.totalIncomeCollected)}
+            </strong>
+            <span style={{ fontSize: '0.75rem', color: '#047857', fontWeight: '600' }}>
+              Promedio mensual: <strong>{formatMoney(monthlySummary.averages.avgMonthlyIncome)}</strong> ({monthlySummary.averages.monthsWithIncome}m)
+            </span>
+          </div>
+
+          <div style={{ background: 'rgba(6, 182, 212, 0.08)', border: '1px solid rgba(6, 182, 212, 0.25)', borderRadius: '14px', padding: '0.95rem 1.1rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#0369a1', display: 'block', textTransform: 'uppercase' }}>
+              Total Facturas Proveedores
+            </span>
+            <strong style={{ fontSize: '1.3rem', color: '#0c4a6e', fontWeight: '800', display: 'block', margin: '0.2rem 0' }}>
+              {formatMoney(monthlySummary.totals.totalProviderAmount)}
+            </strong>
+            <span style={{ fontSize: '0.75rem', color: '#0369a1', fontWeight: '600' }}>
+              Promedio mensual: <strong>{formatMoney(monthlySummary.averages.avgMonthlyProvider)}</strong> ({monthlySummary.averages.monthsWithProvider}m)
+            </span>
+          </div>
+
+          <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.28)', borderRadius: '14px', padding: '0.95rem 1.1rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#b45309', display: 'block', textTransform: 'uppercase' }}>
+              Balance Operativo (Ing. - Prov.)
+            </span>
+            <strong style={{ fontSize: '1.3rem', color: monthlySummary.totals.totalNetBalance >= 0 ? '#92400e' : '#be123c', fontWeight: '800', display: 'block', margin: '0.2rem 0' }}>
+              {formatMoney(monthlySummary.totals.totalNetBalance)}
+            </strong>
+            <span style={{ fontSize: '0.75rem', color: '#b45309', fontWeight: '600' }}>
+              Promedio mensual: <strong>{formatMoney(monthlySummary.averages.avgMonthlyBalance)}</strong>
+            </span>
+          </div>
+
+          <div style={{ background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(16, 185, 129, 0.12))', border: '1px solid rgba(99, 102, 241, 0.35)', borderRadius: '14px', padding: '0.95rem 1.1rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#4338ca', display: 'block', textTransform: 'uppercase' }}>
+              Estimación Ingreso {monthlySummary.forecast.targetFullLabel}
+            </span>
+            <strong style={{ fontSize: '1.35rem', color: '#312e81', fontWeight: '800', display: 'block', margin: '0.2rem 0' }}>
+              {formatMoney(monthlySummary.forecast.estimatedIncome)}
+            </strong>
+            <span style={{ fontSize: '0.71rem', color: '#4338ca', fontWeight: '600', display: 'block', lineHeight: 1.35 }}>
+              {monthlySummary.forecast.closedMonthsCount > 0 ? (
+                <>
+                  Prom. 3M: <strong>{formatMoney(monthlySummary.forecast.movingAvg3M)}</strong> · Tendencia: <strong>{formatMoney(monthlySummary.forecast.linearProjection)}</strong>
+                  {' '}({monthlySummary.forecast.slope >= 0 ? '+' : ''}{formatMoney(monthlySummary.forecast.slope)}/mes)
+                </>
+              ) : (
+                monthlySummary.forecast.formulaNote
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Fórmula Transparente */}
+        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.65rem 0.95rem', fontSize: '0.76rem', color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span>
+            <strong>Fórmula de Estimación:</strong>{' '}
+            <code>Ingreso Futuro = 0.5 × Promedio Móvil (últimos 3 meses cerrados) + 0.5 × Tendencia Lineal (mínimos cuadrados)</code>
+          </span>
+          <span style={{ color: '#4338ca', fontWeight: '700' }}>
+            {monthlySummary.forecast.formulaNote}
+          </span>
+        </div>
+
+        {/* Gráfica Lineal Mensual */}
+        {monthlySummary.chartData.length > 0 ? (
+          <div style={{ width: '100%', height: '290px', background: 'rgba(255, 255, 255, 0.55)', borderRadius: '14px', padding: '0.85rem 0.5rem 0.25rem 0', border: '1px solid rgba(203, 213, 225, 0.6)' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={monthlySummary.chartData} margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.28)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} />
+                <YAxis
+                  tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }}
+                  tickFormatter={(val) => (val >= 1000 ? `$${(val / 1000).toFixed(0)}k` : `$${val}`)}
+                />
+                <Tooltip
+                  formatter={(value, name) => [formatMoney(value), name]}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.fullLabel || ''}
+                  contentStyle={{
+                    borderRadius: '12px',
+                    border: '1px solid rgba(203, 213, 225, 0.8)',
+                    boxShadow: '0 8px 20px rgba(15, 23, 42, 0.08)',
+                    fontSize: '0.8rem'
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: '0.78rem', fontWeight: 700 }} />
+                <Line
+                  type="monotone"
+                  dataKey="Ingresos"
+                  name="Ingresos Cobrados"
+                  stroke="#10b981"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#10b981' }}
+                  activeDot={{ r: 6 }}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Proveedores"
+                  name="Facturas Proveedores"
+                  stroke="#0284c7"
+                  strokeWidth={2.5}
+                  dot={{ r: 4, fill: '#0284c7' }}
+                  activeDot={{ r: 6 }}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="Proyeccion"
+                  name="Ingreso Estimado Futuro"
+                  stroke="#6366f1"
+                  strokeWidth={3}
+                  strokeDasharray="6 4"
+                  dot={{ r: 5, fill: '#6366f1' }}
+                  activeDot={{ r: 7 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <div style={{ textAlign: 'center', color: '#64748b', padding: '1.5rem', background: '#f8fafc', borderRadius: '12px', border: '1px dashed #cbd5e1', fontSize: '0.85rem' }}>
+            No hay movimientos mensuales registrados para graficar en {selectedYear === 'ALL' ? 'el histórico' : selectedYear}.
+          </div>
+        )}
+
+        {/* Tabla Lineal Resumen Mensual (Totales y Promedios) */}
+        <div className="table-container" style={{ margin: 0 }}>
+          <table className="custom-table" style={{ width: '100%', minWidth: '720px' }}>
+            <thead>
+              <tr>
+                <th style={{ whiteSpace: 'nowrap' }}>Mes</th>
+                <th style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>Ingresos Cobrados</th>
+                <th style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>Fact. Proveedores</th>
+                <th style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>IVA Deducible</th>
+                <th style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>Balance (Ing. - Prov.)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlySummary.monthlyRows.length === 0 ? (
+                <tr>
+                  <td colSpan="5" style={{ textAlign: 'center', color: '#64748b', padding: '1.75rem' }}>
+                    Sin registros mensuales en {selectedYear === 'ALL' ? 'ningún año' : selectedYear}.
+                  </td>
+                </tr>
+              ) : (
+                <>
+                  {monthlySummary.monthlyRows.map((row) => {
+                    const isSelectedRow = selectedMonth === row.month && (selectedYear === 'ALL' || selectedYear === row.year);
+                    return (
+                      <tr
+                        key={row.key}
+                        style={{
+                          height: '46px',
+                          background: isSelectedRow ? 'rgba(6, 182, 212, 0.08)' : undefined
+                        }}
+                      >
+                        <td style={{ whiteSpace: 'nowrap', fontWeight: '700', color: '#0f172a' }}>
+                          {row.fullLabel}
+                          {row.isCurrentMonth && (
+                            <span className="badge badge-emerald" style={{ fontSize: '0.66rem', marginLeft: '0.45rem' }}>
+                              En curso
+                            </span>
+                          )}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '700', color: '#047857' }}>
+                          {formatMoney(row.incomeCollected)}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '600', color: '#0369a1' }}>
+                          {formatMoney(row.providerTotal)}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '600', color: '#0d9488' }}>
+                          {formatMoney(row.providerIva)}
+                        </td>
+                        <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '700', color: row.netBalance >= 0 ? '#0f172a' : '#be123c' }}>
+                          {formatMoney(row.netBalance)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+
+                  {/* Fila Total Mensual / Acumulado */}
+                  <tr style={{ background: '#f1f5f9', borderTop: '2px solid #cbd5e1', height: '48px' }}>
+                    <td style={{ whiteSpace: 'nowrap', fontWeight: '800', color: '#0f172a' }}>
+                      TOTAL ACUMULADO
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: '#047857' }}>
+                      {formatMoney(monthlySummary.totals.totalIncomeCollected)}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: '#0369a1' }}>
+                      {formatMoney(monthlySummary.totals.totalProviderAmount)}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: '#0d9488' }}>
+                      {formatMoney(monthlySummary.totals.totalProviderIva)}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: monthlySummary.totals.totalNetBalance >= 0 ? '#0f172a' : '#be123c' }}>
+                      {formatMoney(monthlySummary.totals.totalNetBalance)}
+                    </td>
+                  </tr>
+
+                  {/* Fila Promedio Mensual Real */}
+                  <tr style={{ background: '#ecfeff', height: '46px' }}>
+                    <td style={{ whiteSpace: 'nowrap', fontWeight: '800', color: '#0369a1' }}>
+                      PROMEDIO MENSUAL REAL
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: '#047857' }}>
+                      {formatMoney(monthlySummary.averages.avgMonthlyIncome)}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: '#0369a1' }}>
+                      {formatMoney(monthlySummary.averages.avgMonthlyProvider)}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: '#0d9488' }}>
+                      {formatMoney(monthlySummary.averages.avgMonthlyProviderIva)}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap', textAlign: 'right', fontWeight: '800', color: monthlySummary.averages.avgMonthlyBalance >= 0 ? '#0f172a' : '#be123c' }}>
+                      {formatMoney(monthlySummary.averages.avgMonthlyBalance)}
+                    </td>
+                  </tr>
+                </>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Detalle de Comprobantes Individuales de Proveedores (OCR / Edición / Borrado) */}
+      <div className="glass-panel" style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <h3 style={{ fontSize: '1.02rem', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+            <Receipt size={18} color="#0284c7" />
+            Detalle de Comprobantes de Proveedores ({selectedMonth === 'ALL' ? 'Todos los Meses' : MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} {selectedYear === 'ALL' ? '' : selectedYear})
+          </h3>
+          <span style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '600' }}>
+            {filteredDeductibles.length} {filteredDeductibles.length === 1 ? 'comprobante' : 'comprobantes'}
+          </span>
+        </div>
+
       {/* Deductible Invoices Table */}
-      <div className="table-container">
+      <div className="table-container" style={{ margin: 0 }}>
         <table className="custom-table" style={{ width: '100%', minWidth: '850px' }}>
           <thead>
             <tr>
@@ -539,6 +807,7 @@ export default function ProviderDeductionsModule({ userRole }) {
             )}
           </tbody>
         </table>
+      </div>
       </div>
 
       {/* Modal Captura Manual / Confirmación OCR */}

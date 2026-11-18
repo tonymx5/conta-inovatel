@@ -5,6 +5,11 @@ export const MONTH_NAMES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
 ];
 
+export const SHORT_MONTH_NAMES = [
+  'ene', 'feb', 'mar', 'abr', 'may', 'jun',
+  'jul', 'ago', 'sep', 'oct', 'nov', 'dic'
+];
+
 /**
  * Formats a date string or Date object into "DD/Mes/YYYY" (e.g. "08/Enero/2024")
  * @param {string|Date} dateInput 
@@ -57,4 +62,37 @@ export function formatDate(dateInput, includeTime = false) {
   }
 
   return `${day}/${monthName}/${year}${timeStr}`;
+}
+
+/**
+ * Formats a date string or Date object into compact "DD/mes/YYYY" (e.g. "13/nov/2026")
+ * @param {string|Date} dateInput
+ * @returns {string} Compact formatted date string
+ */
+export function formatShortDate(dateInput) {
+  if (!dateInput) return '';
+
+  if (typeof dateInput === 'string') {
+    const cleanDateStr = dateInput.trim();
+    if (cleanDateStr.includes('-')) {
+      const [datePart] = cleanDateStr.split('T');
+      const parts = datePart.split('-');
+      if (parts.length === 3) {
+        const year = parts[0];
+        const monthIdx = parseInt(parts[1], 10) - 1;
+        const shortMonth = SHORT_MONTH_NAMES[monthIdx] || parts[1];
+        const day = parts[2].padStart(2, '0');
+        return `${day}/${shortMonth}/${year}`;
+      }
+    }
+  }
+
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return String(dateInput);
+
+  const day = String(d.getDate()).padStart(2, '0');
+  const shortMonth = SHORT_MONTH_NAMES[d.getMonth()] || '';
+  const year = d.getFullYear();
+
+  return `${day}/${shortMonth}/${year}`;
 }

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "test": "node scripts/test-tax-calculations.js && node scripts/test-deposit-segregation.js",
+    "test": "node scripts/test-tax-calculations.js && node scripts/test-deposit-segregation.js && node scripts/test-monthly-forecast.js",
     "build": "vite build",
     "lint": "oxlint",
     "db:restore": "node bin/restore-db.js --dry-run",
