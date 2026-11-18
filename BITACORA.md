@@ -292,7 +292,7 @@ Optimizar la lectura de la tabla **Facturas Emitidas (Ventas)** (totales en cabe
    - Creación de `formatShortDate` (`DD/mes/YYYY`, ej. `13/nov/2026`) aplicado en desktop y móvil.
    - Reubicación de los badges resumen (`Total`, `Pagadas`, `Anticipo / Parcial`, `Por Cobrar`) junto a `Facturas Emitidas (Ventas)`.
    - Reordenamiento de columna a `RFC / Cliente` (RFC a la izquierda, nombre a la derecha) en tabla desktop y tarjetas móvil.
-2. **`src/utils/monthlyForecastUtils.js` & `src/components/ProviderDeductionsModule.jsx`:**
-   - Nueva sección de **Análisis Lineal Mensual y Proyección de Ingresos** con gráfica `LineChart` (Recharts), tabla mensual con `TOTAL ACUMULADO` y `PROMEDIO MENSUAL REAL` (calculado sobre meses con actividad efectiva), y fórmula híbrida `0.5 × Promedio 3M + 0.5 × Tendencia Lineal` sobre meses cerrados para estimar el ingreso del mes siguiente, conservando debajo el detalle operativo de comprobantes (OCR/XML, edición y borrado).
+2. **`src/utils/monthlyForecastUtils.js`, `src/components/InvoicesModule.jsx` & `src/components/ProviderDeductionsModule.jsx`:**
+   - Sustitución de la tarjeta central **Facturas Proveedores** dentro del dashboard de `Facturas` (`InvoicesModule.jsx`) por la vista compacta de **Estadísticos & Proyección** (totales, promedios reales, gráfica lineal `LineChart`, tabla mensual y estimación de ingreso futuro), manteniendo además la vista completa y gestión OCR/CRUD en la pestaña `Fact Prov`.
 3. **Pruebas (`scripts/test-monthly-forecast.js` & `package.json`):**
    - Incorporación de pruebas unitarias para `formatShortDate`, promedios reales sin dilución y fórmula de estimación híbrida, encadenadas en `npm test`.

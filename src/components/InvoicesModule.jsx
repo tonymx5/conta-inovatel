@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Plus, Trash2, Edit3, CheckCircle, Clock, Calculator, Calendar, RotateCcw, Layers, Percent, Receipt, TrendingUp, Tag, Landmark, ChevronDown, ChevronUp, UploadCloud, RefreshCw, DollarSign } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { storageService } from '../services/storageService';
 import { ocrService } from '../services/ocrService';
 import { formatDate, formatShortDate, MONTH_NAMES } from '../utils/dateFormatter';
 import { formatFolio } from '../utils/folioFormatter';
 import { getInvoiceFinancials } from '../utils/invoicePaymentUtils';
+import { buildMonthlyProviderAndIncomeSummary } from '../utils/monthlyForecastUtils';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 export default function InvoicesModule({ userRole }) {
@@ -617,27 +619,14 @@ export default function InvoicesModule({ userRole }) {
       });
   }, [invoices, selectedMonth, selectedYear]);
 
-  // Filter and sort provider deductibles by selected month & year (Most recent date at the top)
-  const filteredDeductibles = useMemo(() => {
-    return deductibles
-      .filter((d) => {
-        if (!d.date) return selectedMonth === 'ALL';
-        const [year, month] = d.date.split('-');
-        
-        const matchesYear = selectedYear === 'ALL' || year === selectedYear;
-        const matchesMonth = selectedMonth === 'ALL' || month === selectedMonth;
+  // Estadísticos mensuales, promedios y proyección de ingreso futuro (para tarjeta central de admin)
+  const monthlyStats = useMemo(
+    () => buildMonthlyProviderAndIncomeSummary(invoices, deductibles, selectedYear),
+    [invoices, deductibles, selectedYear]
+  );
 
-        return matchesYear && matchesMonth;
-      })
-      .sort((a, b) => {
-        const dateA = a.date || '';
-        const dateB = b.date || '';
-        if (dateA !== dateB) {
-          return dateB.localeCompare(dateA);
-        }
-        return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
-      });
-  }, [deductibles, selectedMonth, selectedYear]);
+  const formatMoneyCompact = (val) =>
+    `$${(Number(val) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   // Filter and sort account deposits by active profile and date (Most recent date at the top)
   const filteredDeposits = useMemo(() => {
@@ -860,9 +849,6 @@ export default function InvoicesModule({ userRole }) {
 
   // Por Depositar: Utilidad Real menos Total de Depósitos
   const porDepositar = parseFloat((utilidadReal - totalDepositosBrutos).toFixed(2));
-
-  // IVA Acreditable Proveedores (para tarjeta de admin)
-  const totalIvaAcreditable = filteredDeductibles.reduce((sum, d) => sum + (parseFloat(d.ivaTotal) || 0), 0);
 
   const isCurrentMonthSelected = selectedMonth === currentMonthStr && selectedYear === currentYearStr;
 
@@ -1507,83 +1493,168 @@ export default function InvoicesModule({ userRole }) {
           </div>
         </div>
 
-        {/* Card 2: Tarjeta Facturas Proveedores (IVA Acreditable) - Solo visible para edson / admin */}
+        {/* Card 2: Estadísticos Mensuales, Tabla Lineal y Proyección de Ingreso Futuro - Solo visible para edson / admin */}
         {userRole === 'admin' && (
-          <div className="glass-panel" style={{ padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1.5px solid #bae6fd', background: '#f8fafc', height: '100%' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.65rem', marginBottom: '0.75rem' }}>
+          <div className="glass-panel" style={{ padding: '1.1rem 1.25rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1.5px solid #bae6fd', background: '#f8fafc', height: '100%', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.6rem' }}>
                 <div>
                   <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0284c7', display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
-                    <Receipt size={17} color="#0284c7" /> Facturas Proveedores
+                    <TrendingUp size={17} color="#0284c7" /> Estadísticos & Proyección
                   </h4>
-                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>Acreditamiento de IVA</span>
+                  <span style={{ fontSize: '0.7rem', color: '#64748b' }}>
+                    Ingresos vs Proveedores ({selectedYear === 'ALL' ? 'Histórico' : selectedYear})
+                  </span>
                 </div>
                 <span className="badge" style={{ background: '#e0f2fe', color: '#0369a1', fontSize: '0.72rem', fontWeight: '700' }}>
-                  {filteredDeductibles.length} {filteredDeductibles.length === 1 ? 'factura' : 'facturas'}
+                  {monthlyStats.averages.activeMonthsCount} {monthlyStats.averages.activeMonthsCount === 1 ? 'mes' : 'meses'}
                 </span>
               </div>
 
-              {/* Listado de Facturas Capturadas de Proveedores */}
-              {filteredDeductibles.length === 0 ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '180px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
-                    No hay facturas de proveedores registradas para este período.
-                  </p>
+              {/* Resumen Totales & Promedios Mensuales */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: '10px', padding: '0.5rem 0.65rem' }}>
+                  <span style={{ fontSize: '0.64rem', fontWeight: '800', color: '#047857', display: 'block', textTransform: 'uppercase' }}>
+                    Total Ingresos
+                  </span>
+                  <strong style={{ fontSize: '0.92rem', color: '#065f46', fontWeight: '800', display: 'block' }}>
+                    {formatMoneyCompact(monthlyStats.totals.totalIncomeCollected)}
+                  </strong>
+                  <span style={{ fontSize: '0.66rem', color: '#047857', fontWeight: '600' }}>
+                    Prom: {formatMoneyCompact(monthlyStats.averages.avgMonthlyIncome)}
+                  </span>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', maxHeight: '230px', overflowY: 'auto', paddingRight: '0.2rem' }}>
-                  {filteredDeductibles.map((ded) => (
-                    <div
-                      key={ded.id}
-                      style={{
-                        background: '#ffffff',
-                        padding: '0.55rem 0.75rem',
-                        borderRadius: '8px',
-                        border: '1px solid #e2e8f0',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        fontSize: '0.8rem'
-                      }}
-                    >
-                      <div>
-                        <strong style={{ color: '#0f172a', display: 'block', fontSize: '0.82rem' }}>
-                          {ded.providerName}
-                        </strong>
-                        <span style={{ fontSize: '0.7rem', color: '#64748b', fontFamily: 'monospace' }}>
-                          {ded.invoiceNo || 'Sin Folio'} • {formatDate(ded.date)}
-                        </span>
-                      </div>
 
-                      <div style={{ textAlign: 'right' }}>
-                        <span style={{ fontSize: '0.66rem', color: '#64748b', display: 'block' }}>IVA Acreditable</span>
-                        <strong style={{ color: '#0891b2', fontSize: '0.86rem' }}>
-                          ${ded.ivaTotal.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                        </strong>
-                      </div>
-                    </div>
-                  ))}
+                <div style={{ background: '#e0f2fe', border: '1px solid #bae6fd', borderRadius: '10px', padding: '0.5rem 0.65rem' }}>
+                  <span style={{ fontSize: '0.64rem', fontWeight: '800', color: '#0369a1', display: 'block', textTransform: 'uppercase' }}>
+                    Total Proveedores
+                  </span>
+                  <strong style={{ fontSize: '0.92rem', color: '#0c4a6e', fontWeight: '800', display: 'block' }}>
+                    {formatMoneyCompact(monthlyStats.totals.totalProviderAmount)}
+                  </strong>
+                  <span style={{ fontSize: '0.66rem', color: '#0369a1', fontWeight: '600' }}>
+                    Prom: {formatMoneyCompact(monthlyStats.averages.avgMonthlyProvider)}
+                  </span>
                 </div>
-              )}
+              </div>
+
+              {/* Gráfica Lineal Compacta */}
+              {monthlyStats.chartData.length > 0 ? (
+                <div style={{ width: '100%', height: '132px', background: '#ffffff', borderRadius: '10px', padding: '0.35rem 0.25rem 0.1rem 0', border: '1px solid #e2e8f0' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={monthlyStats.chartData} margin={{ top: 6, right: 10, left: -12, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.25)" />
+                      <XAxis dataKey="label" tick={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }} />
+                      <YAxis
+                        tick={{ fontSize: 9, fill: '#64748b', fontWeight: 600 }}
+                        tickFormatter={(v) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}k` : `$${v}`)}
+                      />
+                      <Tooltip
+                        formatter={(value, name) => [formatMoneyCompact(value), name]}
+                        labelFormatter={(_, payload) => payload?.[0]?.payload?.fullLabel || ''}
+                        contentStyle={{ fontSize: '0.72rem', borderRadius: '8px', border: '1px solid #cbd5e1' }}
+                      />
+                      <Line type="monotone" dataKey="Ingresos" name="Ingresos" stroke="#10b981" strokeWidth={2.2} dot={{ r: 2.5 }} connectNulls={false} />
+                      <Line type="monotone" dataKey="Proveedores" name="Proveedores" stroke="#0284c7" strokeWidth={2} dot={{ r: 2.5 }} connectNulls={false} />
+                      <Line type="monotone" dataKey="Proyeccion" name="Est. Futuro" stroke="#6366f1" strokeWidth={2.2} strokeDasharray="4 3" dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : null}
+
+              {/* Tabla Lineal Mensual (Promedio y Total Mensuales) */}
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px', overflow: 'hidden' }}>
+                <div style={{ maxHeight: '140px', overflowY: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.72rem' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9', zIndex: 1 }}>
+                      <tr style={{ color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
+                        <th style={{ textAlign: 'left', padding: '0.35rem 0.5rem', fontWeight: '800' }}>Mes</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem 0.4rem', fontWeight: '800' }}>Ingresos</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem 0.4rem', fontWeight: '800' }}>Prov.</th>
+                        <th style={{ textAlign: 'right', padding: '0.35rem 0.5rem', fontWeight: '800' }}>Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {monthlyStats.monthlyRows.length === 0 ? (
+                        <tr>
+                          <td colSpan="4" style={{ textAlign: 'center', color: '#94a3b8', padding: '0.85rem' }}>
+                            Sin registros mensuales en {selectedYear === 'ALL' ? 'el histórico' : selectedYear}.
+                          </td>
+                        </tr>
+                      ) : (
+                        <>
+                          {monthlyStats.monthlyRows.map((row) => (
+                            <tr key={row.key} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={{ padding: '0.32rem 0.5rem', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap' }}>
+                                {row.shortLabel}
+                              </td>
+                              <td style={{ padding: '0.32rem 0.4rem', textAlign: 'right', fontWeight: '700', color: '#047857', whiteSpace: 'nowrap' }}>
+                                {formatMoneyCompact(row.incomeCollected)}
+                              </td>
+                              <td style={{ padding: '0.32rem 0.4rem', textAlign: 'right', fontWeight: '600', color: '#0369a1', whiteSpace: 'nowrap' }}>
+                                {formatMoneyCompact(row.providerTotal)}
+                              </td>
+                              <td style={{ padding: '0.32rem 0.5rem', textAlign: 'right', fontWeight: '700', color: row.netBalance >= 0 ? '#0f172a' : '#be123c', whiteSpace: 'nowrap' }}>
+                                {formatMoneyCompact(row.netBalance)}
+                              </td>
+                            </tr>
+                          ))}
+                          <tr style={{ background: '#f8fafc', borderTop: '1.5px solid #cbd5e1', fontWeight: '800' }}>
+                            <td style={{ padding: '0.35rem 0.5rem', color: '#0f172a' }}>TOTAL</td>
+                            <td style={{ padding: '0.35rem 0.4rem', textAlign: 'right', color: '#047857' }}>
+                              {formatMoneyCompact(monthlyStats.totals.totalIncomeCollected)}
+                            </td>
+                            <td style={{ padding: '0.35rem 0.4rem', textAlign: 'right', color: '#0369a1' }}>
+                              {formatMoneyCompact(monthlyStats.totals.totalProviderAmount)}
+                            </td>
+                            <td style={{ padding: '0.35rem 0.5rem', textAlign: 'right', color: monthlyStats.totals.totalNetBalance >= 0 ? '#0f172a' : '#be123c' }}>
+                              {formatMoneyCompact(monthlyStats.totals.totalNetBalance)}
+                            </td>
+                          </tr>
+                          <tr style={{ background: '#ecfeff', fontWeight: '800' }}>
+                            <td style={{ padding: '0.35rem 0.5rem', color: '#0369a1' }}>PROMEDIO</td>
+                            <td style={{ padding: '0.35rem 0.4rem', textAlign: 'right', color: '#047857' }}>
+                              {formatMoneyCompact(monthlyStats.averages.avgMonthlyIncome)}
+                            </td>
+                            <td style={{ padding: '0.35rem 0.4rem', textAlign: 'right', color: '#0369a1' }}>
+                              {formatMoneyCompact(monthlyStats.averages.avgMonthlyProvider)}
+                            </td>
+                            <td style={{ padding: '0.35rem 0.5rem', textAlign: 'right', color: monthlyStats.averages.avgMonthlyBalance >= 0 ? '#0f172a' : '#be123c' }}>
+                              {formatMoneyCompact(monthlyStats.averages.avgMonthlyBalance)}
+                            </td>
+                          </tr>
+                        </>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
 
-            {/* Total Box Card 2 */}
+            {/* Estimación Ingreso Mes Futuro */}
             <div style={{
-              background: '#e0f2fe',
-              padding: '0.85rem 1rem',
+              background: 'linear-gradient(135deg, #e0e7ff 0%, #ecfdf5 100%)',
+              padding: '0.75rem 0.9rem',
               borderRadius: '12px',
+              border: '1px solid #a5b4fc',
               display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginTop: '0.6rem',
-              border: '1px solid #bae6fd'
+              flexDirection: 'column',
+              gap: '0.2rem'
             }}>
-              <strong style={{ fontSize: '0.82rem', color: '#0369a1' }}>
-                TOTAL IVA ACREDITABLE:
-              </strong>
-              <strong style={{ fontSize: '1.15rem', color: '#0369a1', fontWeight: '900' }}>
-                ${totalIvaAcreditable.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-              </strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+                <strong style={{ fontSize: '0.78rem', color: '#312e81' }}>
+                  EST. INGRESO {monthlyStats.forecast.targetFullLabel.toUpperCase()}:
+                </strong>
+                <strong style={{ fontSize: '1.1rem', color: '#312e81', fontWeight: '900' }}>
+                  {formatMoneyCompact(monthlyStats.forecast.estimatedIncome)}
+                </strong>
+              </div>
+              <span style={{ fontSize: '0.67rem', color: '#4338ca', fontWeight: '600' }}>
+                {monthlyStats.forecast.closedMonthsCount > 0
+                  ? `Fórmula: 0.5×Prom.3M (${formatMoneyCompact(monthlyStats.forecast.movingAvg3M)}) + 0.5×Tendencia (${formatMoneyCompact(monthlyStats.forecast.linearProjection)})`
+                  : monthlyStats.forecast.formulaNote}
+              </span>
             </div>
           </div>
         )}
